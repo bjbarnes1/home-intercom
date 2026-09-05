@@ -40,10 +40,13 @@ async function main() {
   }
 
   const deviceSpecs = [
-    { key: "ada", displayName: "Ada's room", room: "Ada's room" },
-    { key: "ben", displayName: "Ben's room", room: "Ben's room" },
-    { key: "lounge", displayName: "Lounge", room: "Lounge" },
+    { key: "gus", displayName: "Gus", room: "Gus's room" },
+    { key: "georgette", displayName: "Georgette", room: "Georgette's room" },
+    { key: "willoughby", displayName: "Willoughby", room: "Willoughby's room" },
+    { key: "raff", displayName: "Raff", room: "Raff's room" },
+    { key: "kitchen", displayName: "Kitchen", room: "Kitchen" },
     { key: "rumpus", displayName: "Rumpus", room: "Rumpus" },
+    { key: "lounge", displayName: "Lounge", room: "Lounge" },
   ];
 
   const devices: Record<string, string> = {};
@@ -66,9 +69,9 @@ async function main() {
   }
 
   const zones: Record<string, string[]> = {
-    Kids: ["ada", "ben"],
-    Downstairs: ["lounge", "rumpus"],
-    All: ["ada", "ben", "lounge", "rumpus"],
+    Kids: ["gus", "georgette", "willoughby", "raff"],
+    Downstairs: ["kitchen", "rumpus", "lounge"],
+    Everyone: ["gus", "georgette", "willoughby", "raff", "kitchen", "rumpus", "lounge"],
   };
   for (const [name, members] of Object.entries(zones)) {
     const zone = await prisma.zone.upsert({

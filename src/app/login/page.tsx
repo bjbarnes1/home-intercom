@@ -34,43 +34,49 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-6 p-6">
+    <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-8 p-6">
       <header className="text-center">
-        <h1 className="text-2xl font-semibold">Home Intercom</h1>
-        <p className="mt-1 text-sm text-slate-400">Sign in to the controller.</p>
+        <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent-900 text-accent">
+          <i className="ph-fill ph-device-mobile-speaker text-3xl" />
+        </span>
+        <h1 className="m-0 text-2xl">Home Intercom</h1>
+        <p className="mt-1 text-sm text-neutral-500">Sign in to the controller.</p>
       </header>
 
       <form onSubmit={submit} className="flex flex-col gap-4">
-        <label className="flex flex-col gap-1 text-sm">
-          Email
+        <div className="field">
+          <label htmlFor="email">Email</label>
           <input
+            id="email"
+            className="input"
             type="email"
             autoComplete="username"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-xl bg-slate-800 px-4 py-3 text-base"
           />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          Password
+        </div>
+        <div className="field">
+          <label htmlFor="password">Password</label>
           <input
+            id="password"
+            className="input"
             type="password"
             autoComplete="current-password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="rounded-xl bg-slate-800 px-4 py-3 text-base"
           />
-        </label>
+        </div>
 
-        {error && <p className="text-sm text-amber-300">{error}</p>}
+        {error && (
+          <p className="flex items-center gap-2 text-sm text-accent-200">
+            <i className="ph ph-warning-circle" />
+            {error}
+          </p>
+        )}
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-xl bg-sky-600 px-6 py-3 text-lg font-medium hover:bg-sky-500 disabled:opacity-60"
-        >
+        <button type="submit" disabled={busy} className="btn btn-primary min-h-12">
           {busy ? "Signing in…" : "Sign in"}
         </button>
       </form>

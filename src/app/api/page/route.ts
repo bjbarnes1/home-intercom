@@ -43,6 +43,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       ...result,
       livekitUrl: env.livekit.publicUrl,
+      mock: env.mockLocalServices,
     });
   });
 }

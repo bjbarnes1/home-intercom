@@ -3,14 +3,15 @@ import Link from "next/link";
 /**
  * Role picker. The same PWA serves two roles:
  *  - Controller: a parent's phone that initiates pages/calls/broadcasts.
- *  - Endpoint:   a fixed station (kiosk phone / future touchscreen).
+ *  - Endpoint:   a fixed station (kiosk phone / wall panel).
  */
 export default function Home() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 p-6">
+    <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-10 p-6">
       <header className="text-center">
-        <h1 className="text-3xl font-semibold tracking-tight">Home Intercom</h1>
-        <p className="mt-2 text-sm text-slate-400">
+        <div className="uplabel text-accent mb-2">Barnes / Wilkes</div>
+        <h1 className="m-0 text-3xl">Home Intercom</h1>
+        <p className="mx-auto mt-3 max-w-xs text-sm text-neutral-400">
           Page the kids, broadcast to the house, set spoken reminders.
         </p>
       </header>
@@ -18,26 +19,40 @@ export default function Home() {
       <nav className="grid gap-4">
         <Link
           href="/controller"
-          className="rounded-2xl bg-sky-600 px-6 py-8 text-center text-lg font-medium shadow-lg transition hover:bg-sky-500"
+          className="card card-hover flex items-center gap-4 p-5"
         >
-          📱 Controller
-          <span className="mt-1 block text-sm font-normal text-sky-100/80">
-            Start a page, call or broadcast
+          <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-accent-900 text-accent">
+            <i className="ph-fill ph-device-mobile-speaker text-2xl" />
           </span>
+          <span className="min-w-0">
+            <span className="block font-heading text-lg font-medium">Controller</span>
+            <span className="block text-sm text-neutral-500">
+              Start a page, call or broadcast
+            </span>
+          </span>
+          <i className="ph ph-caret-right ml-auto text-neutral-600" />
         </Link>
 
         <Link
           href="/endpoint"
-          className="rounded-2xl bg-slate-800 px-6 py-8 text-center text-lg font-medium shadow-lg transition hover:bg-slate-700"
+          className="card card-hover flex items-center gap-4 p-5"
         >
-          🔊 Endpoint (kiosk)
-          <span className="mt-1 block text-sm font-normal text-slate-400">
-            Fixed station in a room
+          <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-accent-900 text-accent">
+            <i className="ph-fill ph-speaker-high text-2xl" />
           </span>
+          <span className="min-w-0">
+            <span className="block font-heading text-lg font-medium">
+              Endpoint / wall panel
+            </span>
+            <span className="block text-sm text-neutral-500">
+              Fixed station in a room
+            </span>
+          </span>
+          <i className="ph ph-caret-right ml-auto text-neutral-600" />
         </Link>
       </nav>
 
-      <footer className="text-center text-xs text-slate-500">
+      <footer className="text-center text-xs text-neutral-600">
         Media stays on the home server. No audio is recorded.
       </footer>
     </main>

@@ -36,5 +36,6 @@ export async function POST(req: Request) {
     livekitUrl: env.livekit.publicUrl,
     doNotDisturb: device.doNotDisturb,
     autoAnswer: device.autoAnswer,
+    mock: env.mockLocalServices,
   });
 }
