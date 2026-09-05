@@ -84,12 +84,22 @@ cp .env.example .env        # MOCK_LOCAL_SERVICES=true works with no home server
 docker compose up -d
 
 # 4. set up the database
-npm run prisma:migrate      # or: npx prisma db push
+npm run prisma:migrate      # applies prisma/migrations/ (deploy on prod)
 npm run prisma:seed         # seeds the household, devices and zones
 
 # 5. run the app
 npm run dev                 # http://localhost:3000
 ```
+
+### Database: local Postgres or Neon
+
+For local dev the `postgres` service in `docker-compose.yml` is enough. The
+managed database is a **Neon** project (`home-intercom`) — set `DATABASE_URL`
+to Neon's **pooled** connection (with `pgbouncer=true`) and `DIRECT_URL` to the
+**direct** connection for migrations (see `.env.example`). The schema is
+already applied to Neon and its migration is recorded in `_prisma_migrations`,
+so `prisma migrate deploy` against it is a clean no-op; re-run it after adding
+new migrations. Migrations live in `prisma/migrations/` and are committed.
 
 Sign in at `/login` (the seed creates `soph@example.com` / `bj@example.com`
 with password `changeme123` — override with `SEED_ADMIN_PASSWORD`, and change
