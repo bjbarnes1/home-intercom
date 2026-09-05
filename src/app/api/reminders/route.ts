@@ -1,19 +1,22 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { currentHouseholdId } from "@/lib/auth/context";
+import { currentHouseholdId, requireUser } from "@/lib/auth/context";
+import { withAuth } from "@/lib/http";
 import { computeNextRun, validateCron } from "@/lib/reminders/schedule";
 
 export const dynamic = "force-dynamic";
 
 /** GET /api/reminders — list reminders for the household. */
 export async function GET() {
-  const householdId = await currentHouseholdId();
-  const reminders = await prisma.reminder.findMany({
-    where: { householdId },
-    orderBy: [{ enabled: "desc" }, { nextRunAt: "asc" }],
+  return withAuth(async () => {
+    const householdId = await currentHouseholdId();
+    const reminders = await prisma.reminder.findMany({
+      where: { householdId },
+      orderBy: [{ enabled: "desc" }, { nextRunAt: "asc" }],
+    });
+    return NextResponse.json({ reminders });
   });
-  return NextResponse.json({ reminders });
 }
 
 const CreateReminder = z
@@ -36,48 +39,51 @@ const CreateReminder = z
 
 /** POST /api/reminders — create a reminder and materialise its nextRunAt. */
 export async function POST(req: Request) {
-  const householdId = await currentHouseholdId();
-  const body = await req.json().catch(() => null);
-  const parsed = CreateReminder.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
-  const data = parsed.data;
-
-  if (data.kind === "RECURRING" && data.cron) {
-    const cronError = validateCron(data.cron);
-    if (cronError) {
-      return NextResponse.json({ error: `Invalid cron: ${cronError}` }, { status: 400 });
+  return withAuth(async () => {
+    const user = await requireUser();
+    const body = await req.json().catch(() => null);
+    const parsed = CreateReminder.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
-  }
+    const data = parsed.data;
 
-  const now = new Date();
-  const runAt = data.runAt ? new Date(data.runAt) : null;
-  const nextRunAt = computeNextRun(
-    {
-      kind: data.kind,
-      enabled: true,
-      cron: data.cron,
-      runAt,
-      timezone: data.timezone,
-    },
-    now,
-  );
+    if (data.kind === "RECURRING" && data.cron) {
+      const cronError = validateCron(data.cron);
+      if (cronError) {
+        return NextResponse.json({ error: `Invalid cron: ${cronError}` }, { status: 400 });
+      }
+    }
 
-  const reminder = await prisma.reminder.create({
-    data: {
-      householdId,
-      text: data.text,
-      sound: data.sound,
-      kind: data.kind,
-      cron: data.cron,
-      runAt,
-      timezone: data.timezone,
-      targetDeviceId: data.targetDeviceId,
-      targetZoneId: data.targetZoneId,
-      nextRunAt,
-    },
+    const now = new Date();
+    const runAt = data.runAt ? new Date(data.runAt) : null;
+    const nextRunAt = computeNextRun(
+      {
+        kind: data.kind,
+        enabled: true,
+        cron: data.cron,
+        runAt,
+        timezone: data.timezone,
+      },
+      now,
+    );
+
+    const reminder = await prisma.reminder.create({
+      data: {
+        householdId: user.householdId,
+        text: data.text,
+        sound: data.sound,
+        kind: data.kind,
+        cron: data.cron,
+        runAt,
+        timezone: data.timezone,
+        targetDeviceId: data.targetDeviceId,
+        targetZoneId: data.targetZoneId,
+        createdByUserId: user.id,
+        nextRunAt,
+      },
+    });
+
+    return NextResponse.json({ reminder }, { status: 201 });
   });
-
-  return NextResponse.json({ reminder }, { status: 201 });
 }

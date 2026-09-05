@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { currentHouseholdId } from "@/lib/auth/context";
+import { currentHouseholdId, requireAdmin } from "@/lib/auth/context";
+import { withAuth } from "@/lib/http";
 import {
   generatePairingCode,
   generateDeviceSecret,
@@ -13,6 +14,7 @@ const PRESENCE_WINDOW_MS = 20_000;
 
 /** GET /api/devices — list devices with derived online state. */
 export async function GET() {
+  return withAuth(async () => {
   const householdId = await currentHouseholdId();
   const devices = await prisma.device.findMany({
     where: { householdId },
@@ -36,6 +38,7 @@ export async function GET() {
         now - new Date(d.lastSeenAt).getTime() <= PRESENCE_WINDOW_MS,
     })),
   });
+  });
 }
 
 const CreateDevice = z.object({
@@ -49,25 +52,27 @@ const CreateDevice = z.object({
  * pairing code. The device claims the code via /api/devices/claim.
  */
 export async function POST(req: Request) {
-  const householdId = await currentHouseholdId();
-  const body = await req.json().catch(() => null);
-  const parsed = CreateDevice.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
+  return withAuth(async () => {
+    const admin = await requireAdmin();
+    const body = await req.json().catch(() => null);
+    const parsed = CreateDevice.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
 
-  const device = await prisma.device.create({
-    data: {
-      householdId,
-      displayName: parsed.data.displayName,
-      room: parsed.data.room,
-      type: parsed.data.type,
-      pairing: "PENDING",
-      pairingCode: generatePairingCode(),
-      deviceSecret: generateDeviceSecret(),
-    },
-    select: { id: true, displayName: true, pairingCode: true },
+    const device = await prisma.device.create({
+      data: {
+        householdId: admin.householdId,
+        displayName: parsed.data.displayName,
+        room: parsed.data.room,
+        type: parsed.data.type,
+        pairing: "PENDING",
+        pairingCode: generatePairingCode(),
+        deviceSecret: generateDeviceSecret(),
+      },
+      select: { id: true, displayName: true, pairingCode: true },
+    });
+
+    return NextResponse.json({ device }, { status: 201 });
   });
-
-  return NextResponse.json({ device }, { status: 201 });
 }

@@ -37,14 +37,31 @@ model User {
   name        String
   email       String?  @unique
   role        UserRole @default(MEMBER)
+  // scrypt password hash (salt:hash). Null until a password is set — children
+  // (MEMBER) need not have one; controllers require it.
+  passwordHash String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   devices          Device[]
   initiatedEvents  IntercomEvent[] @relation("EventInitiator")
   createdReminders Reminder[]
+  sessions         Session[]
 
   @@index([householdId])
+}
+
+/// Server-side session. The cookie holds an opaque token; only its SHA-256
+/// hash is stored here, so a database leak does not expose live sessions.
+model Session {
+  id        String   @id // sha256(token), hex
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 enum DeviceType {

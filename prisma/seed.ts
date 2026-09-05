@@ -1,7 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import { generateDeviceSecret } from "../src/lib/devices/pairing";
+import { hashPassword } from "../src/lib/auth/password";
 
 const prisma = new PrismaClient();
+
+// Dev password for seeded parents. Override with SEED_ADMIN_PASSWORD; change it
+// before any real deployment.
+const SEED_PASSWORD = process.env.SEED_ADMIN_PASSWORD ?? "changeme123";
 
 /**
  * Seed a starter household so the app is usable immediately in dev.
@@ -19,11 +24,18 @@ async function main() {
     { name: "Soph", email: "soph@example.com" },
     { name: "BJ", email: "bj@example.com" },
   ];
+  const passwordHash = await hashPassword(SEED_PASSWORD);
   for (const p of parents) {
     await prisma.user.upsert({
       where: { email: p.email },
-      update: {},
-      create: { householdId: household.id, name: p.name, email: p.email, role: "ADMIN" },
+      update: { passwordHash },
+      create: {
+        householdId: household.id,
+        name: p.name,
+        email: p.email,
+        role: "ADMIN",
+        passwordHash,
+      },
     });
   }
 
@@ -74,6 +86,9 @@ async function main() {
   }
 
   console.log(`Seeded household "${household.name}" with ${deviceSpecs.length} devices.`);
+  console.log(
+    `Parents can sign in with soph@example.com / bj@example.com (password: "${SEED_PASSWORD}").`,
+  );
 }
 
 main()

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { currentHouseholdId } from "@/lib/auth/context";
+import { requireUser } from "@/lib/auth/context";
+import { withAuth } from "@/lib/http";
 import { initiateIntercom } from "@/lib/intercom/initiate";
 import { env } from "@/lib/env";
 
@@ -22,23 +23,26 @@ const Initiate = z
  * Returns the initiator's room + token so the controller can join and talk.
  */
 export async function POST(req: Request) {
-  const householdId = await currentHouseholdId();
-  const body = await req.json().catch(() => null);
-  const parsed = Initiate.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
-  }
+  return withAuth(async () => {
+    const user = await requireUser();
+    const body = await req.json().catch(() => null);
+    const parsed = Initiate.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+    }
 
-  const result = await initiateIntercom({
-    householdId,
-    initiatorIdentity: parsed.data.initiatorIdentity,
-    kind: parsed.data.kind,
-    targetDeviceId: parsed.data.targetDeviceId,
-    targetZoneId: parsed.data.targetZoneId,
-  });
+    const result = await initiateIntercom({
+      householdId: user.householdId,
+      initiatorUserId: user.id,
+      initiatorIdentity: parsed.data.initiatorIdentity,
+      kind: parsed.data.kind,
+      targetDeviceId: parsed.data.targetDeviceId,
+      targetZoneId: parsed.data.targetZoneId,
+    });
 
-  return NextResponse.json({
-    ...result,
-    livekitUrl: env.livekit.publicUrl,
+    return NextResponse.json({
+      ...result,
+      livekitUrl: env.livekit.publicUrl,
+    });
   });
 }

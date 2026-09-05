@@ -31,31 +31,41 @@ The same PWA serves both a **Controller** role (a parent's iPhone) and an
 
 ## What's built so far
 
-**Phase 0 (foundations) + the Phase 1 vertical slice (page one device):**
+**Phase 0 (foundations) — complete — plus the Phase 1 vertical slice
+(page one device):**
 
 - Next.js App Router app (TypeScript, Tailwind, Prisma).
 - Prisma schema: `Household`, `User`, `Device`, `Zone`/`ZoneMembership`,
-  `Reminder`, `IntercomEvent` (audit log — metadata only, no audio).
+  `Reminder`, `IntercomEvent` (audit log — metadata only, no audio), `Session`.
+- **User auth** — email + password login with database-backed sessions:
+  - Passwords hashed with Node's built-in **scrypt** (no third-party crypto dep).
+  - Opaque session token in an **HttpOnly** cookie; only its SHA-256 hash is
+    stored, so a DB dump can't forge sessions. Sliding 30-day expiry.
+  - `ADMIN` (parents) vs `MEMBER` (children) roles; device registration is
+    admin-only. Endpoints keep their separate device-secret auth.
+  - Single auth choke point (`src/lib/auth/context.ts`) — swap in OAuth later
+    without touching route logic.
 - LiveKit **token service** with least-privilege, role-scoped grants
   (`lobby` / `listen` / `talk` / `duplex`).
-- Domain logic with unit tests (41 tests):
+- Domain logic with unit tests (51 tests):
   - `reminders/schedule.ts` — cron + one-off next-run math, timezones, snooze.
   - `zones/resolve.ts` — target → device-set resolution, DND + online filters.
   - `devices/pairing.ts` — pairing codes + device secrets.
   - `livekit/token.ts` — grant scoping + JWT signing.
-- API routes: device registration/pairing (`/api/devices`, `/api/devices/claim`),
-  presence heartbeat (`/api/presence`), initiate page/call/broadcast
-  (`/api/page`), reminders CRUD (`/api/reminders`).
+  - `auth/password.ts`, `auth/session.ts` — hashing + token handling.
+- API routes: auth (`/api/auth/login|logout|me`), device registration/pairing
+  (`/api/devices`, `/api/devices/claim`), presence heartbeat (`/api/presence`),
+  initiate page/call/broadcast (`/api/page`), reminders CRUD (`/api/reminders`).
 - Control-plane command types + a **mockable** control sender
   (`MOCK_LOCAL_SERVICES` fakes LiveKit/TTS so the app runs on a laptop).
 - PWA shell: manifest, service worker (offline shell + push-wake scaffold),
-  Controller (hold-to-talk paging) and Endpoint (pair → lobby → auto-answer) UIs.
+  Login, Controller (hold-to-talk paging, auth-gated) and Endpoint
+  (pair → lobby → auto-answer) UIs.
 - `docker-compose.yml` (LiveKit + Postgres) and `livekit.yaml`.
 
-**Still to come** (see the plan): real user auth (the last Phase 0 item),
-zones/broadcast UI (Phase 2), the reminder scheduler + Piper TTS (Phase 3),
-remote reach via tunnel + coturn + web push (Phase 4), kiosk hardening
-(Phase 5), and the native Android device (Phase 6).
+**Still to come** (see the plan): zones/broadcast UI (Phase 2), the reminder
+scheduler + Piper TTS (Phase 3), remote reach via tunnel + coturn + web push
+(Phase 4), kiosk hardening (Phase 5), and the native Android device (Phase 6).
 
 > **Note on Next.js version:** the plan calls for Next 16; at scaffold time the
 > registry resolved to Next 15.5. The App Router conventions are identical, so
@@ -81,9 +91,16 @@ npm run prisma:seed         # seeds the household, devices and zones
 npm run dev                 # http://localhost:3000
 ```
 
-Open `/controller` on your phone and `/endpoint` on a room device (in
-**Fully Kiosk Browser** for the real kiosks). Without Docker, set
-`MOCK_LOCAL_SERVICES=true` to exercise the control flow without live media.
+Sign in at `/login` (the seed creates `soph@example.com` / `bj@example.com`
+with password `changeme123` — override with `SEED_ADMIN_PASSWORD`, and change
+it before any real deployment). Then open `/controller` on your phone and
+`/endpoint` on a room device (in **Fully Kiosk Browser** for the real kiosks).
+Without Docker, set `MOCK_LOCAL_SERVICES=true` to exercise the control flow
+without live media.
+
+> The auth schema adds a `Session` table and a `passwordHash` column, so after
+> pulling run `npm run prisma:migrate` (or `npx prisma db push`) again before
+> `npm run prisma:seed`.
 
 ## Development
 

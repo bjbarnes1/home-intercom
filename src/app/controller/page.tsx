@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Room, RoomEvent } from "livekit-client";
 import { controllerIdentity } from "@/lib/client/identity";
 
@@ -16,6 +17,8 @@ interface DeviceRow {
 type Status = "idle" | "connecting" | "live" | "error";
 
 export default function ControllerPage() {
+  const router = useRouter();
+  const [me, setMe] = useState<{ name: string } | null>(null);
   const [devices, setDevices] = useState<DeviceRow[]>([]);
   const [status, setStatus] = useState<Status>("idle");
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -25,18 +28,45 @@ export default function ControllerPage() {
   const loadDevices = useCallback(async () => {
     try {
       const res = await fetch("/api/devices");
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
       const data = await res.json();
       setDevices((data.devices ?? []).filter((d: DeviceRow) => d.type === "ENDPOINT"));
     } catch {
       setMessage("Could not load devices");
     }
-  }, []);
+  }, [router]);
+
+  // Gate on auth first, then poll devices.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const res = await fetch("/api/auth/me");
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      const data = await res.json();
+      if (!cancelled) setMe(data.user);
+    })().catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
 
   useEffect(() => {
+    if (!me) return;
     loadDevices();
     const t = setInterval(loadDevices, 5000);
     return () => clearInterval(t);
-  }, [loadDevices]);
+  }, [me, loadDevices]);
+
+  const signOut = useCallback(async () => {
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    router.replace("/login");
+  }, [router]);
 
   const stopTalking = useCallback(async () => {
     const room = roomRef.current;
@@ -92,8 +122,20 @@ export default function ControllerPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-4 p-6">
-      <h1 className="text-2xl font-semibold">Controller</h1>
-      <p className="text-sm text-slate-400">Hold a room to talk.</p>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">Controller</h1>
+        {me && (
+          <button
+            onClick={signOut}
+            className="rounded-lg bg-slate-800 px-3 py-1.5 text-sm text-slate-300 hover:bg-slate-700"
+          >
+            Sign out
+          </button>
+        )}
+      </div>
+      <p className="text-sm text-slate-400">
+        {me ? `Signed in as ${me.name}. Hold a room to talk.` : "Hold a room to talk."}
+      </p>
 
       {message && (
         <div className="rounded-lg bg-amber-900/40 px-3 py-2 text-sm text-amber-200">
