@@ -1,0 +1,73 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { currentHouseholdId } from "@/lib/auth/context";
+import {
+  generatePairingCode,
+  generateDeviceSecret,
+} from "@/lib/devices/pairing";
+
+export const dynamic = "force-dynamic";
+
+const PRESENCE_WINDOW_MS = 20_000;
+
+/** GET /api/devices — list devices with derived online state. */
+export async function GET() {
+  const householdId = await currentHouseholdId();
+  const devices = await prisma.device.findMany({
+    where: { householdId },
+    orderBy: { displayName: "asc" },
+    select: {
+      id: true,
+      displayName: true,
+      room: true,
+      type: true,
+      pairing: true,
+      doNotDisturb: true,
+      lastSeenAt: true,
+    },
+  });
+  const now = Date.now();
+  return NextResponse.json({
+    devices: devices.map((d) => ({
+      ...d,
+      online:
+        d.lastSeenAt != null &&
+        now - new Date(d.lastSeenAt).getTime() <= PRESENCE_WINDOW_MS,
+    })),
+  });
+}
+
+const CreateDevice = z.object({
+  displayName: z.string().min(1).max(80),
+  room: z.string().max(80).optional(),
+  type: z.enum(["ENDPOINT", "CONTROLLER"]).default("ENDPOINT"),
+});
+
+/**
+ * POST /api/devices — register a new device in PENDING state and issue a
+ * pairing code. The device claims the code via /api/devices/claim.
+ */
+export async function POST(req: Request) {
+  const householdId = await currentHouseholdId();
+  const body = await req.json().catch(() => null);
+  const parsed = CreateDevice.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const device = await prisma.device.create({
+    data: {
+      householdId,
+      displayName: parsed.data.displayName,
+      room: parsed.data.room,
+      type: parsed.data.type,
+      pairing: "PENDING",
+      pairingCode: generatePairingCode(),
+      deviceSecret: generateDeviceSecret(),
+    },
+    select: { id: true, displayName: true, pairingCode: true },
+  });
+
+  return NextResponse.json({ device }, { status: 201 });
+}

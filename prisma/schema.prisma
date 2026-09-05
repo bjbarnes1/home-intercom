@@ -1,0 +1,205 @@
+// home-intercom control-plane data model.
+// Postgres for concurrent writers (many endpoints) + a durable scheduler.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A household groups all users, devices and zones. Multi-tenant-ready even
+/// though we run a single home today.
+model Household {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  devices   Device[]
+  zones     Zone[]
+  reminders Reminder[]
+  events    IntercomEvent[]
+}
+
+enum UserRole {
+  ADMIN // parents
+  MEMBER // children / limited
+}
+
+model User {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  email       String?  @unique
+  role        UserRole @default(MEMBER)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  devices          Device[]
+  initiatedEvents  IntercomEvent[] @relation("EventInitiator")
+  createdReminders Reminder[]
+
+  @@index([householdId])
+}
+
+enum DeviceType {
+  ENDPOINT // fixed station in a room (kiosk phone, future touchscreen)
+  CONTROLLER // a parent's phone that initiates
+}
+
+enum PairingState {
+  PENDING // pairing code issued, not yet claimed
+  ACTIVE // paired and trusted
+  REVOKED // token rotated / device retired
+}
+
+model Device {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  displayName String
+  room        String? // human room label, e.g. "Ada's room", "Lounge"
+  type        DeviceType   @default(ENDPOINT)
+  pairing     PairingState @default(PENDING)
+
+  // Capabilities advertised by the endpoint (mic/speaker/screen).
+  hasMic     Boolean @default(true)
+  hasSpeaker Boolean @default(true)
+  hasScreen  Boolean @default(true)
+
+  // Per-device etiquette / behaviour.
+  doNotDisturb Boolean @default(false)
+  autoAnswer   Boolean @default(true) // pages auto-open on endpoints
+
+  // Pairing + presence.
+  pairingCode     String?   @unique // short code, cleared once ACTIVE
+  deviceSecret    String    @unique // long-lived per-device secret (rotatable)
+  lastSeenAt      DateTime?
+  pushSubscription Json?    // web-push subscription object
+
+  ownerUserId String?
+  ownerUser   User?   @relation(fields: [ownerUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  zoneMemberships ZoneMembership[]
+  reminders       Reminder[]
+  events          IntercomEvent[] @relation("EventTargetDevice")
+
+  @@index([householdId])
+  @@index([householdId, pairing])
+}
+
+/// A named set of devices: "Kids", "Downstairs", "All", "Lounge".
+model Zone {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships ZoneMembership[]
+  reminders   Reminder[]
+  events      IntercomEvent[] @relation("EventTargetZone")
+
+  @@unique([householdId, name])
+  @@index([householdId])
+}
+
+model ZoneMembership {
+  zoneId   String
+  zone     Zone   @relation(fields: [zoneId], references: [id], onDelete: Cascade)
+  deviceId String
+  device   Device @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@id([zoneId, deviceId])
+  @@index([deviceId])
+}
+
+enum ReminderKind {
+  RECURRING // cron expression
+  ONE_OFF // single runAt
+}
+
+model Reminder {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  text  String
+  sound String? // chime name to play before speaking
+
+  kind ReminderKind @default(ONE_OFF)
+  // For RECURRING: a 5-field cron expression. For ONE_OFF: runAt is set.
+  cron  String?
+  runAt DateTime?
+  // IANA timezone the cron/runAt is interpreted in (defaults to home TZ).
+  timezone String @default("UTC")
+
+  enabled    Boolean   @default(true)
+  nextRunAt  DateTime? // materialised by the scheduler
+  lastRunAt  DateTime?
+  snoozedUntil DateTime?
+
+  // Target: exactly one of device or zone.
+  targetDeviceId String?
+  targetDevice   Device? @relation(fields: [targetDeviceId], references: [id], onDelete: Cascade)
+  targetZoneId   String?
+  targetZone     Zone?   @relation(fields: [targetZoneId], references: [id], onDelete: Cascade)
+
+  createdByUserId String?
+  createdBy       User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([householdId])
+  @@index([enabled, nextRunAt]) // scheduler poll
+}
+
+enum EventType {
+  PAGE
+  CALL
+  BROADCAST
+  REMINDER
+}
+
+enum EventOutcome {
+  INITIATED
+  DELIVERED
+  MISSED // target offline
+  ENDED
+}
+
+/// Audit log of every page / call / broadcast / reminder fired.
+/// No audio is recorded by default — this is metadata only.
+model IntercomEvent {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  type    EventType
+  outcome EventOutcome @default(INITIATED)
+  roomName String? // LiveKit room, when applicable
+
+  initiatorUserId String?
+  initiator       User?   @relation("EventInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
+
+  targetDeviceId String?
+  targetDevice   Device? @relation("EventTargetDevice", fields: [targetDeviceId], references: [id], onDelete: SetNull)
+  targetZoneId   String?
+  targetZone     Zone?   @relation("EventTargetZone", fields: [targetZoneId], references: [id], onDelete: SetNull)
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  @@index([householdId, startedAt])
+}

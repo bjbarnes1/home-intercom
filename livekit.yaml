@@ -1,0 +1,20 @@
+# LiveKit server config for local/home-server use.
+# Dev keys — replace API keys and secret for anything reachable off the LAN.
+port: 7880
+rtc:
+  # UDP port range for media. Open these on the home server / router as needed.
+  port_range_start: 50000
+  port_range_end: 50100
+  # Advertise the LAN IP so on-house clients get a direct host candidate.
+  use_external_ip: false
+
+keys:
+  # key: secret  (must match LIVEKIT_API_KEY / LIVEKIT_API_SECRET)
+  devkey: devsecret_change_me_at_least_32_chars_long
+
+# TURN is added in Phase 4 (coturn / Cloudflare) for off-LAN clients.
+turn:
+  enabled: false
+
+logging:
+  level: info

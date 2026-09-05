@@ -1,0 +1,52 @@
+# Home-server stack for home-intercom.
+# Phase 0/1: LiveKit SFU + Postgres. Redis/Piper/coturn are added in later
+# phases (commented below) so this file grows with the plan.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: intercom
+      POSTGRES_PASSWORD: intercom
+      POSTGRES_DB: intercom
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U intercom"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880" # signaling (ws/http)
+      - "7881:7881" # rtc tcp fallback
+      - "50000-50100:50000-50100/udp" # rtc media
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  # --- added in later phases -------------------------------------------------
+  # redis:            # Phase 3: BullMQ-backed scheduler (optional; poll works too)
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   ports: ["6379:6379"]
+  #
+  # piper-tts:        # Phase 3: local, offline reminder speech
+  #   image: rhasspy/wyoming-piper:latest
+  #   restart: unless-stopped
+  #   command: --voice en_GB-alba-medium
+  #   ports: ["5000:5000"]
+  #
+  # coturn:           # Phase 4: NAT relay for off-LAN clients
+  #   image: coturn/coturn:latest
+  #   network_mode: host
+  #   restart: unless-stopped
+
+volumes:
+  pgdata:
