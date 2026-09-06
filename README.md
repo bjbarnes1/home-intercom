@@ -47,25 +47,36 @@ The same PWA serves both a **Controller** role (a parent's iPhone) and an
     without touching route logic.
 - LiveKit **token service** with least-privilege, role-scoped grants
   (`lobby` / `listen` / `talk` / `duplex`).
-- Domain logic with unit tests (51 tests):
+- Domain logic with unit tests (59 tests):
   - `reminders/schedule.ts` — cron + one-off next-run math, timezones, snooze.
   - `zones/resolve.ts` — target → device-set resolution, DND + online filters.
   - `devices/pairing.ts` — pairing codes + device secrets.
   - `livekit/token.ts` — grant scoping + JWT signing.
   - `auth/password.ts`, `auth/session.ts` — hashing + token handling.
-- API routes: auth (`/api/auth/login|logout|me`), device registration/pairing
-  (`/api/devices`, `/api/devices/claim`), presence heartbeat (`/api/presence`),
-  initiate page/call/broadcast (`/api/page`), reminders CRUD (`/api/reminders`).
+  - `jobs/board.ts` — local-day + streak math.
+- **Nocturne design system** (`globals.css` via Tailwind `@theme`): dark
+  lavender palette, cards, tags, buttons, toggle, hold-to-talk button,
+  level bars, overlays. Space Grotesk + Inter, Phosphor icons.
+- **Controller (iPhone)**: Home (zones + rooms with presence), hold-to-talk
+  paging, two-way call, Broadcast to a zone, Reminders (list + create).
+- **Wall panel / endpoint**: pairing → lobby → auto-answer, live clock Home
+  with summary cards, Schedule (calendar day view), Jobs (chore board with
+  tap-to-tick + streaks), Reminders (spoken via SpeechSynthesis), Music
+  (shared player state), Sound (DND / chime / half-duplex / quiet hours),
+  and on-air / incoming-call / reminder overlays.
+- API routes: auth, devices, presence, page/call/broadcast, reminders, zones,
+  and device-authed `endpoint/reminders`, `jobs` (+`/tick`), `schedule`,
+  `music`.
+- Data model: household, users, sessions, devices, zones, reminders, audit
+  log, kids, chores + completions, calendar events, music state.
 - Control-plane command types + a **mockable** control sender
-  (`MOCK_LOCAL_SERVICES` fakes LiveKit/TTS so the app runs on a laptop).
-- PWA shell: manifest, service worker (offline shell + push-wake scaffold),
-  Login, Controller (hold-to-talk paging, auth-gated) and Endpoint
-  (pair → lobby → auto-answer) UIs.
+  (`MOCK_LOCAL_SERVICES` fakes LiveKit/TTS and simulates on-air state).
 - `docker-compose.yml` (LiveKit + Postgres) and `livekit.yaml`.
 
-**Still to come** (see the plan): zones/broadcast UI (Phase 2), the reminder
-scheduler + Piper TTS (Phase 3), remote reach via tunnel + coturn + web push
-(Phase 4), kiosk hardening (Phase 5), and the native Android device (Phase 6).
+**Still to come** (see the plan): real live media on the home-server LiveKit
+SFU + tunnel/TURN for remote reach (Phase 4), the durable reminder scheduler +
+Piper TTS (Phase 3 backend), kiosk hardening (Phase 5), the native Android
+device (Phase 6), and wiring Music/Jobs/Schedule editing from the controller.
 
 > **Note on Next.js version:** the plan calls for Next 16; at scaffold time the
 > registry resolved to Next 15.5. The App Router conventions are identical, so
