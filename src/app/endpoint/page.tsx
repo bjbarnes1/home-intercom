@@ -141,6 +141,10 @@ export default function EndpointPage() {
       r.on(RoomEvent.Disconnected, () => {
         if (mediaRef.current === r) leaveMedia();
       });
+      // When the caller/broadcaster leaves, close this end automatically.
+      r.on(RoomEvent.ParticipantDisconnected, () => {
+        if (mediaRef.current === r && r.remoteParticipants.size === 0) leaveMedia();
+      });
       await r.connect(url, token);
       if (mode === "duplex") await r.localParticipant.setMicrophoneEnabled(true);
       setIncoming({ title, mode });

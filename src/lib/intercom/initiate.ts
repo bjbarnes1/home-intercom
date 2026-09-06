@@ -74,7 +74,7 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     { deviceId: input.targetDeviceId, zoneId: input.targetZoneId },
     snapshot,
     zoneMembership,
-    { onlineOnly: true, excludeDeviceId: input.targetDeviceId ? undefined : undefined },
+    { onlineOnly: true },
   );
 
   // Room name derives from the target. Broadcast uses the zone; page/call use
@@ -103,24 +103,30 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     select: { id: true },
   });
 
-  // Mint a scoped token per reached endpoint and push the join command.
+  // Mint a scoped token per reached endpoint and push the join command. A send
+  // that fails (e.g. the endpoint dropped its lobby connection) must not fail
+  // the whole request — the initiator still gets its token to talk.
   const sender = controlSender();
   await Promise.all(
     resolved.targets.map(async (deviceId) => {
-      const token = await mintToken({
-        identity: deviceId,
-        room,
-        role: input.kind === "call" ? "duplex" : "listen",
-      });
-      const command: JoinRoomCommand = {
-        type: "join",
-        room,
-        token,
-        mode: endpointMode,
-        autoAnswer: input.kind !== "call", // pages/broadcasts auto-open; calls ring
-        eventId: event.id,
-      };
-      await sender.send([deviceId], command);
+      try {
+        const token = await mintToken({
+          identity: deviceId,
+          room,
+          role: input.kind === "call" ? "duplex" : "listen",
+        });
+        const command: JoinRoomCommand = {
+          type: "join",
+          room,
+          token,
+          mode: endpointMode,
+          autoAnswer: input.kind !== "call", // pages/broadcasts auto-open; calls ring
+          eventId: event.id,
+        };
+        await sender.send([deviceId], command);
+      } catch (e) {
+        console.error(`control send to ${deviceId} failed`, e);
+      }
     }),
   );
 

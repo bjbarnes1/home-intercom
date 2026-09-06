@@ -23,6 +23,9 @@ export function useTalk() {
   const [message, setMessage] = useState("");
   const roomRef = useRef<Room | null>(null);
   const audioEls = useRef<HTMLAudioElement[]>([]);
+  // Bumped on every start and every stop; an in-flight start whose id no longer
+  // matches was cancelled (e.g. a quick release) and must tear itself down.
+  const sessionRef = useRef(0);
 
   const cleanupAudio = () => {
     for (const el of audioEls.current) el.remove();
@@ -30,6 +33,7 @@ export function useTalk() {
   };
 
   const stop = useCallback(async () => {
+    sessionRef.current++; // invalidate any in-flight start
     const room = roomRef.current;
     roomRef.current = null;
     setStatus("idle");
@@ -37,61 +41,79 @@ export function useTalk() {
     if (room) await room.disconnect().catch(() => {});
   }, []);
 
-  const start = useCallback(async (target: TalkTarget): Promise<{ reached: number }> => {
-    setStatus("connecting");
-    setMessage("");
-    try {
-      const res = await fetch("/api/page", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          kind: target.kind,
-          initiatorIdentity: controllerIdentity(),
-          targetDeviceId: target.deviceId,
-          targetZoneId: target.zoneId,
-        }),
-      });
-      if (!res.ok) throw new Error(`Couldn't start (${res.status})`);
-      const data = await res.json();
-      const reached = (data.reached ?? []).length;
+  const start = useCallback(
+    async (target: TalkTarget): Promise<{ reached: number }> => {
+      const my = ++sessionRef.current;
+      const cancelled = () => sessionRef.current !== my;
 
-      if (reached === 0) {
-        setStatus("error");
-        setMessage("Nobody online to hear that.");
-        return { reached: 0 };
-      }
+      setStatus("connecting");
+      setMessage("");
+      try {
+        const res = await fetch("/api/page", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            kind: target.kind,
+            initiatorIdentity: controllerIdentity(),
+            targetDeviceId: target.deviceId,
+            targetZoneId: target.zoneId,
+          }),
+        });
+        if (!res.ok) throw new Error(`Couldn't start (${res.status})`);
+        const data = await res.json();
+        if (cancelled()) return { reached: 0 };
 
-      if (data.mock) {
-        // No real SFU reachable — simulate the open channel.
+        const reached = (data.reached ?? []).length;
+        if (reached === 0) {
+          setStatus("error");
+          setMessage("Nobody online to hear that.");
+          return { reached: 0 };
+        }
+
+        if (data.mock) {
+          // No real SFU reachable — simulate the open channel.
+          setStatus("live");
+          return { reached };
+        }
+
+        const room = new Room();
+        room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+          if (track.kind === Track.Kind.Audio) {
+            const el = track.attach();
+            el.autoplay = true;
+            el.hidden = true;
+            document.body.appendChild(el);
+            audioEls.current.push(el);
+          }
+        });
+        room.on(RoomEvent.Disconnected, () => {
+          if (roomRef.current === room) stop();
+        });
+
+        await room.connect(data.livekitUrl, data.initiatorToken);
+        // Released (or superseded) while connecting → tear down, don't open mic.
+        if (cancelled()) {
+          await room.disconnect().catch(() => {});
+          return { reached: 0 };
+        }
+        roomRef.current = room;
+        await room.localParticipant.setMicrophoneEnabled(true);
+        if (cancelled()) {
+          roomRef.current = null;
+          await room.disconnect().catch(() => {});
+          return { reached: 0 };
+        }
         setStatus("live");
         return { reached };
+      } catch (e) {
+        if (cancelled()) return { reached: 0 };
+        setStatus("error");
+        setMessage(e instanceof Error ? e.message : "Failed to start");
+        return { reached: 0 };
       }
-
-      const room = new Room();
-      roomRef.current = room;
-      // Play the far side (needed for two-way calls; harmless for one-way pages).
-      room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
-        if (track.kind === Track.Kind.Audio) {
-          const el = track.attach();
-          el.autoplay = true;
-          el.hidden = true;
-          document.body.appendChild(el);
-          audioEls.current.push(el);
-        }
-      });
-      room.on(RoomEvent.Disconnected, () => {
-        if (roomRef.current === room) stop();
-      });
-      await room.connect(data.livekitUrl, data.initiatorToken);
-      await room.localParticipant.setMicrophoneEnabled(true);
-      setStatus("live");
-      return { reached };
-    } catch (e) {
-      setStatus("error");
-      setMessage(e instanceof Error ? e.message : "Failed to start");
-      return { reached: 0 };
-    }
-  }, [stop]);
+    },
+    [stop],
+  );
 
   return { status, message, start, stop };
 }
