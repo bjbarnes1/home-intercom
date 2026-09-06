@@ -104,8 +104,11 @@ The intercom core is working end-to-end, including **real two-way audio**
   on the panel); persist per-device **Sound/DND** settings.
 
 **Hardening / platform:**
-- Move media to a **self-hosted home LiveKit SFU** + tunnel/TURN for privacy and
-  remote reach (currently LiveKit Cloud). Phase 4.
+- **Latency (optional):** keep the intercom on **LiveKit Cloud** (privacy is not
+  a requirement — cloud is fine), but consider an **optional local media node**
+  so on-LAN audio stays low-latency instead of round-tripping to the cloud. See
+  "Future ideas → Local fast-path" below. `coturn`/tunnel only needed if we ever
+  self-host.
 - **iOS audio unlock** (`room.startAudio()`) if inbound playback needs a tap.
 - **Web-push wake** for backgrounded/remote devices (Phase 4).
 - Enforce **pairing-code expiry** (TTL exists but isn't enforced yet).
@@ -115,6 +118,42 @@ The intercom core is working end-to-end, including **real two-way audio**
 
 > **Note on Next.js version:** the plan calls for Next 16; the registry resolved
 > to Next 15.5. App Router conventions are identical — a drop-in bump later.
+
+## Future ideas (backlog)
+
+Bigger, exploratory features — not scheduled, captured so we don't lose them.
+
+- **Follow-me (presence-aware media).** Use a **BLE** signal from each person's
+  phone, heard by the room devices, to estimate **where people are in the
+  house**. Then let their **music and/or screen follow them** room to room
+  (hand off playback / the active display to the nearest endpoint as they move).
+  - Rough shape: room devices act as BLE scanners reporting RSSI of known phones
+    → a presence service picks the nearest room (with hysteresis to avoid
+    flapping) → the media/session state moves to that room's endpoint. Data model
+    would add `Person`↔`phone beacon` and a `presence` stream; ties into the
+    existing Music state and (later) per-person profiles.
+  - Note: iOS restricts background BLE advertising, so the phone likely needs the
+    PWA/app foregrounded or a small companion app; worth prototyping on Android
+    endpoints first.
+
+- **Custom device with LED lighting.** The future in-house touchscreen device
+  gains a **front-facing LED** for room lighting + notifications (e.g. gentle
+  pulse on an incoming page, colour-coded alerts) and a **rear-facing LED bar**
+  for ambient backlight/bias lighting. Needs a hardware abstraction (an
+  endpoint capability like `hasLeds`) and control commands (`led: {mode, colour,
+  brightness}`) alongside the existing audio ones.
+
+- **Local fast-path (latency, not privacy).** Privacy is **not** a driver —
+  cloud (LiveKit Cloud, Neon, Vercel) is fine. The open question is keeping
+  **on-LAN traffic fast**. Options to explore, cheapest first:
+  1. **Rely on WebRTC host candidates** — when two endpoints are on the same
+     LAN, LiveKit can route media peer-to-peer/host-direct so it doesn't
+     round-trip to the cloud SFU (already partly true; verify/measure).
+  2. **A small always-on local service** (mini-PC / Pi) running a **LiveKit node
+     or relay** and cache, so intra-house audio and control stay local and only
+     cross-house / remote traffic uses the cloud. This is the "local service on a
+     device to keep local traffic fast" idea — an optimisation we add only if
+     measured latency warrants it.
 
 ## Getting started
 
@@ -211,9 +250,12 @@ Conventions mirror the inChambers app: `src/app/**/route.ts` for the API,
 `src/lib/<domain>/` with co-located `*.test.ts`, Prisma for data, and the
 `MOCK_LOCAL_SERVICES` toggle for laptop-only dev.
 
-## Privacy
+## Privacy & hosting
 
-No audio is recorded by default. Media stays on the home SFU whenever a client
-is on the LAN. Every page / call / broadcast / reminder is written to the
-`IntercomEvent` audit log (who, when, target — never the audio). The cloud
-footprint is limited to remote wake/relay.
+Cloud hosting is fine — on-premise is **not** required for privacy. The app runs
+on Vercel + Neon + LiveKit Cloud today. Still, no audio is **recorded** by
+default: calls/pages/broadcasts are live media, and every page / call /
+broadcast / reminder is written to the `IntercomEvent` audit log (who, when,
+target — never the audio). A local media node, if we add one, is purely a
+**latency** optimisation (see Future ideas → Local fast-path), not a privacy
+requirement.

@@ -24,6 +24,15 @@
 > Beyond the original plan, also built: a **Nocturne** design system from the
 > Barnes/Wilkes canvas, a **device pairing UI** (codes + QR), and a
 > **smart-display** wall panel (clock, Schedule, Jobs, Music, Sound).
+>
+> **Correction (hosting/privacy):** the plan below justifies the home server by
+> keeping audio in-house for privacy. That is **no longer a requirement** — cloud
+> hosting is acceptable. Any local media node is now an **optional latency**
+> optimisation, not a privacy one. See the README "Future ideas → Local
+> fast-path". Backlog additions: **Follow-me** (BLE presence so music/screen
+> follow people around the house) and a **custom LED device** (front-facing LED
+> for lighting/notifications + rear-facing ambient LED bar) — both detailed in
+> the README "Future ideas".
 
 ## Context
 
