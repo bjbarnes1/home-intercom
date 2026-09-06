@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Room, RoomEvent } from "livekit-client";
+import { Room, RoomEvent, RemoteTrack, Track } from "livekit-client";
 import { controllerIdentity } from "@/lib/client/identity";
 
 export type TalkStatus = "idle" | "connecting" | "live" | "error";
@@ -22,11 +22,18 @@ export function useTalk() {
   const [status, setStatus] = useState<TalkStatus>("idle");
   const [message, setMessage] = useState("");
   const roomRef = useRef<Room | null>(null);
+  const audioEls = useRef<HTMLAudioElement[]>([]);
+
+  const cleanupAudio = () => {
+    for (const el of audioEls.current) el.remove();
+    audioEls.current = [];
+  };
 
   const stop = useCallback(async () => {
     const room = roomRef.current;
     roomRef.current = null;
     setStatus("idle");
+    cleanupAudio();
     if (room) await room.disconnect().catch(() => {});
   }, []);
 
@@ -62,6 +69,16 @@ export function useTalk() {
 
       const room = new Room();
       roomRef.current = room;
+      // Play the far side (needed for two-way calls; harmless for one-way pages).
+      room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
+        if (track.kind === Track.Kind.Audio) {
+          const el = track.attach();
+          el.autoplay = true;
+          el.hidden = true;
+          document.body.appendChild(el);
+          audioEls.current.push(el);
+        }
+      });
       room.on(RoomEvent.Disconnected, () => {
         if (roomRef.current === room) stop();
       });

@@ -1,4 +1,4 @@
-import { RoomServiceClient } from "livekit-server-sdk";
+import { RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
 import { env } from "@/lib/env";
 import { LOBBY_ROOM } from "@/lib/livekit/rooms";
 import { encodeCommand, type ControlCommand } from "@/lib/control/commands";
@@ -35,9 +35,12 @@ class LiveKitControlSender implements ControlSender {
     );
   }
   async send(deviceIds: string[], command: ControlCommand): Promise<void> {
-    await this.client.sendData(LOBBY_ROOM, encodeCommand(command), 1 /* RELIABLE */, {
-      destinationIdentities: deviceIds,
-    });
+    await this.client.sendData(
+      LOBBY_ROOM,
+      encodeCommand(command),
+      DataPacket_Kind.RELIABLE,
+      { destinationIdentities: deviceIds },
+    );
   }
 }
 
