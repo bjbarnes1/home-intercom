@@ -48,6 +48,25 @@ interface JobBoard {
   kids: JobKid[];
 }
 
+interface SchedEvent {
+  id: string;
+  title: string;
+  time: string;
+  who: string | null;
+  color: string;
+}
+interface SchedDay {
+  day: string;
+  weekday: string;
+  dayNum: number;
+  count: number;
+  events: SchedEvent[];
+}
+interface Schedule {
+  days: SchedDay[];
+  nextEvent: { title: string; time: string; who: string | null; day: string } | null;
+}
+
 export default function EndpointPage() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [rail, setRail] = useState<Rail>("home");
@@ -60,6 +79,8 @@ export default function EndpointPage() {
   const [reminders, setReminders] = useState<EndpointReminder[]>([]);
   const [speaking, setSpeaking] = useState<EndpointReminder | null>(null);
   const [board, setBoard] = useState<JobBoard | null>(null);
+  const [schedule, setSchedule] = useState<Schedule | null>(null);
+  const [schedDay, setSchedDay] = useState(0);
 
   const lobbyRef = useRef<Room | null>(null);
   const mediaRef = useRef<Room | null>(null);
@@ -181,6 +202,21 @@ export default function EndpointPage() {
     const t = setInterval(loadJobs, 30_000);
     return () => clearInterval(t);
   }, [phase, loadJobs]);
+
+  // Schedule.
+  const loadSchedule = useCallback(async () => {
+    const secret = getDeviceSecret();
+    if (!secret) return;
+    const res = await fetch("/api/schedule", { headers: { "x-device-secret": secret } });
+    if (res.ok) setSchedule(await res.json());
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "ready") return;
+    loadSchedule();
+    const t = setInterval(loadSchedule, 120_000);
+    return () => clearInterval(t);
+  }, [phase, loadSchedule]);
 
   const tick = useCallback(async (choreId: string) => {
     const secret = getDeviceSecret();
@@ -331,26 +367,65 @@ export default function EndpointPage() {
             </div>
             <div className="mt-3 text-xl text-neutral-400">{dateLong}</div>
             <div className="mt-9 flex gap-3">
-              <InfoCard
-                label="Status"
-                value={dnd ? "Do not disturb" : "Listening"}
-                sub={phase === "ready" ? "Online" : "Reconnecting"}
-              />
-              {reminders[0] ? (
-                <button
-                  onClick={() => setRail("reminders")}
-                  className="card card-hover flex-1 p-4 text-left"
-                >
-                  <div className="uplabel mb-1.5 text-accent">
-                    Next reminder · {reminderTime(reminders[0])}
-                  </div>
-                  <div className="font-heading text-lg font-medium leading-snug">
-                    {reminders[0].text}
-                  </div>
-                </button>
-              ) : (
-                <InfoCard label="Household" value={room} sub="This wall panel" />
-              )}
+              <button
+                onClick={() => setRail("schedule")}
+                className="card card-hover flex-1 p-4 text-left"
+              >
+                <div className="uplabel mb-1.5 text-accent">Next on the calendar</div>
+                {schedule?.nextEvent ? (
+                  <>
+                    <div className="font-heading text-lg font-medium">
+                      {schedule.nextEvent.title}
+                    </div>
+                    <div className="mt-0.5 text-xs text-neutral-500">
+                      {schedule.nextEvent.time}
+                      {schedule.nextEvent.who ? ` · ${schedule.nextEvent.who}` : ""}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-neutral-500">Nothing coming up</div>
+                )}
+              </button>
+              <button
+                onClick={() => setRail("jobs")}
+                className="card card-hover flex-1 p-4 text-left"
+              >
+                <div className="uplabel mb-1.5 text-accent">Jobs still open</div>
+                {(() => {
+                  const open = (board?.kids ?? []).reduce(
+                    (n, k) => n + (k.total - k.doneToday),
+                    0,
+                  );
+                  return (
+                    <>
+                      <div className="font-heading text-lg font-medium">
+                        {open === 0 ? "All done 🎉" : `${open} to go`}
+                      </div>
+                      <div className="mt-0.5 text-xs text-neutral-500">
+                        {board?.weekDoneTotal ?? 0} done this week
+                      </div>
+                    </>
+                  );
+                })()}
+              </button>
+              <button
+                onClick={() => setRail("reminders")}
+                className="card card-hover flex-1 p-4 text-left"
+              >
+                <div className="uplabel mb-1.5 text-accent">Next reminder</div>
+                {reminders[0] ? (
+                  <>
+                    <div className="font-heading text-lg font-medium">
+                      {reminderTime(reminders[0])}
+                    </div>
+                    <div className="mt-0.5 text-xs text-neutral-500 line-clamp-1">
+                      {reminders[0].text}
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-sm text-neutral-500">None scheduled</div>
+                )}
+              </button>
             </div>
           </div>
         )}
@@ -400,11 +475,78 @@ export default function EndpointPage() {
           </div>
         )}
         {rail === "schedule" && (
-          <ComingSoon
-            icon="ph-calendar-dots"
-            title="Today's schedule"
-            body="The shared calendar surface lands in the smart-display phase."
-          />
+          <div className="flex flex-1 flex-col overflow-hidden px-7 pb-6">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <h3 className="m-0">
+                  {schedule?.days[schedDay]
+                    ? schedDay === 0
+                      ? "Today"
+                      : `${schedule.days[schedDay].weekday} ${schedule.days[schedDay].dayNum}`
+                    : "Schedule"}
+                </h3>
+                <div className="text-xs text-neutral-500">
+                  {schedule?.days[schedDay]?.count
+                    ? `${schedule.days[schedDay].count} ${schedule.days[schedDay].count === 1 ? "event" : "events"}`
+                    : "Nothing booked"}
+                </div>
+              </div>
+              <div className="flex gap-1.5">
+                {(schedule?.days ?? []).map((d, i) => (
+                  <button
+                    key={d.day}
+                    onClick={() => setSchedDay(i)}
+                    className={`flex w-11 flex-col items-center gap-0.5 rounded-lg py-1.5 transition ${
+                      i === schedDay
+                        ? "bg-accent text-[#141221]"
+                        : "text-neutral-400 hover:bg-surface"
+                    }`}
+                  >
+                    <span className="text-[10px] uppercase tracking-wide opacity-70">
+                      {d.weekday}
+                    </span>
+                    <span className="font-heading text-[17px] font-medium">
+                      {d.dayNum}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="no-scrollbar flex-1 overflow-auto">
+              {schedule?.days[schedDay]?.events.length ? (
+                schedule.days[schedDay].events.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-center gap-4 border-b border-divider py-3.5"
+                  >
+                    <div className="w-20 flex-none font-heading text-[17px] font-medium text-accent-300">
+                      {e.time}
+                    </div>
+                    <div
+                      className="h-9 w-[3px] flex-none rounded"
+                      style={{ background: e.color }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-heading text-lg font-medium">{e.title}</div>
+                      {e.who && (
+                        <div className="mt-0.5 text-[13px] text-neutral-500">{e.who}</div>
+                      )}
+                    </div>
+                    {e.who && <span className="tag tag-neutral">{e.who}</span>}
+                  </div>
+                ))
+              ) : (
+                <div className="grid place-items-center py-16 text-center text-neutral-500">
+                  <div>
+                    <i className="ph ph-cloud-sun mb-2 block text-3xl text-accent-400" />
+                    <div className="text-[17px]">
+                      Nothing booked. A rare and beautiful thing.
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         )}
         {rail === "jobs" && (
           <div className="flex flex-1 flex-col overflow-hidden px-7 pb-6">
@@ -581,42 +723,6 @@ export default function EndpointPage() {
           {note}
         </div>
       )}
-    </div>
-  );
-}
-
-function InfoCard({
-  label,
-  value,
-  sub,
-}: {
-  label: string;
-  value: string;
-  sub: string;
-}) {
-  return (
-    <div className="card flex-1 p-4">
-      <div className="uplabel mb-1.5 text-accent">{label}</div>
-      <div className="font-heading text-lg font-medium">{value}</div>
-      <div className="mt-0.5 text-xs text-neutral-500">{sub}</div>
-    </div>
-  );
-}
-
-function ComingSoon({
-  icon,
-  title,
-  body,
-}: {
-  icon: string;
-  title: string;
-  body: string;
-}) {
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-3 px-10 text-center">
-      <i className={`ph ${icon} text-4xl text-accent-400`} />
-      <div className="font-heading text-xl font-medium">{title}</div>
-      <p className="max-w-md text-sm text-neutral-500">{body}</p>
     </div>
   );
 }

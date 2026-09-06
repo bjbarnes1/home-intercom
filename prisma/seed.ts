@@ -123,6 +123,36 @@ async function main() {
     }
   }
 
+  // A few upcoming calendar events (relative to now).
+  const at = (dayOffset: number, hour: number, minute: number): Date => {
+    const d = new Date();
+    d.setDate(d.getDate() + dayOffset);
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  };
+  const eventSpecs = [
+    { id: "seed-ev-1", title: "School pickup", who: "Family", color: "#9184d9", at: at(0, 15, 30) },
+    { id: "seed-ev-2", title: "Piano lesson", who: "Georgette", color: "#a498e1", at: at(0, 16, 30) },
+    { id: "seed-ev-3", title: "Family dinner", who: "Family", color: "#7bb892", at: at(0, 18, 30) },
+    { id: "seed-ev-4", title: "Soccer training", who: "Gus", color: "#d9b184", at: at(1, 9, 0) },
+    { id: "seed-ev-5", title: "Dentist", who: "Willoughby", color: "#b9afea", at: at(1, 14, 0) },
+    { id: "seed-ev-6", title: "Playdate", who: "Raff", color: "#9184d9", at: at(2, 10, 0) },
+  ];
+  for (const e of eventSpecs) {
+    await prisma.calendarEvent.upsert({
+      where: { id: e.id },
+      update: { title: e.title, startsAt: e.at, who: e.who, color: e.color },
+      create: {
+        id: e.id,
+        householdId: household.id,
+        title: e.title,
+        startsAt: e.at,
+        who: e.who,
+        color: e.color,
+      },
+    });
+  }
+
   console.log(`Seeded household "${household.name}" with ${deviceSpecs.length} devices.`);
   console.log(
     `Parents can sign in with soph@example.com / bj@example.com (password: "${SEED_PASSWORD}").`,

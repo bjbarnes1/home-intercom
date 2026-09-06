@@ -31,6 +31,25 @@ model Household {
   events    IntercomEvent[]
   kids      Kid[]
   chores    Chore[]
+  calendarEvents CalendarEvent[]
+}
+
+/// A shared calendar entry shown on the wall panel's Schedule surface.
+model CalendarEvent {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  title       String
+  startsAt    DateTime
+  endsAt      DateTime?
+  allDay      Boolean  @default(false)
+  who         String? // free-text owner label, e.g. "Gus", "Family"
+  location    String?
+  color       String? // hex accent for the event's rail
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([householdId, startsAt])
 }
 
 /// A child in the household. Distinct from their room's Device — a kid may have
