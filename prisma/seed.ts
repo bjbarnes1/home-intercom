@@ -153,6 +153,13 @@ async function main() {
     });
   }
 
+  // Music player state (demo-backed).
+  await prisma.musicState.upsert({
+    where: { householdId: household.id },
+    update: {},
+    create: { householdId: household.id, rooms: [] },
+  });
+
   console.log(`Seeded household "${household.name}" with ${deviceSpecs.length} devices.`);
   console.log(
     `Parents can sign in with soph@example.com / bj@example.com (password: "${SEED_PASSWORD}").`,

@@ -32,6 +32,19 @@ model Household {
   kids      Kid[]
   chores    Chore[]
   calendarEvents CalendarEvent[]
+  music     MusicState?
+}
+
+/// Shared, household-wide music player state. Demo-backed today (a fixed
+/// playlist); the same shape can front a real source (Spotify/Sonos) later.
+model MusicState {
+  householdId String   @id
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  source      String   @default("Household")
+  trackIndex  Int      @default(0)
+  isPlaying   Boolean  @default(false)
+  rooms       String[] // device ids the music is playing on
+  updatedAt   DateTime @updatedAt
 }
 
 /// A shared calendar entry shown on the wall panel's Schedule surface.
