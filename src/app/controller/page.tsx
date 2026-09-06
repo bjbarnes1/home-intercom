@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTalk } from "@/lib/client/useTalk";
+import { useSpeechInput } from "@/lib/client/useSpeechInput";
 import Toggle from "@/components/Toggle";
 import DevicesManager from "./DevicesManager";
 
@@ -511,11 +512,13 @@ function Reminders({
             Spoken on the rooms you choose
           </div>
         </div>
-        <button onClick={() => setCreating(true)} className="btn btn-primary min-h-9 text-xs">
+        <button onClick={() => setCreating(true)} className="btn btn-secondary min-h-9 text-xs">
           <i className="ph ph-plus" />
-          New
+          Manual
         </button>
       </header>
+
+      <AskReminder onCreated={load} />
 
       {reminders.length === 0 && (
         <div className="py-16 text-center text-neutral-500">
@@ -545,6 +548,74 @@ function Reminders({
         ))}
       </div>
     </>
+  );
+}
+
+/* ── AI reminder box ───────────────────────────────────────────────────────*/
+function AskReminder({ onCreated }: { onCreated: () => void }) {
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  const { supported, listening, start, stop } = useSpeechInput((t) => setText(t));
+
+  async function submit() {
+    if (!text.trim()) return;
+    setBusy(true);
+    setNote("");
+    try {
+      const res = await fetch("/api/reminders/parse", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setNote(typeof data.error === "string" ? data.error : "Couldn't set that.");
+        return;
+      }
+      setNote(`✓ ${data.confirmation ?? "Reminder set."}`);
+      setText("");
+      onCreated();
+    } catch {
+      setNote("Couldn't set that.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="card mb-5 p-3">
+      <div className="uplabel mb-2 flex items-center gap-1.5 text-accent">
+        <i className="ph-fill ph-sparkle" />
+        Ask in plain words
+      </div>
+      <textarea
+        className="input min-h-16"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Remind Willoughby to read his novel at 4pm tomorrow"
+      />
+      <div className="mt-2 flex items-center gap-2">
+        {supported && (
+          <button
+            onClick={listening ? stop : start}
+            className={`btn min-h-10 px-3 ${listening ? "btn-outline" : "btn-secondary"}`}
+            aria-label="Dictate"
+          >
+            <i className={`ph-fill ${listening ? "ph-stop" : "ph-microphone"} text-base`} />
+            {listening ? "Listening…" : "Speak"}
+          </button>
+        )}
+        <button
+          onClick={submit}
+          disabled={busy || !text.trim()}
+          className="btn btn-primary min-h-10 flex-1"
+        >
+          {busy ? "Setting…" : "Set reminder"}
+        </button>
+      </div>
+      {note && <p className="mt-2 text-sm text-neutral-300">{note}</p>}
+    </div>
   );
 }
 
