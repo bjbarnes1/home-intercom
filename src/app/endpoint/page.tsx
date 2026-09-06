@@ -208,6 +208,9 @@ export default function EndpointPage() {
                 label: cmd.from ? `Announcement · ${cmd.from}` : "Announcement",
               });
               speak(cmd.text);
+            } else if (cmd.type === "reminder") {
+              setSpeaking({ text: cmd.text, label: "Reminder" });
+              speak(cmd.text);
             } else if (cmd.type === "hangup") {
               setRinging(null);
               leaveMedia();

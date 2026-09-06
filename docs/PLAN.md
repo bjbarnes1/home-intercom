@@ -10,9 +10,10 @@
 >   two-way call with real audio (verified iOS ↔ desktop).
 > - **Phase 2 — Zones & broadcast:** ✅ done — zones, live broadcast, plus async
 >   **text announcements** (TTS) that don't wait for connections.
-> - **Phase 3 — Reminders:** 🟡 partial — reminders (manual + **AI natural
->   language**) are created and played on demand; the **durable scheduler** that
->   auto-fires them and **local Piper TTS** are still to build.
+> - **Phase 3 — Reminders:** 🟡 mostly done — reminders (manual + **AI natural
+>   language**) auto-fire on schedule via a **Vercel Cron** scheduler
+>   (`/api/cron/tick`) and speak on the endpoints; **local Piper TTS** (render
+>   the voice at home instead of the browser) is the remaining piece.
 > - **Phase 4 — Remote reach:** 🟡 partial — runs on **LiveKit Cloud** today
 >   (works off-LAN); self-hosted home SFU + tunnel/TURN + web-push wake are TODO.
 > - **Phase 5 — Hardening:** ⬜ TODO (kiosk provisioning, DND persistence, code

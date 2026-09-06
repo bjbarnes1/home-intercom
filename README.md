@@ -97,9 +97,9 @@ The intercom core is working end-to-end, including **real two-way audio**
 **Next features:**
 - **Recorded-voice broadcast** — record a clip on the controller, release →
   plays on the endpoints (needs audio capture + a small clip store).
-- **Durable reminder scheduler** — reminders are created and can be played, but
-  nothing **auto-fires** them on schedule yet. Needs a cron/poll worker
-  (Vercel Cron or a home-server job) + local **Piper TTS** (Phase 3 backend).
+- **Local Piper TTS** — reminders now **auto-fire** on schedule (Vercel Cron →
+  `/api/cron/tick`) and speak via the browser's SpeechSynthesis; swap in
+  home-server **Piper** so the voice is rendered locally (Phase 3 backend).
 - Edit **Jobs / Schedule / Music** from the controller (currently seeded/managed
   on the panel); persist per-device **Sound/DND** settings.
 
@@ -176,7 +176,15 @@ Environment variables on the Vercel project:
 | `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | for audio | Sign tokens + call the LiveKit server API. |
 | `MOCK_LOCAL_SERVICES` | optional | `true` fakes LiveKit (control UI works, no real audio). Set `false` for live audio. |
 | `ANTHROPIC_API_KEY` | for AI reminders | Enables `/api/reminders/parse`. Absent → that route returns 503; the rest is unaffected. |
+| `CRON_SECRET` | recommended | Guards the scheduler route; Vercel Cron sends it as a bearer token every minute. |
 | `SEED_ADMIN_PASSWORD` | optional | Password for seeded parents (default `changeme123`). |
+
+The **reminder scheduler** runs as a Vercel Cron (`vercel.json` → `/api/cron/tick`,
+every minute): it fires reminders whose `nextRunAt` has passed, delivers the
+`reminder` command to connected endpoints, and advances the schedule
+(compare-and-swap so overlapping ticks can't double-fire). The same
+`fireDueReminders()` core can run from a home-server interval later. Set
+`CRON_SECRET` on Vercel so only Vercel can trigger it.
 
 Env changes only take effect on a **new deployment** — add the var, then redeploy.
 `NEXT_PUBLIC_LIVEKIT_URL` may be set to the same `wss://` value or left unset
