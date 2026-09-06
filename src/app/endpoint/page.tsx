@@ -100,7 +100,7 @@ export default function EndpointPage() {
   const [mock, setMock] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [reminders, setReminders] = useState<EndpointReminder[]>([]);
-  const [speaking, setSpeaking] = useState<EndpointReminder | null>(null);
+  const [speaking, setSpeaking] = useState<{ text: string; label: string } | null>(null);
   const [board, setBoard] = useState<JobBoard | null>(null);
   const [schedule, setSchedule] = useState<Schedule | null>(null);
   const [schedDay, setSchedDay] = useState(0);
@@ -202,6 +202,12 @@ export default function EndpointPage() {
                   title: "Incoming call",
                 });
               }
+            } else if (cmd.type === "announce") {
+              setSpeaking({
+                text: cmd.text,
+                label: cmd.from ? `Announcement · ${cmd.from}` : "Announcement",
+              });
+              speak(cmd.text);
             } else if (cmd.type === "hangup") {
               setRinging(null);
               leaveMedia();
@@ -340,7 +346,7 @@ export default function EndpointPage() {
   }, [loadJobs]);
 
   const playReminder = useCallback((r: EndpointReminder) => {
-    setSpeaking(r);
+    setSpeaking({ text: r.text, label: "Reminder" });
     speak(r.text);
   }, []);
 
@@ -906,8 +912,8 @@ export default function EndpointPage() {
           }}
         >
           <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-accent">
-            <i className="ph-fill ph-bell-ringing text-lg" />
-            Reminder · {room}
+            <i className="ph-fill ph-megaphone-simple text-lg" />
+            {speaking.label} · {room}
           </div>
           <div className="max-w-3xl font-heading text-5xl font-medium leading-tight">
             {speaking.text}

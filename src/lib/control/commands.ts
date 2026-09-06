@@ -12,6 +12,7 @@ export type ControlCommand =
   | JoinRoomCommand
   | RingCommand
   | ReminderCommand
+  | AnnounceCommand
   | HangupCommand
   | PingCommand;
 
@@ -44,6 +45,17 @@ export interface ReminderCommand {
   /** Chime to play before speaking. */
   sound?: string;
   reminderId: string;
+}
+
+/** A one-way spoken announcement (TTS) delivered to endpoints — no live room. */
+export interface AnnounceCommand {
+  type: "announce";
+  text: string;
+  /** Who it's from, e.g. "Mum". */
+  from?: string;
+  /** Pre-rendered audio (Piper) if available; else endpoint speaks the text. */
+  audioUrl?: string;
+  announcementId: string;
 }
 
 export interface HangupCommand {

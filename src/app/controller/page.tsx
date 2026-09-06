@@ -321,6 +321,10 @@ function PageTalk({ target, onBack }: { target: DeviceRow; onBack: () => void })
 function Broadcast({ zones }: { zones: ZoneRow[] }) {
   const { status, message, start, stop } = useTalk();
   const [zoneId, setZoneId] = useState<string | null>(null);
+  const [mode, setMode] = useState<"say" | "live">("say");
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<string>("");
   const selected = useMemo(
     () => zones.find((z) => z.id === zoneId) ?? null,
     [zones, zoneId],
@@ -331,6 +335,35 @@ function Broadcast({ zones }: { zones: ZoneRow[] }) {
     if (!zoneId && zones.length) setZoneId(zones[zones.length - 1].id);
   }, [zones, zoneId]);
 
+  async function announce() {
+    if (!zoneId || !text.trim()) return;
+    setSending(true);
+    setResult("");
+    try {
+      const res = await fetch("/api/announce", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: text.trim(), targetZoneId: zoneId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setResult("Couldn't send that.");
+        return;
+      }
+      const reached = (data.reached ?? []).length;
+      const missed = (data.notConnected ?? []).length + (data.offline ?? []).length;
+      setResult(
+        reached > 0
+          ? `Spoken on ${reached} ${reached === 1 ? "speaker" : "speakers"}` +
+              (missed ? ` · ${missed} not reached` : "")
+          : "No speakers reached — none connected.",
+      );
+      setText("");
+    } finally {
+      setSending(false);
+    }
+  }
+
   return (
     <>
       <header className="mb-4">
@@ -338,8 +371,28 @@ function Broadcast({ zones }: { zones: ZoneRow[] }) {
         <div className="text-xs text-neutral-500">One way, every speaker at once</div>
       </header>
 
+      <div className="mb-4 flex gap-1.5">
+        {(
+          [
+            ["say", "ph-chat-text", "Say something"],
+            ["live", "ph-microphone", "Talk live"],
+          ] as ["say" | "live", string, string][]
+        ).map(([m, icon, label]) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
+              mode === m ? "bg-accent text-[#141221]" : "card text-neutral-300"
+            }`}
+          >
+            <i className={`ph ${icon}`} />
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="uplabel mb-2">Send to</div>
-      <div className="mb-2 flex flex-col gap-1.5">
+      <div className="mb-4 flex flex-col gap-1.5">
         {zones.map((z) => {
           const on = z.id === zoneId;
           return (
@@ -362,37 +415,56 @@ function Broadcast({ zones }: { zones: ZoneRow[] }) {
         })}
       </div>
 
-      <div className="flex flex-col items-center justify-center gap-5 py-8">
-        {live && (
-          <div className="flex flex-col items-center gap-2">
-            <span className="tag tag-accent uppercase tracking-wider">
-              Live to {selected?.name}
-            </span>
-            <div className="text-sm text-neutral-400">
-              {selected?.onlineCount} speakers open
+      {mode === "say" ? (
+        <>
+          <textarea
+            className="input mb-3 min-h-24"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Dinner's ready — wash your hands, please."
+          />
+          <button
+            onClick={announce}
+            disabled={sending || !text.trim() || !zoneId}
+            className="btn btn-primary min-h-12 w-full"
+          >
+            <i className="ph-fill ph-megaphone-simple text-lg" />
+            {sending ? "Sending…" : `Announce to ${selected?.name ?? "…"}`}
+          </button>
+          {result && (
+            <p className="mt-3 text-center text-sm text-neutral-400">{result}</p>
+          )}
+          <p className="mt-3 text-center text-[11px] text-neutral-600">
+            Spoken aloud on every connected speaker. No waiting to connect.
+          </p>
+        </>
+      ) : (
+        <div className="flex flex-col items-center justify-center gap-5 py-6">
+          {live && (
+            <div className="flex flex-col items-center gap-2">
+              <span className="tag tag-accent uppercase tracking-wider">
+                Live to {selected?.name}
+              </span>
+              <div className="text-sm text-neutral-400">
+                {selected?.onlineCount} speakers open
+              </div>
             </div>
+          )}
+          {status === "error" && <p className="text-sm text-accent-200">{message}</p>}
+          <div
+            className="ptt"
+            data-live={live}
+            onPointerDown={() => zoneId && start({ kind: "broadcast", zoneId })}
+            onPointerUp={stop}
+            onPointerLeave={() => live && stop()}
+          >
+            <i className="ph-fill ph-megaphone-simple text-5xl" />
+            <span className="font-heading text-sm font-medium">
+              {live ? "Broadcasting" : "Hold to talk"}
+            </span>
           </div>
-        )}
-        {status === "error" && (
-          <p className="text-sm text-accent-200">{message}</p>
-        )}
-        <div
-          className="ptt"
-          data-live={live}
-          onPointerDown={() => zoneId && start({ kind: "broadcast", zoneId })}
-          onPointerUp={stop}
-          onPointerLeave={() => live && stop()}
-        >
-          <i className="ph-fill ph-megaphone-simple text-5xl" />
-          <span className="font-heading text-sm font-medium">
-            {live ? "Broadcasting" : "Hold to talk"}
-          </span>
         </div>
-      </div>
-
-      <div className="text-center text-[11px] text-neutral-600">
-        Every broadcast is written to the household log
-      </div>
+      )}
     </>
   );
 }
