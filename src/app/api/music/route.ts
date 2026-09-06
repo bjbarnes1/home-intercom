@@ -1,12 +1,11 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
 import { PLAYLIST, SOURCES, trackAt } from "@/lib/music/playlist";
+import { MusicActionSchema } from "@/lib/music/actions";
 
 export const dynamic = "force-dynamic";
 
-/** Load or lazily create the household's music state. */
 async function loadState(householdId: string) {
   return prisma.musicState.upsert({
     where: { householdId },
@@ -46,18 +45,12 @@ export async function GET(req: Request) {
   return NextResponse.json(await serialize(device.householdId));
 }
 
-const Action = z.object({
-  action: z.enum(["play", "pause", "next", "prev", "source", "toggleRoom"]),
-  deviceId: z.string().optional(),
-  source: z.string().optional(),
-});
-
 export async function POST(req: Request) {
   const device = await deviceFromRequest(req);
   if (!device || device.pairing !== "ACTIVE") {
     return NextResponse.json({ error: "Unauthorized device" }, { status: 401 });
   }
-  const parsed = Action.safeParse(await req.json().catch(() => null));
+  const parsed = MusicActionSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
@@ -98,6 +91,10 @@ export async function POST(req: Request) {
           : [...state.rooms, id];
       }
       break;
+    }
+    default: {
+      const _exhaustive: never = action;
+      return NextResponse.json({ error: `Unknown action: ${_exhaustive}` }, { status: 400 });
     }
   }
 

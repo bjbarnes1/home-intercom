@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { Room, RoomEvent, RemoteTrack, Track } from "livekit-client";
+import { Room, RoomEvent, RemoteTrack } from "livekit-client";
 import { controllerIdentity } from "@/lib/client/identity";
 import { toWsUrl } from "@/lib/client/livekitUrl";
+import { attachRemoteAudio } from "@/lib/client/attachAudioTrack";
 
 export type TalkStatus = "idle" | "connecting" | "live" | "error";
 
@@ -13,20 +14,23 @@ export interface TalkTarget {
   zoneId?: string;
 }
 
+interface SessionMeta {
+  eventId: string;
+  reached: string[];
+}
+
 /**
  * Hold-to-talk session for the controller. POSTs /api/page to open the room and
- * mint a token, then joins LiveKit and publishes the mic. Under
- * MOCK_LOCAL_SERVICES (no reachable SFU) it simulates the on-air state so the
- * deployed demo still feels live.
+ * mint a token, then joins LiveKit and publishes the mic. On stop, sends hangup
+ * so endpoints clear overlays and the media room is torn down.
  */
 export function useTalk() {
   const [status, setStatus] = useState<TalkStatus>("idle");
   const [message, setMessage] = useState("");
   const roomRef = useRef<Room | null>(null);
   const audioEls = useRef<HTMLAudioElement[]>([]);
-  // Bumped on every start and every stop; an in-flight start whose id no longer
-  // matches was cancelled (e.g. a quick release) and must tear itself down.
   const sessionRef = useRef(0);
+  const metaRef = useRef<SessionMeta | null>(null);
 
   const cleanupAudio = () => {
     for (const el of audioEls.current) el.remove();
@@ -34,11 +38,23 @@ export function useTalk() {
   };
 
   const stop = useCallback(async () => {
-    sessionRef.current++; // invalidate any in-flight start
+    sessionRef.current++;
     const room = roomRef.current;
     roomRef.current = null;
+    const meta = metaRef.current;
+    metaRef.current = null;
     setStatus("idle");
     cleanupAudio();
+    if (meta?.eventId) {
+      await fetch("/api/page/hangup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          eventId: meta.eventId,
+          deviceIds: meta.reached,
+        }),
+      }).catch(() => {});
+    }
     if (room) await room.disconnect().catch(() => {});
   }, []);
 
@@ -64,8 +80,8 @@ export function useTalk() {
         const data = await res.json();
         if (cancelled()) return { reached: 0 };
 
-        const reached = (data.reached ?? []).length;
-        if (reached === 0) {
+        const reached = (data.reached ?? []) as string[];
+        if (reached.length === 0) {
           const notConnected = (data.notConnected ?? []).length;
           setStatus("error");
           setMessage(
@@ -76,28 +92,34 @@ export function useTalk() {
           return { reached: 0 };
         }
 
+        metaRef.current = {
+          eventId: data.eventId as string,
+          reached,
+        };
+
         if (data.mock) {
-          // No real SFU reachable — simulate the open channel.
           setStatus("live");
-          return { reached };
+          return { reached: reached.length };
         }
 
         const room = new Room();
         room.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
-          if (track.kind === Track.Kind.Audio) {
-            const el = track.attach();
-            el.autoplay = true;
+          const el = attachRemoteAudio(track, document.body);
+          if (el) {
             el.hidden = true;
-            document.body.appendChild(el);
-            audioEls.current.push(el);
+            audioEls.current.push(el as HTMLAudioElement);
           }
         });
         room.on(RoomEvent.Disconnected, () => {
-          if (roomRef.current === room) stop();
+          if (roomRef.current === room) {
+            roomRef.current = null;
+            metaRef.current = null;
+            setStatus("idle");
+            cleanupAudio();
+          }
         });
 
         await room.connect(toWsUrl(data.livekitUrl), data.initiatorToken);
-        // Released (or superseded) while connecting → tear down, don't open mic.
         if (cancelled()) {
           await room.disconnect().catch(() => {});
           return { reached: 0 };
@@ -110,7 +132,7 @@ export function useTalk() {
           return { reached: 0 };
         }
         setStatus("live");
-        return { reached };
+        return { reached: reached.length };
       } catch (e) {
         if (cancelled()) return { reached: 0 };
         setStatus("error");
@@ -118,7 +140,7 @@ export function useTalk() {
         return { reached: 0 };
       }
     },
-    [stop],
+    [],
   );
 
   return { status, message, start, stop };

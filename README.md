@@ -65,7 +65,10 @@ The intercom core is working end-to-end, including **real two-way audio**
 
 ### Announcements & reminders
 - **Text announcements (async broadcast)**: type a message → spoken aloud on a
-  zone's connected speakers immediately, no waiting for connections.
+  zone's connected speakers immediately, no waiting for connections. When
+  `OPENAI_API_KEY` + `BLOB_READ_WRITE_TOKEN` are set, speech is **OpenAI Ash**
+  (`gpt-4o-mini-tts`) with household delivery instructions; otherwise each
+  endpoint falls back to browser SpeechSynthesis.
 - **Reminders**: manual create, plus **AI natural-language** ("remind Willoughby
   to read his novel at 4pm tomorrow") via Claude (`claude-opus-5`) with a strict
   tool + luxon timezone math. Spoken on the wall panel (SpeechSynthesis) with a
@@ -79,9 +82,9 @@ The intercom core is working end-to-end, including **real two-way audio**
 ### Wall panel / endpoint (kiosk PWA)
 - Pair → lobby → auto-answer; live-clock Home with summary cards; **Schedule**
   (calendar day view), **Jobs** (chore board, tap-to-tick + streaks),
-  **Reminders**, **Music** (shared player state), **Sound** (DND / chime /
-  half-duplex / quiet hours), and on-air / incoming-call / reminder /
-  announcement overlays.
+  **Reminders**, **Music** (shared player state), **Sound** (persisted DND;
+  quiet hours / LEDs planned with hardware), and on-air / incoming-call /
+  reminder / announcement overlays.
 
 ### Infra
 - `MOCK_LOCAL_SERVICES` fakes LiveKit and simulates on-air state for laptop dev.
@@ -93,15 +96,22 @@ The intercom core is working end-to-end, including **real two-way audio**
 **Needs your action (config):**
 - Set **`ANTHROPIC_API_KEY`** on Vercel to enable AI reminders (until then that
   one route returns a friendly "not configured"; everything else works).
+- Set **`OPENAI_API_KEY`** + **`BLOB_READ_WRITE_TOKEN`** for Ash neural announce
+  voice (without them, text announce still works via on-device TTS).
+- Set **`CRON_SECRET`** so only Vercel Cron can hit `/api/cron/tick`.
+
+**Agent delivery:** feature work follows [`docs/AGENT_TEAMS.md`](docs/AGENT_TEAMS.md)
+(program architect / PM / QA + per-feature product teams). Skills live under
+`.cursor/skills/home-intercom-*`.
 
 **Next features:**
 - **Recorded-voice broadcast** — record a clip on the controller, release →
   plays on the endpoints (needs audio capture + a small clip store).
-- **Local Piper TTS** — reminders now **auto-fire** on schedule (Vercel Cron →
-  `/api/cron/tick`) and speak via the browser's SpeechSynthesis; swap in
-  home-server **Piper** so the voice is rendered locally (Phase 3 backend).
+- Reuse **Ash TTS** for scheduled reminders (announce path is wired; reminders
+  still use SpeechSynthesis).
+- **Local Piper TTS** — optional offline/home-node alternative to OpenAI.
 - Edit **Jobs / Schedule / Music** from the controller (currently seeded/managed
-  on the panel); persist per-device **Sound/DND** settings.
+  on the panel).
 
 **Hardening / platform:**
 - **Latency (optional):** keep the intercom on **LiveKit Cloud** (privacy is not
@@ -111,7 +121,7 @@ The intercom core is working end-to-end, including **real two-way audio**
   self-host.
 - **iOS audio unlock** (`room.startAudio()`) if inbound playback needs a tap.
 - **Web-push wake** for backgrounded/remote devices (Phase 4).
-- Enforce **pairing-code expiry** (TTL exists but isn't enforced yet).
+- Quiet hours / half-duplex / LED cue mapping (Sound rail backlog).
 - Kiosk provisioning/hardening (Phase 5); native **Android** device (Phase 6).
 - Separate **Neon branch per environment** before previews share prod data.
 - Open a PR / promote `claude/new-project-fx1pzn` to a `main` line when ready.
@@ -215,6 +225,8 @@ Environment variables on the Vercel project:
 | `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | for audio | Sign tokens + call the LiveKit server API. |
 | `MOCK_LOCAL_SERVICES` | optional | `true` fakes LiveKit (control UI works, no real audio). Set `false` for live audio. |
 | `ANTHROPIC_API_KEY` | for AI reminders | Enables `/api/reminders/parse`. Absent → that route returns 503; the rest is unaffected. |
+| `OPENAI_API_KEY` | for Ash announce | Neural TTS for Broadcast “Say something”. |
+| `BLOB_READ_WRITE_TOKEN` | for Ash announce | Stores mp3 clips endpoints fetch via `audioUrl`. |
 | `CRON_SECRET` | recommended | Guards the scheduler route; Vercel Cron sends it as a bearer token every minute. |
 | `SEED_ADMIN_PASSWORD` | optional | Password for seeded parents (default `changeme123`). |
 
@@ -241,14 +253,15 @@ To add a schema change: edit `prisma/schema.prisma`, create a migration
 ## Development
 
 ```bash
-npm test            # vitest — domain logic (59 tests)
+npm test            # vitest — domain logic
 npm run typecheck   # tsc --noEmit
 npm run build       # production build
 ```
 
 Conventions mirror the inChambers app: `src/app/**/route.ts` for the API,
 `src/lib/<domain>/` with co-located `*.test.ts`, Prisma for data, and the
-`MOCK_LOCAL_SERVICES` toggle for laptop-only dev.
+`MOCK_LOCAL_SERVICES` toggle for laptop-only dev. Multi-agent delivery roles
+and gates: [`docs/AGENT_TEAMS.md`](docs/AGENT_TEAMS.md).
 
 ## Privacy & hosting
 

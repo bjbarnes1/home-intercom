@@ -1,14 +1,43 @@
 "use client";
 
 /**
- * Speak text on this device using the browser's SpeechSynthesis — the
- * zero-dependency fallback for reminder playback before local Piper TTS is
- * wired in. Plays a short chime first when available.
+ * Speak text on this device. Prefers a pre-rendered audioUrl (OpenAI Ash)
+ * when provided; falls back to browser SpeechSynthesis.
  */
-export function speak(text: string): void {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  try {
+
+let currentAudio: HTMLAudioElement | null = null;
+
+export function stopSpeaking(): void {
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
+  }
+  if (currentAudio) {
+    currentAudio.pause();
+    currentAudio.src = "";
+    currentAudio = null;
+  }
+}
+
+export function speak(text: string, audioUrl?: string | null): void {
+  if (typeof window === "undefined") return;
+  stopSpeaking();
+
+  if (audioUrl) {
+    const el = new Audio(audioUrl);
+    currentAudio = el;
+    el.play().catch(() => {
+      // Autoplay / network failure → browser TTS fallback.
+      speakWithSynthesis(text);
+    });
+    return;
+  }
+
+  speakWithSynthesis(text);
+}
+
+function speakWithSynthesis(text: string): void {
+  if (!("speechSynthesis" in window)) return;
+  try {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1;
     u.pitch = 1;

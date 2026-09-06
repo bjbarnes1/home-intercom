@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentHouseholdId } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
+import { isOnline } from "@/lib/presence/snapshot";
 
 export const dynamic = "force-dynamic";
 
-const PRESENCE_WINDOW_MS = 20_000;
-
-/** GET /api/zones — zones with their member devices and online counts. */
+/** GET /api/zones — zones with member devices and online counts. */
 export async function GET() {
   return withAuth(async () => {
     const householdId = await currentHouseholdId();
@@ -32,9 +31,7 @@ export async function GET() {
           id: m.device.id,
           displayName: m.device.displayName,
           room: m.device.room,
-          online:
-            m.device.lastSeenAt != null &&
-            now - new Date(m.device.lastSeenAt).getTime() <= PRESENCE_WINDOW_MS,
+          online: isOnline(m.device.lastSeenAt, now),
         }));
         return {
           id: z.id,

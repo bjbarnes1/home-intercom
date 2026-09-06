@@ -46,6 +46,9 @@ export const env = {
   },
 
   tts: {
+    /** OpenAI API key for Ash neural announce (gpt-4o-mini-tts). */
+    openaiKey: process.env.OPENAI_API_KEY ?? "",
+    /** Legacy local Piper endpoint — optional offline path. */
     piperUrl: process.env.PIPER_TTS_URL ?? "",
   },
 } as const;

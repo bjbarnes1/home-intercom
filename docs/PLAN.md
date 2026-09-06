@@ -12,12 +12,12 @@
 >   **text announcements** (TTS) that don't wait for connections.
 > - **Phase 3 — Reminders:** 🟡 mostly done — reminders (manual + **AI natural
 >   language**) auto-fire on schedule via a **Vercel Cron** scheduler
->   (`/api/cron/tick`) and speak on the endpoints; **local Piper TTS** (render
->   the voice at home instead of the browser) is the remaining piece.
+>   (`/api/cron/tick`) and speak on the endpoints; **OpenAI Ash** neural TTS is
+>   wired for **text announce**; reminder clips and optional **local Piper** remain.
 > - **Phase 4 — Remote reach:** 🟡 partial — runs on **LiveKit Cloud** today
 >   (works off-LAN); self-hosted home SFU + tunnel/TURN + web-push wake are TODO.
-> - **Phase 5 — Hardening:** ⬜ TODO (kiosk provisioning, DND persistence, code
->   expiry, soak).
+> - **Phase 5 — Hardening:** 🟡 partial — DND persistence and pairing-code TTL
+>   enforcement are done; quiet hours, kiosk soak, and LED cues remain.
 > - **Phase 6 — Custom device:** ⬜ TODO (native Android + smart display; the
 >   smart-display surfaces — Schedule/Jobs/Music — already exist in the PWA).
 >

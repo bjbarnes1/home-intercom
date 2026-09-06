@@ -273,6 +273,7 @@ enum EventType {
   PAGE
   CALL
   BROADCAST
+  ANNOUNCE
   REMINDER
 }
 

@@ -7,37 +7,34 @@ import {
   generatePairingCode,
   generateDeviceSecret,
 } from "@/lib/devices/pairing";
+import { isOnline } from "@/lib/presence/snapshot";
 
 export const dynamic = "force-dynamic";
-
-const PRESENCE_WINDOW_MS = 20_000;
 
 /** GET /api/devices — list devices with derived online state. */
 export async function GET() {
   return withAuth(async () => {
-  const householdId = await currentHouseholdId();
-  const devices = await prisma.device.findMany({
-    where: { householdId },
-    orderBy: { displayName: "asc" },
-    select: {
-      id: true,
-      displayName: true,
-      room: true,
-      type: true,
-      pairing: true,
-      doNotDisturb: true,
-      lastSeenAt: true,
-    },
-  });
-  const now = Date.now();
-  return NextResponse.json({
-    devices: devices.map((d) => ({
-      ...d,
-      online:
-        d.lastSeenAt != null &&
-        now - new Date(d.lastSeenAt).getTime() <= PRESENCE_WINDOW_MS,
-    })),
-  });
+    const householdId = await currentHouseholdId();
+    const devices = await prisma.device.findMany({
+      where: { householdId },
+      orderBy: { displayName: "asc" },
+      select: {
+        id: true,
+        displayName: true,
+        room: true,
+        type: true,
+        pairing: true,
+        doNotDisturb: true,
+        lastSeenAt: true,
+      },
+    });
+    const now = Date.now();
+    return NextResponse.json({
+      devices: devices.map((d) => ({
+        ...d,
+        online: isOnline(d.lastSeenAt, now),
+      })),
+    });
   });
 }
 
@@ -48,8 +45,7 @@ const CreateDevice = z.object({
 });
 
 /**
- * POST /api/devices — register a new device in PENDING state and issue a
- * pairing code. The device claims the code via /api/devices/claim.
+ * POST /api/devices — register a device in PENDING and issue a pairing code.
  */
 export async function POST(req: Request) {
   return withAuth(async () => {
