@@ -108,9 +108,35 @@ it before any real deployment). Then open `/controller` on your phone and
 Without Docker, set `MOCK_LOCAL_SERVICES=true` to exercise the control flow
 without live media.
 
-> The auth schema adds a `Session` table and a `passwordHash` column, so after
-> pulling run `npm run prisma:migrate` (or `npx prisma db push`) again before
-> `npm run prisma:seed`.
+## Deploying (Vercel)
+
+`vercel.json` sets the build command to:
+
+```
+prisma migrate deploy && next build
+```
+
+so **every deploy applies any pending migrations before building**. Because
+each migration is recorded in `_prisma_migrations` with a matching checksum,
+already-applied migrations are skipped — only genuinely new ones run. If a
+migration fails, the build fails (fail-fast, nothing half-deployed).
+
+Requirements on the Vercel project:
+
+- `DATABASE_URL` — Neon **pooled** URL (`pgbouncer=true`) for the app runtime.
+- `DIRECT_URL` — Neon **direct** URL; `migrate deploy` uses it (via the schema's
+  `directUrl`) because migrations must not run over the PgBouncer pool.
+- `MOCK_LOCAL_SERVICES=true` until the home-server LiveKit SFU is reachable.
+
+`prisma generate` runs in `postinstall`, so the client is always fresh.
+
+> Note: previews and production share one Neon database today, so a preview
+> deploy will apply new migrations to that database. Add a separate Neon branch
+> per environment before that becomes a problem.
+
+To add a schema change: edit `prisma/schema.prisma`, create a migration
+(`prisma migrate dev --name <x>` against a dev DB, or hand-author the SQL under
+`prisma/migrations/`), commit it, and push — the deploy applies it.
 
 ## Development
 
