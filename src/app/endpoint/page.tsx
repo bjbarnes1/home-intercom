@@ -134,6 +134,8 @@ export default function EndpointPage() {
   const joinMedia = useCallback(
     async (url: string, token: string, mode: string, title: string) => {
       await leaveMedia();
+      // Show an overlay while the connection is establishing.
+      setIncoming({ title: "Connecting…", mode });
       const r = new Room();
       mediaRef.current = r;
       r.on(RoomEvent.TrackSubscribed, (track: RemoteTrack) => {
@@ -842,8 +844,11 @@ export default function EndpointPage() {
           <div className="mt-2 flex gap-4">
             <button
               onClick={() => {
-                joinMedia(ringing.url, ringing.token, ringing.mode, "In call");
+                const r = ringing;
+                // Repaint immediately (close the ring), then run the heavy
+                // LiveKit connect on the next tick so it doesn't block INP.
                 setRinging(null);
+                setTimeout(() => joinMedia(r.url, r.token, r.mode, "In call"), 0);
               }}
               className="btn btn-outline min-h-16 px-9 text-lg"
             >
