@@ -83,6 +83,15 @@ export default function EndpointPage() {
   const [room, setRoom] = useState("This room");
   const [dnd, setDnd] = useState(false);
   const [incoming, setIncoming] = useState<Incoming | null>(null);
+  const [ringing, setRinging] = useState<{
+    url: string;
+    token: string;
+    mode: string;
+    title: string;
+  } | null>(null);
+  const [halfDuplex, setHalfDuplex] = useState(false);
+  const [quietHours, setQuietHours] = useState(false);
+  const [chime, setChime] = useState(true);
   const [now, setNow] = useState(() => new Date());
   const [reminders, setReminders] = useState<EndpointReminder[]>([]);
   const [speaking, setSpeaking] = useState<EndpointReminder | null>(null);
@@ -159,8 +168,19 @@ export default function EndpointPage() {
           try {
             const cmd = decodeCommand(payload);
             if (cmd.type === "join") {
-              joinMedia(data.livekitUrl, cmd.token, cmd.mode, "Incoming");
+              if (cmd.autoAnswer) {
+                joinMedia(data.livekitUrl, cmd.token, cmd.mode, "Incoming page");
+              } else {
+                // A call rings first — wait for Answer.
+                setRinging({
+                  url: data.livekitUrl,
+                  token: cmd.token,
+                  mode: cmd.mode,
+                  title: "Incoming call",
+                });
+              }
             } else if (cmd.type === "hangup") {
+              setRinging(null);
               leaveMedia();
             }
           } catch {
@@ -700,7 +720,7 @@ export default function EndpointPage() {
             <p className="mb-5 text-xs text-neutral-500">
               This panel only. Other rooms keep their own settings.
             </p>
-            <div className="card mb-3 flex items-center gap-4 p-4">
+            <div className="card mb-4 flex items-center gap-4 p-4">
               <i className="ph ph-moon text-2xl text-accent" />
               <div className="flex-1">
                 <div className="font-heading text-lg font-medium">Do not disturb</div>
@@ -710,12 +730,76 @@ export default function EndpointPage() {
               </div>
               <Toggle on={dnd} onChange={setDnd} label="Do not disturb" />
             </div>
-            <p className="text-[11px] text-neutral-600">
-              Volume and chime controls arrive with kiosk hardening (Phase 5).
+
+            <div className="flex flex-col">
+              <SoundRow
+                title="Chime before someone speaks"
+                sub="A short tone so nobody is startled"
+                on={chime}
+                onChange={setChime}
+              />
+              <SoundRow
+                title="Half duplex"
+                sub="One direction at a time — stops feedback in open rooms"
+                on={halfDuplex}
+                onChange={setHalfDuplex}
+              />
+              <SoundRow
+                title="Quiet hours · 7:30pm to 7:00am"
+                sub="Reminders whisper, pages still ring"
+                on={quietHours}
+                onChange={setQuietHours}
+              />
+            </div>
+            <p className="mt-4 text-[11px] text-neutral-600">
+              These apply to this panel. Per-device persistence and volume land
+              with kiosk hardening (Phase 5).
             </p>
           </div>
         )}
       </div>
+
+      {/* incoming call — ring first */}
+      {ringing && !incoming && (
+        <div
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-10"
+          style={{
+            background:
+              "linear-gradient(160deg, var(--color-accent-900), var(--color-bg) 62%)",
+          }}
+        >
+          <div className="text-xs uppercase tracking-[0.16em] text-accent-200">
+            Calling {room}
+          </div>
+          <div
+            className="grid h-28 w-28 place-items-center rounded-full bg-surface"
+            style={{ animation: "halo 1.6s ease-out infinite" }}
+          >
+            <i className="ph-fill ph-phone text-4xl text-accent" />
+          </div>
+          <div className="font-heading text-4xl font-medium">{ringing.title}</div>
+          <div className="text-sm text-neutral-400">Two-way — they&apos;ll hear the room</div>
+          <div className="mt-2 flex gap-4">
+            <button
+              onClick={() => {
+                joinMedia(ringing.url, ringing.token, ringing.mode, "In call");
+                setRinging(null);
+              }}
+              className="btn btn-outline min-h-16 px-9 text-lg"
+            >
+              <i className="ph-fill ph-phone text-xl" />
+              Answer
+            </button>
+            <button
+              onClick={() => setRinging(null)}
+              className="btn btn-secondary min-h-16 px-7 text-lg"
+            >
+              <i className="ph ph-phone-x text-xl" />
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* incoming page/call overlay */}
       {incoming && (
@@ -785,6 +869,28 @@ export default function EndpointPage() {
           {note}
         </div>
       )}
+    </div>
+  );
+}
+
+function SoundRow({
+  title,
+  sub,
+  on,
+  onChange,
+}: {
+  title: string;
+  sub: string;
+  on: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center gap-4 border-b border-divider py-3.5 last:border-0">
+      <div className="flex-1">
+        <div className="text-base">{title}</div>
+        <div className="text-xs text-neutral-500">{sub}</div>
+      </div>
+      <Toggle on={on} onChange={onChange} label={title} />
     </div>
   );
 }
