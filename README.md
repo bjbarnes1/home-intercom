@@ -16,71 +16,105 @@ Two planes, deliberately separate:
   SFU on the home server. Paging, calls and broadcasts are all LiveKit *rooms*.
   On the LAN, audio never leaves the house.
 - **Control plane** — every endpoint permanently joins a LiveKit **`lobby`**
-  room. Presence and control commands (`join`, `ring`, `reminder`, `hangup`)
-  ride as LiveKit **data messages** — one transport for both planes.
+  room and reconnects automatically if the link drops. Presence and control
+  commands (`join`, `announce`, `reminder`, `hangup`) ride as LiveKit **data
+  messages** — one transport for both planes. The backend only delivers to
+  endpoints actually present in the lobby, and reports online-but-not-connected.
 
 | Feature | Room | Endpoint role |
 |---|---|---|
 | Page one device | `page:<deviceId>` | listen (auto-answer) |
 | Two-way call | `call:<deviceId>` | duplex (ring first) |
-| Broadcast to a zone | `broadcast:<zoneId>` | listen |
-| Reminder | *(no room)* | play chime + speak |
+| Live broadcast to a zone | `broadcast:<zoneId>` | listen |
+| Text announcement (TTS) | *(no room)* | speak the text aloud |
+| Reminder | *(no room)* | chime + speak |
 
 The same PWA serves both a **Controller** role (a parent's iPhone) and an
 **Endpoint** role (a kiosk phone in a room, later a custom touchscreen).
 
-## What's built so far
+## What's built
 
-**Phase 0 (foundations) — complete — plus the Phase 1 vertical slice
-(page one device):**
+The intercom core is working end-to-end, including **real two-way audio**
+(verified iOS ↔ desktop over LiveKit Cloud), plus the smart-display surfaces.
 
-- Next.js App Router app (TypeScript, Tailwind, Prisma).
-- Prisma schema: `Household`, `User`, `Device`, `Zone`/`ZoneMembership`,
-  `Reminder`, `IntercomEvent` (audit log — metadata only, no audio), `Session`.
-- **User auth** — email + password login with database-backed sessions:
-  - Passwords hashed with Node's built-in **scrypt** (no third-party crypto dep).
-  - Opaque session token in an **HttpOnly** cookie; only its SHA-256 hash is
-    stored, so a DB dump can't forge sessions. Sliding 30-day expiry.
-  - `ADMIN` (parents) vs `MEMBER` (children) roles; device registration is
-    admin-only. Endpoints keep their separate device-secret auth.
-  - Single auth choke point (`src/lib/auth/context.ts`) — swap in OAuth later
-    without touching route logic.
-- LiveKit **token service** with least-privilege, role-scoped grants
-  (`lobby` / `listen` / `talk` / `duplex`).
-- Domain logic with unit tests (59 tests):
-  - `reminders/schedule.ts` — cron + one-off next-run math, timezones, snooze.
-  - `zones/resolve.ts` — target → device-set resolution, DND + online filters.
-  - `devices/pairing.ts` — pairing codes + device secrets.
-  - `livekit/token.ts` — grant scoping + JWT signing.
-  - `auth/password.ts`, `auth/session.ts` — hashing + token handling.
-  - `jobs/board.ts` — local-day + streak math.
-- **Nocturne design system** (`globals.css` via Tailwind `@theme`): dark
-  lavender palette, cards, tags, buttons, toggle, hold-to-talk button,
-  level bars, overlays. Space Grotesk + Inter, Phosphor icons.
-- **Controller (iPhone)**: Home (zones + rooms with presence), hold-to-talk
-  paging, two-way call, Broadcast to a zone, Reminders (list + create).
-- **Wall panel / endpoint**: pairing → lobby → auto-answer, live clock Home
-  with summary cards, Schedule (calendar day view), Jobs (chore board with
-  tap-to-tick + streaks), Reminders (spoken via SpeechSynthesis), Music
-  (shared player state), Sound (DND / chime / half-duplex / quiet hours),
-  and on-air / incoming-call / reminder overlays.
-- API routes: auth, devices, presence, page/call/broadcast, reminders, zones,
-  and device-authed `endpoint/reminders`, `jobs` (+`/tick`), `schedule`,
-  `music`.
-- Data model: household, users, sessions, devices, zones, reminders, audit
-  log, kids, chores + completions, calendar events, music state.
-- Control-plane command types + a **mockable** control sender
-  (`MOCK_LOCAL_SERVICES` fakes LiveKit/TTS and simulates on-air state).
-- `docker-compose.yml` (LiveKit + Postgres) and `livekit.yaml`.
+### Platform & foundations
+- Next.js App Router app (TypeScript, Tailwind v4, Prisma), 59 unit tests.
+- **User auth** — email + password with database-backed sessions: scrypt hashing
+  (no third-party crypto dep), opaque token in an **HttpOnly** cookie with only
+  its SHA-256 hash stored, sliding 30-day expiry, `ADMIN`/`MEMBER` roles. Single
+  choke point at `src/lib/auth/context.ts`.
+- **Data model**: household (+timezone), users, sessions, devices, zones,
+  reminders, `IntercomEvent` audit log (metadata only — no audio), kids, chores
+  + completions, calendar events, music state. Four committed migrations.
+- **Nocturne design system** (`globals.css` via Tailwind `@theme`) — dark
+  lavender palette, cards, tags, buttons, toggle, hold-to-talk, level bars,
+  overlays. Space Grotesk + Inter, Phosphor icons.
 
-**Still to come** (see the plan): real live media on the home-server LiveKit
-SFU + tunnel/TURN for remote reach (Phase 4), the durable reminder scheduler +
-Piper TTS (Phase 3 backend), kiosk hardening (Phase 5), the native Android
-device (Phase 6), and wiring Music/Jobs/Schedule editing from the controller.
+### Devices & control channel
+- **Pairing**: admin registers a device → 6-char code **+ QR**; the room phone
+  scans it (`/endpoint?code=…` auto-pairs) or types it. Re-pairing rotates the
+  device secret (revokes the old phone). Endpoints authenticate by device secret.
+- **Presence + control**: endpoints hold a lobby connection with **auto-reconnect**
+  and a visible **"Ready to receive"** indicator; the backend delivers only to
+  connected endpoints and reports the rest.
 
-> **Note on Next.js version:** the plan calls for Next 16; at scaffold time the
-> registry resolved to Next 15.5. The App Router conventions are identical, so
-> this is a drop-in bump when 16 is available.
+### Talk (media plane — LiveKit)
+- **Two-way calls** with real audio (ring → answer). **Hold-to-talk paging**
+  (one-way). **Live broadcast** hold-to-talk to a zone.
+- Least-privilege, role-scoped tokens (`lobby`/`listen`/`talk`/`duplex`).
+
+### Announcements & reminders
+- **Text announcements (async broadcast)**: type a message → spoken aloud on a
+  zone's connected speakers immediately, no waiting for connections.
+- **Reminders**: manual create, plus **AI natural-language** ("remind Willoughby
+  to read his novel at 4pm tomorrow") via Claude (`claude-opus-5`) with a strict
+  tool + luxon timezone math. Spoken on the wall panel (SpeechSynthesis) with a
+  "Play now" action.
+
+### Controller (iPhone PWA)
+- Home (zones + rooms with live presence), page / two-way call, Broadcast
+  ("Say something" TTS + "Talk live"), Reminders (AI "ask in plain words" with
+  optional speech input + manual form), and a **Devices** manager.
+
+### Wall panel / endpoint (kiosk PWA)
+- Pair → lobby → auto-answer; live-clock Home with summary cards; **Schedule**
+  (calendar day view), **Jobs** (chore board, tap-to-tick + streaks),
+  **Reminders**, **Music** (shared player state), **Sound** (DND / chime /
+  half-duplex / quiet hours), and on-air / incoming-call / reminder /
+  announcement overlays.
+
+### Infra
+- `MOCK_LOCAL_SERVICES` fakes LiveKit and simulates on-air state for laptop dev.
+- `docker-compose.yml` (LiveKit + Postgres), `livekit.yaml`, `vercel.json`
+  (migrate-on-deploy), Neon Postgres.
+
+## Outstanding tasks
+
+**Needs your action (config):**
+- Set **`ANTHROPIC_API_KEY`** on Vercel to enable AI reminders (until then that
+  one route returns a friendly "not configured"; everything else works).
+
+**Next features:**
+- **Recorded-voice broadcast** — record a clip on the controller, release →
+  plays on the endpoints (needs audio capture + a small clip store).
+- **Durable reminder scheduler** — reminders are created and can be played, but
+  nothing **auto-fires** them on schedule yet. Needs a cron/poll worker
+  (Vercel Cron or a home-server job) + local **Piper TTS** (Phase 3 backend).
+- Edit **Jobs / Schedule / Music** from the controller (currently seeded/managed
+  on the panel); persist per-device **Sound/DND** settings.
+
+**Hardening / platform:**
+- Move media to a **self-hosted home LiveKit SFU** + tunnel/TURN for privacy and
+  remote reach (currently LiveKit Cloud). Phase 4.
+- **iOS audio unlock** (`room.startAudio()`) if inbound playback needs a tap.
+- **Web-push wake** for backgrounded/remote devices (Phase 4).
+- Enforce **pairing-code expiry** (TTL exists but isn't enforced yet).
+- Kiosk provisioning/hardening (Phase 5); native **Android** device (Phase 6).
+- Separate **Neon branch per environment** before previews share prod data.
+- Open a PR / promote `claude/new-project-fx1pzn` to a `main` line when ready.
+
+> **Note on Next.js version:** the plan calls for Next 16; the registry resolved
+> to Next 15.5. App Router conventions are identical — a drop-in bump later.
 
 ## Getting started
 
@@ -132,13 +166,21 @@ each migration is recorded in `_prisma_migrations` with a matching checksum,
 already-applied migrations are skipped — only genuinely new ones run. If a
 migration fails, the build fails (fail-fast, nothing half-deployed).
 
-Requirements on the Vercel project:
+Environment variables on the Vercel project:
 
-- `DATABASE_URL` — Neon **pooled** URL (`pgbouncer=true`) for the app runtime.
-- `DIRECT_URL` — Neon **direct** URL; `migrate deploy` uses it (via the schema's
-  `directUrl`) because migrations must not run over the PgBouncer pool.
-- `MOCK_LOCAL_SERVICES=true` until the home-server LiveKit SFU is reachable.
+| Var | Required? | Purpose |
+|---|---|---|
+| `DATABASE_URL` | yes | Neon **pooled** URL (`pgbouncer=true`) for the app runtime. |
+| `DIRECT_URL` | yes | Neon **direct** URL; `migrate deploy` uses it (migrations must not run over PgBouncer). |
+| `LIVEKIT_URL` | for audio | LiveKit **wss://** URL (LiveKit Cloud today). The client normalizes http(s)→ws(s). |
+| `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` | for audio | Sign tokens + call the LiveKit server API. |
+| `MOCK_LOCAL_SERVICES` | optional | `true` fakes LiveKit (control UI works, no real audio). Set `false` for live audio. |
+| `ANTHROPIC_API_KEY` | for AI reminders | Enables `/api/reminders/parse`. Absent → that route returns 503; the rest is unaffected. |
+| `SEED_ADMIN_PASSWORD` | optional | Password for seeded parents (default `changeme123`). |
 
+Env changes only take effect on a **new deployment** — add the var, then redeploy.
+`NEXT_PUBLIC_LIVEKIT_URL` may be set to the same `wss://` value or left unset
+(it falls back to `LIVEKIT_URL`; an empty string is treated as unset).
 `prisma generate` runs in `postinstall`, so the client is always fresh.
 
 > Note: previews and production share one Neon database today, so a preview
@@ -152,7 +194,7 @@ To add a schema change: edit `prisma/schema.prisma`, create a migration
 ## Development
 
 ```bash
-npm test            # vitest — domain logic (41 tests)
+npm test            # vitest — domain logic (59 tests)
 npm run typecheck   # tsc --noEmit
 npm run build       # production build
 ```

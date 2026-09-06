@@ -1,5 +1,29 @@
 # Home Intercom System — Implementation Plan
 
+> **Status (living):** this is the original plan. For the current feature list
+> and the up-to-date outstanding-tasks list, see [`../README.md`](../README.md).
+> Progress against the phases below:
+>
+> - **Phase 0 — Foundations:** ✅ done (auth, household model, pairing, PWA shell,
+>   LiveKit token service).
+> - **Phase 1 — Core intercom:** ✅ done — presence lobby, page one device,
+>   two-way call with real audio (verified iOS ↔ desktop).
+> - **Phase 2 — Zones & broadcast:** ✅ done — zones, live broadcast, plus async
+>   **text announcements** (TTS) that don't wait for connections.
+> - **Phase 3 — Reminders:** 🟡 partial — reminders (manual + **AI natural
+>   language**) are created and played on demand; the **durable scheduler** that
+>   auto-fires them and **local Piper TTS** are still to build.
+> - **Phase 4 — Remote reach:** 🟡 partial — runs on **LiveKit Cloud** today
+>   (works off-LAN); self-hosted home SFU + tunnel/TURN + web-push wake are TODO.
+> - **Phase 5 — Hardening:** ⬜ TODO (kiosk provisioning, DND persistence, code
+>   expiry, soak).
+> - **Phase 6 — Custom device:** ⬜ TODO (native Android + smart display; the
+>   smart-display surfaces — Schedule/Jobs/Music — already exist in the PWA).
+>
+> Beyond the original plan, also built: a **Nocturne** design system from the
+> Barnes/Wilkes canvas, a **device pairing UI** (codes + QR), and a
+> **smart-display** wall panel (clock, Schedule, Jobs, Music, Sound).
+
 ## Context
 
 We want a household intercom + announcement system for the Barnes/Wilkes home.
