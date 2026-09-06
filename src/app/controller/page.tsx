@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTalk } from "@/lib/client/useTalk";
 import Toggle from "@/components/Toggle";
+import DevicesManager from "./DevicesManager";
 
 interface DeviceRow {
   id: string;
@@ -44,6 +45,7 @@ export default function ControllerPage() {
   const [zones, setZones] = useState<ZoneRow[]>([]);
   const [tab, setTab] = useState<Tab>("home");
   const [pageTarget, setPageTarget] = useState<DeviceRow | null>(null);
+  const [showDevices, setShowDevices] = useState(false);
 
   const load = useCallback(async () => {
     const [dRes, zRes] = await Promise.all([
@@ -87,6 +89,10 @@ export default function ControllerPage() {
 
   const onlineCount = devices.filter((d) => d.online).length;
 
+  if (showDevices) {
+    return <DevicesManager onBack={() => setShowDevices(false)} />;
+  }
+
   if (pageTarget) {
     return (
       <PageTalk target={pageTarget} onBack={() => setPageTarget(null)} />
@@ -105,10 +111,19 @@ export default function ControllerPage() {
                   {onlineCount} of {devices.length} endpoints online
                 </div>
               </div>
-              <button onClick={signOut} className="btn btn-secondary min-h-9 text-xs">
-                <i className="ph ph-sign-out" />
-                {me?.name ?? "Sign out"}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowDevices(true)}
+                  className="btn btn-secondary min-h-9 px-2.5 text-xs"
+                  aria-label="Manage devices"
+                >
+                  <i className="ph ph-devices" />
+                </button>
+                <button onClick={signOut} className="btn btn-secondary min-h-9 text-xs">
+                  <i className="ph ph-sign-out" />
+                  {me?.name ?? "Sign out"}
+                </button>
+              </div>
             </header>
 
             <div className="uplabel mb-2">Zones</div>

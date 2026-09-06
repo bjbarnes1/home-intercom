@@ -10,6 +10,7 @@ import {
 } from "@/lib/client/identity";
 import { decodeCommand } from "@/lib/control/commands";
 import { speak, reminderTime } from "@/lib/client/speak";
+import { isWellFormedPairingCode } from "@/lib/devices/pairing";
 import Toggle from "@/components/Toggle";
 
 type Phase = "loading" | "unpaired" | "ready" | "error";
@@ -104,6 +105,13 @@ export default function EndpointPage() {
   const lobbyRef = useRef<Room | null>(null);
   const mediaRef = useRef<Room | null>(null);
   const sinkRef = useRef<HTMLDivElement | null>(null);
+  const autoPairTried = useRef(false);
+
+  // Prefill a pairing code passed via ?code= (e.g. scanned from the QR).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search).get("code");
+    if (p) setCode(p.toUpperCase());
+  }, []);
 
   // Live clock.
   useEffect(() => {
@@ -335,6 +343,18 @@ export default function EndpointPage() {
       setNote("Pairing failed");
     }
   }, [code, heartbeat]);
+
+  // Auto-submit a valid code that arrived via the URL, once.
+  useEffect(() => {
+    if (
+      phase === "unpaired" &&
+      !autoPairTried.current &&
+      isWellFormedPairingCode(code)
+    ) {
+      autoPairTried.current = true;
+      claim();
+    }
+  }, [phase, code, claim]);
 
   const clockBig = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const dateLong = now.toLocaleDateString([], {
