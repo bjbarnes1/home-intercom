@@ -11,6 +11,7 @@ import {
 import { decodeCommand } from "@/lib/control/commands";
 import { speak, reminderTime } from "@/lib/client/speak";
 import { isWellFormedPairingCode } from "@/lib/devices/pairing";
+import { toWsUrl } from "@/lib/client/livekitUrl";
 import Toggle from "@/components/Toggle";
 
 type Phase = "loading" | "unpaired" | "ready" | "error";
@@ -94,6 +95,8 @@ export default function EndpointPage() {
   const [quietHours, setQuietHours] = useState(false);
   const [chime, setChime] = useState(true);
   const [receiving, setReceiving] = useState(false);
+  const [receiveError, setReceiveError] = useState("");
+  const [livekitUrl, setLivekitUrl] = useState("");
   const [mock, setMock] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [reminders, setReminders] = useState<EndpointReminder[]>([]);
@@ -173,6 +176,8 @@ export default function EndpointPage() {
       const data = await res.json();
       setDnd(!!data.doNotDisturb);
       setMock(!!data.mock);
+      const wsUrl = toWsUrl(data.livekitUrl ?? "");
+      setLivekitUrl(wsUrl);
       setPhase("ready");
 
       // Real mode: keep a lobby connection for control messages, and
@@ -185,11 +190,11 @@ export default function EndpointPage() {
             const cmd = decodeCommand(payload);
             if (cmd.type === "join") {
               if (cmd.autoAnswer) {
-                joinMedia(data.livekitUrl, cmd.token, cmd.mode, "Incoming page");
+                joinMedia(wsUrl, cmd.token, cmd.mode, "Incoming page");
               } else {
                 // A call rings first — wait for Answer.
                 setRinging({
-                  url: data.livekitUrl,
+                  url: wsUrl,
                   token: cmd.token,
                   mode: cmd.mode,
                   title: "Incoming call",
@@ -210,18 +215,17 @@ export default function EndpointPage() {
           }
         });
         try {
-          await r.connect(data.livekitUrl, data.lobbyToken);
+          await r.connect(wsUrl, data.lobbyToken);
           setReceiving(true);
+          setReceiveError("");
         } catch (e) {
           if (lobbyRef.current === r) lobbyRef.current = null;
           setReceiving(false);
-          throw e;
+          setReceiveError(e instanceof Error ? e.message : "Audio connection failed");
         }
       }
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Connection failed");
-      // Don't drop the whole panel to an error screen for a transient lobby
-      // hiccup — the heartbeat will retry.
       setPhase((p) => (p === "ready" ? p : "error"));
     }
   }, [joinMedia, leaveMedia]);
@@ -456,15 +460,21 @@ export default function EndpointPage() {
       {/* main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-none items-center gap-3 px-7 pb-3 pt-5">
-          <div className="flex flex-1 items-center gap-2 text-sm text-neutral-400">
-            <span
-              className={`dot ${mock ? "dot-offline" : receiving ? "dot-online" : "dot-offline"}`}
-            />
-            {mock
-              ? "Demo mode — audio disabled"
-              : receiving
-                ? "Ready to receive"
-                : "Connecting to audio…"}
+          <div className="flex flex-1 flex-col gap-0.5">
+            <div className="flex items-center gap-2 text-sm text-neutral-400">
+              <span className={`dot ${!mock && receiving ? "dot-online" : "dot-offline"}`} />
+              {mock
+                ? "Demo mode — audio disabled"
+                : receiving
+                  ? "Ready to receive"
+                  : "Connecting to audio…"}
+            </div>
+            {!mock && !receiving && (receiveError || livekitUrl) && (
+              <div className="text-[11px] text-accent-200">
+                {receiveError ? `${receiveError} · ` : ""}
+                {livekitUrl}
+              </div>
+            )}
           </div>
           <button
             onClick={() => {

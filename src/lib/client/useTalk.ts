@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { Room, RoomEvent, RemoteTrack, Track } from "livekit-client";
 import { controllerIdentity } from "@/lib/client/identity";
+import { toWsUrl } from "@/lib/client/livekitUrl";
 
 export type TalkStatus = "idle" | "connecting" | "live" | "error";
 
@@ -95,7 +96,7 @@ export function useTalk() {
           if (roomRef.current === room) stop();
         });
 
-        await room.connect(data.livekitUrl, data.initiatorToken);
+        await room.connect(toWsUrl(data.livekitUrl), data.initiatorToken);
         // Released (or superseded) while connecting → tear down, don't open mic.
         if (cancelled()) {
           await room.disconnect().catch(() => {});
