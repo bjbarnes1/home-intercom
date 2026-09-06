@@ -19,6 +19,8 @@ datasource db {
 model Household {
   id        String   @id @default(cuid())
   name      String
+  /// IANA timezone for day boundaries (chore days, quiet hours, etc.).
+  timezone  String   @default("UTC")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -27,6 +29,55 @@ model Household {
   zones     Zone[]
   reminders Reminder[]
   events    IntercomEvent[]
+  kids      Kid[]
+  chores    Chore[]
+}
+
+/// A child in the household. Distinct from their room's Device — a kid may have
+/// no device, or more than one. Used for the jobs / chore board.
+model Kid {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household  @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  order       Int        @default(0)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  chores Chore[]
+
+  @@index([householdId])
+}
+
+/// A recurring (daily) chore assigned to a kid.
+model Chore {
+  id          String   @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  kidId       String
+  kid         Kid       @relation(fields: [kidId], references: [id], onDelete: Cascade)
+  label       String
+  order       Int       @default(0)
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  completions ChoreCompletion[]
+
+  @@index([householdId])
+  @@index([kidId])
+}
+
+/// A chore ticked done on a particular local day (yyyy-mm-dd).
+model ChoreCompletion {
+  id          String   @id @default(cuid())
+  choreId     String
+  chore       Chore    @relation(fields: [choreId], references: [id], onDelete: Cascade)
+  day         String // yyyy-mm-dd in the household timezone
+  completedAt DateTime @default(now())
+
+  @@unique([choreId, day])
+  @@index([choreId])
 }
 
 enum UserRole {

@@ -88,6 +88,41 @@ async function main() {
     }
   }
 
+  // Kids + their chores (the jobs board).
+  await prisma.household.update({
+    where: { id: household.id },
+    data: { timezone: "Australia/Sydney" },
+  });
+
+  const kidSpecs: { key: string; name: string; chores: string[] }[] = [
+    { key: "gus", name: "Gus", chores: ["Make bed", "Feed the dog", "Homework", "Dishes"] },
+    { key: "georgette", name: "Georgette", chores: ["Make bed", "Practice piano", "Homework", "Tidy room"] },
+    { key: "willoughby", name: "Willoughby", chores: ["Make bed", "Homework", "Set the table"] },
+    { key: "raff", name: "Raff", chores: ["Make bed", "Put toys away", "Brush teeth"] },
+  ];
+  for (let i = 0; i < kidSpecs.length; i++) {
+    const spec = kidSpecs[i];
+    const kid = await prisma.kid.upsert({
+      where: { id: `seed-kid-${spec.key}` },
+      update: { name: spec.name, order: i },
+      create: { id: `seed-kid-${spec.key}`, householdId: household.id, name: spec.name, order: i },
+    });
+    for (let c = 0; c < spec.chores.length; c++) {
+      const id = `seed-chore-${spec.key}-${c}`;
+      await prisma.chore.upsert({
+        where: { id },
+        update: { label: spec.chores[c], order: c },
+        create: {
+          id,
+          householdId: household.id,
+          kidId: kid.id,
+          label: spec.chores[c],
+          order: c,
+        },
+      });
+    }
+  }
+
   console.log(`Seeded household "${household.name}" with ${deviceSpecs.length} devices.`);
   console.log(
     `Parents can sign in with soph@example.com / bj@example.com (password: "${SEED_PASSWORD}").`,

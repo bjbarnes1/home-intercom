@@ -29,6 +29,25 @@ interface EndpointReminder {
   nextRunAt: string | null;
 }
 
+interface JobChore {
+  id: string;
+  label: string;
+  done: boolean;
+}
+interface JobKid {
+  id: string;
+  name: string;
+  initial: string;
+  total: number;
+  doneToday: number;
+  streak: number;
+  chores: JobChore[];
+}
+interface JobBoard {
+  weekDoneTotal: number;
+  kids: JobKid[];
+}
+
 export default function EndpointPage() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [rail, setRail] = useState<Rail>("home");
@@ -40,6 +59,7 @@ export default function EndpointPage() {
   const [now, setNow] = useState(() => new Date());
   const [reminders, setReminders] = useState<EndpointReminder[]>([]);
   const [speaking, setSpeaking] = useState<EndpointReminder | null>(null);
+  const [board, setBoard] = useState<JobBoard | null>(null);
 
   const lobbyRef = useRef<Room | null>(null);
   const mediaRef = useRef<Room | null>(null);
@@ -146,6 +166,46 @@ export default function EndpointPage() {
     const t = setInterval(loadReminders, 60_000);
     return () => clearInterval(t);
   }, [phase, loadReminders]);
+
+  // Jobs board.
+  const loadJobs = useCallback(async () => {
+    const secret = getDeviceSecret();
+    if (!secret) return;
+    const res = await fetch("/api/jobs", { headers: { "x-device-secret": secret } });
+    if (res.ok) setBoard(await res.json());
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "ready") return;
+    loadJobs();
+    const t = setInterval(loadJobs, 30_000);
+    return () => clearInterval(t);
+  }, [phase, loadJobs]);
+
+  const tick = useCallback(async (choreId: string) => {
+    const secret = getDeviceSecret();
+    if (!secret) return;
+    // Optimistic toggle.
+    setBoard((b) =>
+      b
+        ? {
+            ...b,
+            kids: b.kids.map((k) => {
+              const chores = k.chores.map((c) =>
+                c.id === choreId ? { ...c, done: !c.done } : c,
+              );
+              return { ...k, chores, doneToday: chores.filter((c) => c.done).length };
+            }),
+          }
+        : b,
+    );
+    await fetch("/api/jobs/tick", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-device-secret": secret },
+      body: JSON.stringify({ choreId }),
+    }).catch(() => {});
+    loadJobs();
+  }, [loadJobs]);
 
   const playReminder = useCallback((r: EndpointReminder) => {
     setSpeaking(r);
@@ -347,11 +407,87 @@ export default function EndpointPage() {
           />
         )}
         {rail === "jobs" && (
-          <ComingSoon
-            icon="ph-list-checks"
-            title="Jobs & chore streaks"
-            body="Tap-to-tick chore charts land in the smart-display phase."
-          />
+          <div className="flex flex-1 flex-col overflow-hidden px-7 pb-6">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <h3 className="m-0">Jobs</h3>
+                <div className="text-xs text-neutral-500">
+                  Tap a job when it&apos;s done · resets each week
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="font-heading text-2xl font-medium">
+                  {board?.weekDoneTotal ?? 0}
+                </div>
+                <div className="text-[11px] text-neutral-500">done this week</div>
+              </div>
+            </div>
+            <div className="grid flex-1 grid-cols-4 gap-3 overflow-hidden">
+              {(board?.kids ?? []).map((k) => {
+                const pct = k.total ? Math.round((k.doneToday / k.total) * 100) : 0;
+                return (
+                  <div key={k.id} className="card flex min-h-0 flex-col gap-2.5 p-3.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="grid h-9 w-9 flex-none place-items-center rounded-full bg-accent-900 font-heading text-base font-medium text-accent-200">
+                        {k.initial}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-heading text-[17px] font-medium">
+                          {k.name}
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] text-accent-300">
+                          <i className="ph-fill ph-flame text-xs" />
+                          {k.streak > 0 ? `${k.streak}-day streak` : "No streak yet"}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="h-1 overflow-hidden rounded bg-neutral-800">
+                      <div
+                        className="h-full rounded bg-accent transition-all"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    <div className="text-[11px] text-neutral-500">
+                      {k.doneToday} of {k.total} today
+                    </div>
+                    <div className="no-scrollbar flex flex-col gap-1.5 overflow-auto">
+                      {k.chores.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => tick(c.id)}
+                          className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition ${
+                            c.done ? "bg-accent-900/60" : "hover:bg-neutral-800"
+                          }`}
+                        >
+                          <span
+                            className={`grid h-5 w-5 flex-none place-items-center rounded-md border ${
+                              c.done
+                                ? "border-accent bg-accent text-[#141221]"
+                                : "border-neutral-600"
+                            }`}
+                          >
+                            {c.done && <i className="ph-bold ph-check text-[11px]" />}
+                          </span>
+                          <span
+                            className={
+                              c.done ? "text-neutral-500 line-through" : "text-neutral-200"
+                            }
+                          >
+                            {c.label}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+              {(!board || board.kids.length === 0) && (
+                <div className="col-span-4 grid place-items-center text-neutral-500">
+                  No kids set up yet.
+                </div>
+              )}
+            </div>
+          </div>
         )}
 
         {rail === "sound" && (
