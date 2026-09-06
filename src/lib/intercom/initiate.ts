@@ -40,7 +40,10 @@ export interface InitiateResult {
   room: string;
   /** Token for the initiator to join and publish. */
   initiatorToken: string;
+  /** Endpoints the join command was delivered to (present in the lobby). */
   reached: string[];
+  /** Endpoints online per heartbeat but not connected to the control channel. */
+  notConnected: string[];
   suppressedByDnd: string[];
   offline: string[];
 }
@@ -90,11 +93,18 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     input.kind === "call" ? "duplex" : "listen";
   const initiatorRole = input.kind === "call" ? "duplex" : "talk";
 
+  // Of the heartbeat-online targets, which are actually connected to the lobby
+  // control channel right now? Only those can receive the join command.
+  const sender = controlSender();
+  const connectedList = await sender.connected(resolved.targets);
+  const connected = new Set(connectedList);
+  const notConnected = resolved.targets.filter((id) => !connected.has(id));
+
   const event = await prisma.intercomEvent.create({
     data: {
       householdId: input.householdId,
       type: input.kind.toUpperCase() as "PAGE" | "CALL" | "BROADCAST",
-      outcome: resolved.targets.length > 0 ? "DELIVERED" : "MISSED",
+      outcome: connectedList.length > 0 ? "DELIVERED" : "MISSED",
       roomName: room,
       initiatorUserId: input.initiatorUserId,
       targetDeviceId: input.targetDeviceId,
@@ -103,12 +113,11 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     select: { id: true },
   });
 
-  // Mint a scoped token per reached endpoint and push the join command. A send
-  // that fails (e.g. the endpoint dropped its lobby connection) must not fail
-  // the whole request — the initiator still gets its token to talk.
-  const sender = controlSender();
+  // Mint a scoped token per reachable endpoint and push the join command. A send
+  // that fails must not fail the whole request — the initiator still gets its
+  // token to talk.
   await Promise.all(
-    resolved.targets.map(async (deviceId) => {
+    connectedList.map(async (deviceId) => {
       try {
         const token = await mintToken({
           identity: deviceId,
@@ -141,7 +150,8 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     eventId: event.id,
     room,
     initiatorToken,
-    reached: resolved.targets,
+    reached: connectedList,
+    notConnected,
     suppressedByDnd: resolved.suppressedByDnd,
     offline: resolved.offline,
   };

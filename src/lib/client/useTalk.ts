@@ -65,8 +65,13 @@ export function useTalk() {
 
         const reached = (data.reached ?? []).length;
         if (reached === 0) {
+          const notConnected = (data.notConnected ?? []).length;
           setStatus("error");
-          setMessage("Nobody online to hear that.");
+          setMessage(
+            notConnected > 0
+              ? "That screen isn't connected to audio — open or refresh its panel."
+              : "Nobody online to hear that.",
+          );
           return { reached: 0 };
         }
 

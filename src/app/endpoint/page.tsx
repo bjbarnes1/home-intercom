@@ -93,6 +93,8 @@ export default function EndpointPage() {
   const [halfDuplex, setHalfDuplex] = useState(false);
   const [quietHours, setQuietHours] = useState(false);
   const [chime, setChime] = useState(true);
+  const [receiving, setReceiving] = useState(false);
+  const [mock, setMock] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [reminders, setReminders] = useState<EndpointReminder[]>([]);
   const [speaking, setSpeaking] = useState<EndpointReminder | null>(null);
@@ -170,9 +172,11 @@ export default function EndpointPage() {
       }
       const data = await res.json();
       setDnd(!!data.doNotDisturb);
+      setMock(!!data.mock);
       setPhase("ready");
 
-      // Real mode: keep a lobby connection for control messages.
+      // Real mode: keep a lobby connection for control messages, and
+      // re-establish it whenever it drops (token expiry, network blip, sleep).
       if (!data.mock && !lobbyRef.current) {
         const r = new Room();
         lobbyRef.current = r;
@@ -199,11 +203,26 @@ export default function EndpointPage() {
             /* ignore malformed control message */
           }
         });
-        await r.connect(data.livekitUrl, data.lobbyToken);
+        r.on(RoomEvent.Disconnected, () => {
+          if (lobbyRef.current === r) {
+            lobbyRef.current = null; // allow the next heartbeat to reconnect
+            setReceiving(false);
+          }
+        });
+        try {
+          await r.connect(data.livekitUrl, data.lobbyToken);
+          setReceiving(true);
+        } catch (e) {
+          if (lobbyRef.current === r) lobbyRef.current = null;
+          setReceiving(false);
+          throw e;
+        }
       }
     } catch (e) {
-      setPhase("error");
       setNote(e instanceof Error ? e.message : "Connection failed");
+      // Don't drop the whole panel to an error screen for a transient lobby
+      // hiccup — the heartbeat will retry.
+      setPhase((p) => (p === "ready" ? p : "error"));
     }
   }, [joinMedia, leaveMedia]);
 
@@ -437,8 +456,15 @@ export default function EndpointPage() {
       {/* main */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex flex-none items-center gap-3 px-7 pb-3 pt-5">
-          <div className="flex-1 text-sm text-neutral-400">
-            {phase === "ready" ? "Connected" : "Connecting…"}
+          <div className="flex flex-1 items-center gap-2 text-sm text-neutral-400">
+            <span
+              className={`dot ${mock ? "dot-offline" : receiving ? "dot-online" : "dot-offline"}`}
+            />
+            {mock
+              ? "Demo mode — audio disabled"
+              : receiving
+                ? "Ready to receive"
+                : "Connecting to audio…"}
           </div>
           <button
             onClick={() => {

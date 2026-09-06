@@ -12,6 +12,8 @@ import { encodeCommand, type ControlCommand } from "@/lib/control/commands";
 
 export interface ControlSender {
   send(deviceIds: string[], command: ControlCommand): Promise<void>;
+  /** Of the given device ids, which are actually connected to the lobby. */
+  connected(deviceIds: string[]): Promise<string[]>;
 }
 
 class MockControlSender implements ControlSender {
@@ -20,6 +22,10 @@ class MockControlSender implements ControlSender {
     this.sent.push({ deviceIds, command });
     // eslint-disable-next-line no-console
     console.info(`[mock control] -> ${deviceIds.join(", ")}: ${command.type}`);
+  }
+  async connected(deviceIds: string[]): Promise<string[]> {
+    // In mock mode there is no real lobby; treat all as reachable.
+    return deviceIds;
   }
 }
 
@@ -41,6 +47,18 @@ class LiveKitControlSender implements ControlSender {
       DataPacket_Kind.RELIABLE,
       { destinationIdentities: deviceIds },
     );
+  }
+
+  async connected(deviceIds: string[]): Promise<string[]> {
+    if (deviceIds.length === 0) return [];
+    try {
+      const participants = await this.client.listParticipants(LOBBY_ROOM);
+      const present = new Set(participants.map((p) => p.identity));
+      return deviceIds.filter((id) => present.has(id));
+    } catch {
+      // Room doesn't exist yet → nobody connected.
+      return [];
+    }
   }
 }
 
