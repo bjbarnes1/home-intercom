@@ -9,6 +9,7 @@ import {
   clearDeviceCredentials,
 } from "@/lib/client/identity";
 import { decodeCommand } from "@/lib/control/commands";
+import { speak, reminderTime } from "@/lib/client/speak";
 import Toggle from "@/components/Toggle";
 
 type Phase = "loading" | "unpaired" | "ready" | "error";
@@ -17,6 +18,15 @@ type Rail = "home" | "schedule" | "jobs" | "reminders" | "sound";
 interface Incoming {
   title: string;
   mode: string;
+}
+
+interface EndpointReminder {
+  id: string;
+  text: string;
+  sound: string | null;
+  cron: string | null;
+  runAt: string | null;
+  nextRunAt: string | null;
 }
 
 export default function EndpointPage() {
@@ -28,6 +38,8 @@ export default function EndpointPage() {
   const [dnd, setDnd] = useState(false);
   const [incoming, setIncoming] = useState<Incoming | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [reminders, setReminders] = useState<EndpointReminder[]>([]);
+  const [speaking, setSpeaking] = useState<EndpointReminder | null>(null);
 
   const lobbyRef = useRef<Room | null>(null);
   const mediaRef = useRef<Room | null>(null);
@@ -117,6 +129,35 @@ export default function EndpointPage() {
     const t = setInterval(heartbeat, 10_000);
     return () => clearInterval(t);
   }, [heartbeat]);
+
+  // Load this panel's reminders once paired, and refresh periodically.
+  const loadReminders = useCallback(async () => {
+    const secret = getDeviceSecret();
+    if (!secret) return;
+    const res = await fetch("/api/endpoint/reminders", {
+      headers: { "x-device-secret": secret },
+    });
+    if (res.ok) setReminders((await res.json()).reminders ?? []);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "ready") return;
+    loadReminders();
+    const t = setInterval(loadReminders, 60_000);
+    return () => clearInterval(t);
+  }, [phase, loadReminders]);
+
+  const playReminder = useCallback((r: EndpointReminder) => {
+    setSpeaking(r);
+    speak(r.text);
+  }, []);
+
+  const dismissReminder = useCallback(() => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setSpeaking(null);
+  }, []);
 
   const claim = useCallback(async () => {
     setNote("");
@@ -230,22 +271,73 @@ export default function EndpointPage() {
             </div>
             <div className="mt-3 text-xl text-neutral-400">{dateLong}</div>
             <div className="mt-9 flex gap-3">
-              <InfoCard label="Household" value={room} sub="This wall panel" />
               <InfoCard
                 label="Status"
                 value={dnd ? "Do not disturb" : "Listening"}
                 sub={phase === "ready" ? "Online" : "Reconnecting"}
               />
+              {reminders[0] ? (
+                <button
+                  onClick={() => setRail("reminders")}
+                  className="card card-hover flex-1 p-4 text-left"
+                >
+                  <div className="uplabel mb-1.5 text-accent">
+                    Next reminder · {reminderTime(reminders[0])}
+                  </div>
+                  <div className="font-heading text-lg font-medium leading-snug">
+                    {reminders[0].text}
+                  </div>
+                </button>
+              ) : (
+                <InfoCard label="Household" value={room} sub="This wall panel" />
+              )}
             </div>
           </div>
         )}
 
         {rail === "reminders" && (
-          <ComingSoon
-            icon="ph-bell-simple"
-            title="Reminders speak here on schedule"
-            body="This panel plays scheduled reminders aloud. The list view is wiring up next — parents already create and manage reminders from the Controller."
-          />
+          <div className="flex flex-1 flex-col overflow-hidden px-7 pb-8">
+            <div className="mb-4 flex items-end justify-between">
+              <div>
+                <h3 className="m-0">Reminders</h3>
+                <div className="text-xs text-neutral-500">
+                  Spoken here on schedule · edit them on a parent&apos;s phone
+                </div>
+              </div>
+              <span className="tag tag-outline whitespace-nowrap">{room} only</span>
+            </div>
+            <div className="no-scrollbar flex-1 overflow-auto">
+              {reminders.length === 0 && (
+                <div className="py-16 text-center text-neutral-500">
+                  <i className="ph ph-bell-simple mb-2 block text-3xl text-accent-400" />
+                  <div className="text-sm">Nothing scheduled for this room.</div>
+                </div>
+              )}
+              {reminders.map((r) => (
+                <div
+                  key={r.id}
+                  className="flex items-center gap-4 border-b border-divider py-3.5"
+                >
+                  <div className="w-20 flex-none font-heading text-lg font-medium text-accent-300">
+                    {reminderTime(r)}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[17px]">{r.text}</div>
+                    <div className="mt-0.5 text-xs text-neutral-500">
+                      {r.cron ? "Repeats daily" : "Once"}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => playReminder(r)}
+                    className="btn btn-secondary min-h-11"
+                  >
+                    <i className="ph ph-play text-[15px]" />
+                    Play now
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
         {rail === "schedule" && (
           <ComingSoon
@@ -312,6 +404,38 @@ export default function EndpointPage() {
             <i className="ph ph-x text-lg" />
             Dismiss
           </button>
+        </div>
+      )}
+
+      {/* reminder speaking overlay */}
+      {speaking && (
+        <div
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-14 text-center"
+          style={{
+            background:
+              "linear-gradient(160deg, var(--color-neutral-900), var(--color-bg) 60%)",
+          }}
+        >
+          <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-accent">
+            <i className="ph-fill ph-bell-ringing text-lg" />
+            Reminder · {room}
+          </div>
+          <div className="max-w-3xl font-heading text-5xl font-medium leading-tight">
+            {speaking.text}
+          </div>
+          <div className="mt-2 flex gap-3.5">
+            <button onClick={dismissReminder} className="btn btn-outline min-h-14 px-8 text-base">
+              <i className="ph ph-check text-lg" />
+              Got it
+            </button>
+            <button
+              onClick={() => speak(speaking.text)}
+              className="btn btn-secondary min-h-14 px-7 text-base"
+            >
+              <i className="ph ph-repeat text-lg" />
+              Again
+            </button>
+          </div>
         </div>
       )}
 
