@@ -11,6 +11,13 @@ function bool(value: string | undefined, fallback = false): boolean {
   return value === "1" || value.toLowerCase() === "true";
 }
 
+/** Treat empty/whitespace env vars as unset (Vercel can store empty strings). */
+function str(value: string | undefined): string | undefined {
+  if (value == null) return undefined;
+  const trimmed = value.trim();
+  return trimmed === "" ? undefined : trimmed;
+}
+
 export const env = {
   /**
    * When true, cloud/home-server integrations (LiveKit token signing against a
@@ -21,14 +28,15 @@ export const env = {
 
   livekit: {
     /** Server-side URL used by the backend SDK. */
-    url: process.env.LIVEKIT_URL ?? "ws://localhost:7880",
-    /** Browser-facing URL (may differ behind a tunnel). */
+    url: str(process.env.LIVEKIT_URL) ?? "ws://localhost:7880",
+    /** Browser-facing URL (may differ behind a tunnel). Empty NEXT_PUBLIC value
+     *  falls back to LIVEKIT_URL rather than becoming an empty string. */
     publicUrl:
-      process.env.NEXT_PUBLIC_LIVEKIT_URL ??
-      process.env.LIVEKIT_URL ??
+      str(process.env.NEXT_PUBLIC_LIVEKIT_URL) ??
+      str(process.env.LIVEKIT_URL) ??
       "ws://localhost:7880",
-    apiKey: process.env.LIVEKIT_API_KEY ?? "devkey",
-    apiSecret: process.env.LIVEKIT_API_SECRET ?? "devsecret",
+    apiKey: str(process.env.LIVEKIT_API_KEY) ?? "devkey",
+    apiSecret: str(process.env.LIVEKIT_API_SECRET) ?? "devsecret",
   },
 
   push: {
