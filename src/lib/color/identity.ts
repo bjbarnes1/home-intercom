@@ -1,6 +1,9 @@
 /**
  * Home Intercom — identity colour map.
  * Mirrors docs/handoff/colours/identity.css. Do not fork.
+ *
+ * Identity is returned as a CSS custom property, never a literal, so the light
+ * ground is a pure CSS swap.
  */
 
 import type { CSSProperties } from "react";
@@ -9,23 +12,25 @@ export type Person = "Gus" | "Georgette" | "Willoughby" | "Raff" | "Mum" | "Dad"
 export type Room = "Kitchen" | "Rumpus" | "Lounge";
 export type Zone = "Everyone" | "Kids" | "Downstairs";
 export type Identity = Person | Room | Zone;
+export type Theme = "dark" | "light";
+export type ThemePref = Theme | "auto";
 
-export const IDENT: Record<Identity, string> = {
-  Gus: "oklch(0.75 0.115 205)",
-  Georgette: "oklch(0.74 0.125 350)",
-  Willoughby: "oklch(0.80 0.125 72)",
-  Raff: "oklch(0.77 0.125 148)",
-  Mum: "oklch(0.74 0.125 350)",
-  Dad: "oklch(0.75 0.115 205)",
-  Kitchen: "oklch(0.71 0.125 289)",
-  Rumpus: "oklch(0.73 0.12 262)",
-  Lounge: "oklch(0.75 0.13 28)",
-  Kids: "oklch(0.75 0.12 320)",
-  Downstairs: "oklch(0.74 0.11 240)",
-  Everyone: "oklch(0.72 0.125 289)",
+const TOKEN: Record<Identity, string> = {
+  Gus: "gus",
+  Georgette: "georgette",
+  Willoughby: "willoughby",
+  Raff: "raff",
+  Mum: "mum",
+  Dad: "dad",
+  Kitchen: "kitchen",
+  Rumpus: "rumpus",
+  Lounge: "lounge",
+  Kids: "kids",
+  Downstairs: "downstairs",
+  Everyone: "everyone",
 };
 
-/** Plain-English colour name, for labels and accessibility copy. */
+/** Plain-English colour name — theme-stable (light retunes lightness, not hue). */
 export const COLOR_NAME: Record<Identity, string> = {
   Gus: "teal",
   Georgette: "rose",
@@ -54,7 +59,7 @@ const GROUND = "var(--hi-bg)";
 export function resolveIdentity(name?: string | null): Identity | undefined {
   if (!name) return undefined;
   const trimmed = name.trim();
-  if (IDENT[trimmed as Identity]) return trimmed as Identity;
+  if (TOKEN[trimmed as Identity]) return trimmed as Identity;
 
   const lower = trimmed.toLowerCase();
   if (lower.includes("willoughby")) return "Willoughby";
@@ -74,7 +79,15 @@ export function resolveIdentity(name?: string | null): Identity | undefined {
 
 export const ident = (name?: string | null): string => {
   const key = resolveIdentity(name);
-  return (key && IDENT[key]) || ACCENT_FALLBACK;
+  const t = key && TOKEN[key];
+  return t ? `var(--hi-ident-${t})` : ACCENT_FALLBACK;
+};
+
+/** Identity as emitted light — LED bars only; never re-tuned by theme. */
+export const litIdent = (name?: string | null): string => {
+  const key = resolveIdentity(name);
+  const t = key && TOKEN[key];
+  return t ? `var(--hi-lit-${t})` : ACCENT_FALLBACK;
 };
 
 /** All blends run in oklab — hue-interpolating spaces skew warm tints magenta. */
@@ -96,4 +109,16 @@ export const reaches = (target: string | undefined, room: Room): boolean => {
   if (!target) return false;
   if (target === room) return true;
   return (ZONE_MEMBERS[target as Zone] ?? []).includes(room);
+};
+
+/** lux thresholds with a dead band, so a passing cloud can't flicker the panel. */
+export const resolveTheme = (
+  pref: ThemePref,
+  lux: number,
+  current: Theme = "dark",
+): Theme => {
+  if (pref !== "auto") return pref;
+  if (lux > 120) return "light";
+  if (lux < 60) return "dark";
+  return current;
 };

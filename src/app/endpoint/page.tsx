@@ -245,19 +245,27 @@ export default function EndpointPage() {
       style={identStyle(room)}
     >
       <div
-        className="hi-led-bar absolute left-3 right-3 top-2 z-50 h-1.5"
-        data-live={front.live}
-        style={ledStyle(front)}
+        className="hi-led-fixture absolute left-3 right-3 top-2 z-50"
         title={front.why}
         aria-hidden
-      />
+      >
+        <div
+          className="hi-led-bar h-1.5"
+          data-live={front.live}
+          style={ledStyle(front)}
+        />
+      </div>
       <div
-        className="hi-led-bar absolute bottom-2 left-3 right-3 z-50 h-1"
-        data-live={rear.live}
-        style={ledStyle(rear)}
+        className="hi-led-fixture absolute bottom-2 left-3 right-3 z-50"
         title={rear.why}
         aria-hidden
-      />
+      >
+        <div
+          className="hi-led-bar h-1"
+          data-live={rear.live}
+          style={ledStyle(rear)}
+        />
+      </div>
       <nav className="flex w-56 flex-none flex-col gap-1.5 border-r border-divider p-5 pt-6">
         <div className="px-2 pb-4">
           <div
@@ -279,7 +287,7 @@ export default function EndpointPage() {
                 : "text-neutral-300 hover:bg-surface"
             }`}
             style={
-              rail === key ? { background: "var(--hi-tint-22)" } : undefined
+              rail === key ? { background: "var(--hi-tint-3)" } : undefined
             }
           >
             <i className={`ph ${icon} text-xl`} />
@@ -291,7 +299,7 @@ export default function EndpointPage() {
           className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] ${
             dnd ? "text-accent-200" : "text-neutral-500"
           }`}
-          style={dnd ? { background: "var(--hi-tint-14)" } : undefined}
+          style={dnd ? { background: "var(--hi-tint-2)" } : undefined}
         >
           <i className="ph ph-moon text-base" />
           {dnd ? "Do not disturb" : "Available"}

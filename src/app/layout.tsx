@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import ClientErrorBridge from "@/components/ClientErrorBridge";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
   title: "Home Intercom",
@@ -55,9 +56,11 @@ export default function RootLayout({
         />
       </head>
       <body>
-        <ServiceWorkerRegistrar />
-        <ClientErrorBridge />
-        {children}
+        <ThemeProvider>
+          <ServiceWorkerRegistrar />
+          <ClientErrorBridge />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,20 +1,34 @@
 /* Home Intercom — identity & LED colour tokens
  * Source of truth for the mockups in this project (Home Intercom v2).
  * Every colour is OKLCH; every blend is done in oklab so warm hues stay warm
- * against the indigo ground (hue-interpolating mixes turned tints pink/teal).
+ * against the ground (hue-interpolating mixes turned tints pink/teal).
+ *
+ * Two grounds. Dark is the default (wall panels at night, phones in dark mode);
+ * light is opt-in via [data-theme="light"] on any ancestor — the panels sit in a
+ * kitchen, and in daylight a dark bar behind glass is a mirror. Nothing below
+ * needs a JS branch: identity is read as a token, so the theme swap is CSS only.
  */
 
 :root {
-  /* --- Ground (from the Nocturne theme; keep in step with styles.css) --- */
-  --hi-bg: #161826;
+  /* --- Ground (dark; from the Nocturne theme — keep in step with styles.css) --- */
+  --hi-bg:      #161826;
+  --hi-surface: var(--color-neutral-800, #26283a);
+  --hi-ink:     var(--color-text, #e9e9ed);
+  --hi-ink-dim: var(--color-neutral-300, #a8a8b8);
+  --hi-rule:    var(--color-divider, #2c2e40);
+
+  /* The physical fixture the LEDs sit in. Constant across themes: emitted light
+   * is only truthful against something dark, and it keeps the bar legible on a
+   * light page without faking the colour. */
+  --hi-fixture: #101120;
 
   /* --- Identity: one hue per person --- */
   --hi-ident-gus:        oklch(0.75 0.115 205);  /* teal   */
   --hi-ident-georgette:  oklch(0.74 0.125 350);  /* rose   */
   --hi-ident-willoughby: oklch(0.80 0.125 72);   /* amber  */
   --hi-ident-raff:       oklch(0.77 0.125 148);  /* green  */
-  --hi-ident-mum:        oklch(0.74 0.125 350);
-  --hi-ident-dad:        oklch(0.75 0.115 205);
+  --hi-ident-mum:        var(--hi-ident-georgette);
+  --hi-ident-dad:        var(--hi-ident-gus);
 
   /* --- Identity: one hue per room --- */
   --hi-ident-kitchen:    oklch(0.71 0.125 289);  /* blurple */
@@ -22,11 +36,36 @@
   --hi-ident-lounge:     oklch(0.75 0.13 28);    /* coral   */
 
   /* --- Identity: zones --- */
-  --hi-ident-kids:       oklch(0.75 0.12 320);   /* pink   */
-  --hi-ident-downstairs: oklch(0.74 0.11 240);   /* blue   */
+  --hi-ident-kids:       oklch(0.75 0.12 320);   /* pink    */
+  --hi-ident-downstairs: oklch(0.74 0.11 240);   /* blue    */
   --hi-ident-everyone:   oklch(0.72 0.125 289);  /* blurple */
 
-  /* --- LED bar palette (the six colours a user can pick) --- */
+  /* --- Identity as emitted light. Same numbers as the dark ramp, but these are
+   * NEVER re-tuned by theme: an LED showing "who is on air" is a light source,
+   * so it must not dim because the screen went light. Use --hi-lit-* for the
+   * bar, --hi-ident-* for anything drawn on the screen. --- */
+  --hi-lit-gus:        oklch(0.75 0.115 205);
+  --hi-lit-georgette:  oklch(0.74 0.125 350);
+  --hi-lit-willoughby: oklch(0.80 0.125 72);
+  --hi-lit-raff:       oklch(0.77 0.125 148);
+  --hi-lit-mum:        var(--hi-lit-georgette);
+  --hi-lit-dad:        var(--hi-lit-gus);
+  --hi-lit-kitchen:    oklch(0.71 0.125 289);
+  --hi-lit-rumpus:     oklch(0.73 0.12 262);
+  --hi-lit-lounge:     oklch(0.75 0.13 28);
+  --hi-lit-kids:       oklch(0.75 0.12 320);
+  --hi-lit-downstairs: oklch(0.74 0.11 240);
+  --hi-lit-everyone:   oklch(0.72 0.125 289);
+
+  /* --- Tint strengths. Light mode overrides these, not the hues. --- */
+  --hi-t-1: 8%;
+  --hi-t-2: 14%;
+  --hi-t-3: 22%;
+  --hi-t-4: 55%;
+
+  /* --- LED bar palette (the six colours a user can pick).
+   * These are emitted-light values and do NOT change between themes — the
+   * firmware gets the same number either way. --- */
   --hi-led-warm:   oklch(0.80 0.11 68);
   --hi-led-amber:  oklch(0.77 0.14 48);
   --hi-led-rose:   oklch(0.72 0.14 350);
@@ -36,7 +75,42 @@
 
   /* --- Reserved LED states --- */
   --hi-led-dnd:    oklch(0.52 0.09 25);          /* dim red, never user-pickable */
-  --hi-led-off:    var(--color-neutral-800, #26283a);
+  --hi-led-off:    #23253a;
+}
+
+/* --- Light ground -----------------------------------------------------------
+ * Same hues, re-tuned for a light backdrop: identity drops to OKLCH lightness
+ * ~0.52 (from ~0.75) so identity-coloured text clears 4.5:1 on the light
+ * ground, and chroma rises a little to keep each hue as recognisable as its
+ * dark twin. Tints drop to roughly half strength — on white, a 14% wash is
+ * already a strong colour.
+ */
+[data-theme="light"] {
+  --hi-bg:      #f4f4f8;
+  --hi-surface: #fbfbfd;
+  --hi-ink:     #1b1c28;
+  --hi-ink-dim: #5c5d70;
+  --hi-rule:    #dcdce6;
+
+  --hi-ident-gus:        oklch(0.52 0.11 205);
+  --hi-ident-georgette:  oklch(0.53 0.15 350);
+  --hi-ident-willoughby: oklch(0.55 0.14 72);
+  --hi-ident-raff:       oklch(0.52 0.13 148);
+
+  --hi-ident-kitchen:    oklch(0.52 0.16 289);
+  --hi-ident-rumpus:     oklch(0.50 0.16 262);
+  --hi-ident-lounge:     oklch(0.55 0.17 28);
+
+  --hi-ident-kids:       oklch(0.53 0.16 320);
+  --hi-ident-downstairs: oklch(0.52 0.14 240);
+  --hi-ident-everyone:   oklch(0.52 0.16 289);
+
+  --hi-t-1: 5%;
+  --hi-t-2: 9%;
+  --hi-t-3: 15%;
+  --hi-t-4: 45%;
+
+  --hi-led-off: #d6d6e2;
 }
 
 /* Identity is applied by setting --hi-ident on a subtree, then reading the
@@ -47,27 +121,28 @@
 .hi-tinted {
   --hi-ident: var(--color-accent, #9184d9);
 
-  --hi-tint-8:   color-mix(in oklab, var(--hi-ident) 8%,  var(--hi-bg));
-  --hi-tint-14:  color-mix(in oklab, var(--hi-ident) 14%, var(--hi-bg));
-  --hi-tint-22:  color-mix(in oklab, var(--hi-ident) 22%, var(--hi-bg));
-  --hi-tint-55:  color-mix(in oklab, var(--hi-ident) 55%, var(--hi-bg));
-  --hi-glow-30:  color-mix(in oklab, var(--hi-ident) 30%, transparent);
-  --hi-glow-55:  color-mix(in oklab, var(--hi-ident) 55%, transparent);
+  --hi-tint-1:  color-mix(in oklab, var(--hi-ident) var(--hi-t-1), var(--hi-bg));
+  --hi-tint-2:  color-mix(in oklab, var(--hi-ident) var(--hi-t-2), var(--hi-bg));
+  --hi-tint-3:  color-mix(in oklab, var(--hi-ident) var(--hi-t-3), var(--hi-bg));
+  --hi-tint-4:  color-mix(in oklab, var(--hi-ident) var(--hi-t-4), var(--hi-bg));
+  --hi-glow-30: color-mix(in oklab, var(--hi-ident) 30%, transparent);
+  --hi-glow-55: color-mix(in oklab, var(--hi-ident) 55%, transparent);
 }
 
 /* Chip / pill: outlined when idle, identity-tinted when selected. */
 .hi-chip {
   display: flex; align-items: center; gap: 7px;
   min-height: 44px; padding: 9px 14px;
-  border: 1px solid var(--color-divider);
+  border: 1px solid var(--hi-rule);
   border-radius: 8px;
-  color: var(--color-neutral-300);
+  background: transparent;
+  color: var(--hi-ink-dim);
   font-size: 13px; white-space: nowrap; cursor: pointer;
 }
 .hi-chip[aria-pressed="true"] {
   border-color: var(--hi-ident);
   color: var(--hi-ident);
-  background: var(--hi-tint-14);
+  background: var(--hi-tint-2);
 }
 .hi-chip:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 2px; }
 
@@ -75,20 +150,27 @@
 .hi-hold {
   display: flex; align-items: center; gap: 8px;
   min-height: 52px; padding: 0 18px;
-  border: 1px solid var(--color-divider);
+  border: 1px solid var(--hi-rule);
   border-radius: 8px;
-  color: var(--color-text);
+  background: transparent;
+  color: var(--hi-ink);
   font-family: var(--font-heading); font-weight: 500; font-size: 16px;
   cursor: pointer; user-select: none; touch-action: none;
 }
 .hi-hold[data-active="true"] {
   border-color: var(--hi-ident);
   color: var(--hi-ident);
-  background: color-mix(in oklab, var(--hi-ident) 16%, var(--hi-bg));
+  background: var(--hi-tint-3);
 }
 
-/* The LED bar itself: --hi-led is the resolved state colour, --hi-led-alpha the
- * brightness step (rear bar only; the front bar is always full). */
+/* The LED fixture: the bar always sits on a dark housing so emitted colour is
+ * shown as light, not as paint. --hi-led is the resolved state colour,
+ * --hi-led-alpha the brightness step (rear bar only; the front bar is full). */
+.hi-led-fixture {
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--hi-fixture);
+}
 .hi-led-bar {
   border-radius: 999px;
   background: var(--hi-led);

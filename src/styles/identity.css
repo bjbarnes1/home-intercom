@@ -1,16 +1,26 @@
 /* Home Intercom — identity & LED colour tokens
  * From docs/handoff/colours. Blends in oklab so warm hues stay warm.
+ *
+ * Two grounds. Dark is default; light via [data-theme="light"] on an ancestor.
+ * Identity is read as a token, so the theme swap is CSS only.
  */
 
 :root {
   --hi-bg: #161826;
+  --hi-surface: var(--color-neutral-800, #26283a);
+  --hi-ink: var(--color-text, #e9e9ed);
+  --hi-ink-dim: var(--color-neutral-300, #a8a8b8);
+  --hi-rule: var(--color-divider, #2c2e40);
+
+  /* Physical LED fixture — constant across themes. */
+  --hi-fixture: #101120;
 
   --hi-ident-gus: oklch(0.75 0.115 205);
   --hi-ident-georgette: oklch(0.74 0.125 350);
-  --hi-ident-willoughby: oklch(0.80 0.125 72);
+  --hi-ident-willoughby: oklch(0.8 0.125 72);
   --hi-ident-raff: oklch(0.77 0.125 148);
-  --hi-ident-mum: oklch(0.74 0.125 350);
-  --hi-ident-dad: oklch(0.75 0.115 205);
+  --hi-ident-mum: var(--hi-ident-georgette);
+  --hi-ident-dad: var(--hi-ident-gus);
 
   --hi-ident-kitchen: oklch(0.71 0.125 289);
   --hi-ident-rumpus: oklch(0.73 0.12 262);
@@ -20,7 +30,26 @@
   --hi-ident-downstairs: oklch(0.74 0.11 240);
   --hi-ident-everyone: oklch(0.72 0.125 289);
 
-  --hi-led-warm: oklch(0.80 0.11 68);
+  /* Emitted light — never re-tuned by theme. */
+  --hi-lit-gus: oklch(0.75 0.115 205);
+  --hi-lit-georgette: oklch(0.74 0.125 350);
+  --hi-lit-willoughby: oklch(0.8 0.125 72);
+  --hi-lit-raff: oklch(0.77 0.125 148);
+  --hi-lit-mum: var(--hi-lit-georgette);
+  --hi-lit-dad: var(--hi-lit-gus);
+  --hi-lit-kitchen: oklch(0.71 0.125 289);
+  --hi-lit-rumpus: oklch(0.73 0.12 262);
+  --hi-lit-lounge: oklch(0.75 0.13 28);
+  --hi-lit-kids: oklch(0.75 0.12 320);
+  --hi-lit-downstairs: oklch(0.74 0.11 240);
+  --hi-lit-everyone: oklch(0.72 0.125 289);
+
+  --hi-t-1: 8%;
+  --hi-t-2: 14%;
+  --hi-t-3: 22%;
+  --hi-t-4: 55%;
+
+  --hi-led-warm: oklch(0.8 0.11 68);
   --hi-led-amber: oklch(0.77 0.14 48);
   --hi-led-rose: oklch(0.72 0.14 350);
   --hi-led-teal: oklch(0.76 0.12 197);
@@ -28,16 +57,68 @@
   --hi-led-green: oklch(0.77 0.13 148);
 
   --hi-led-dnd: oklch(0.52 0.09 25);
-  --hi-led-off: var(--color-neutral-800, #26283a);
+  --hi-led-off: #23253a;
+}
+
+[data-theme="light"] {
+  --hi-bg: #f4f4f8;
+  --hi-surface: #fbfbfd;
+  --hi-ink: #1b1c28;
+  --hi-ink-dim: #5c5d70;
+  --hi-rule: #dcdce6;
+
+  --hi-ident-gus: oklch(0.52 0.11 205);
+  --hi-ident-georgette: oklch(0.53 0.15 350);
+  --hi-ident-willoughby: oklch(0.55 0.14 72);
+  --hi-ident-raff: oklch(0.52 0.13 148);
+
+  --hi-ident-kitchen: oklch(0.52 0.16 289);
+  --hi-ident-rumpus: oklch(0.5 0.16 262);
+  --hi-ident-lounge: oklch(0.55 0.17 28);
+
+  --hi-ident-kids: oklch(0.53 0.16 320);
+  --hi-ident-downstairs: oklch(0.52 0.14 240);
+  --hi-ident-everyone: oklch(0.52 0.16 289);
+
+  --hi-t-1: 5%;
+  --hi-t-2: 9%;
+  --hi-t-3: 15%;
+  --hi-t-4: 45%;
+
+  --hi-led-off: #d6d6e2;
+
+  /* Remap app theme tokens so Tailwind utilities follow light ground. */
+  --color-bg: #f4f4f8;
+  --color-surface: #fbfbfd;
+  --color-surface-2: #ececf3;
+  --color-text: #1b1c28;
+  --color-neutral-200: #3a3b4d;
+  --color-neutral-300: #5c5d70;
+  --color-neutral-400: #6b6b7e;
+  --color-neutral-500: #7a7b8c;
+  --color-neutral-600: #9a9aab;
+  --color-neutral-700: #c4c4d0;
+  --color-neutral-800: #e4e4ec;
+  --color-neutral-900: #ececf3;
+  --color-divider: #dcdce6;
+  --color-accent: oklch(0.52 0.16 289);
+  --color-accent-200: oklch(0.42 0.14 289);
+  --color-accent-300: oklch(0.48 0.15 289);
+  --color-accent-400: oklch(0.52 0.16 289);
+  --color-accent-800: oklch(0.78 0.08 289);
+  --color-accent-900: oklch(0.9 0.04 289);
+  --shadow-sm: 0 1px 2px rgba(20, 18, 33, 0.06), 0 1px 3px rgba(20, 18, 33, 0.04);
+  --shadow-md: 0 10px 30px rgba(20, 18, 33, 0.08);
+  color-scheme: light;
 }
 
 .hi-tinted {
   --hi-ident: var(--color-accent);
 
-  --hi-tint-8: color-mix(in oklab, var(--hi-ident) 8%, var(--hi-bg));
-  --hi-tint-14: color-mix(in oklab, var(--hi-ident) 14%, var(--hi-bg));
-  --hi-tint-22: color-mix(in oklab, var(--hi-ident) 22%, var(--hi-bg));
-  --hi-tint-55: color-mix(in oklab, var(--hi-ident) 55%, var(--hi-bg));
+  --hi-tint-1: color-mix(in oklab, var(--hi-ident) var(--hi-t-1), var(--hi-bg));
+  --hi-tint-2: color-mix(in oklab, var(--hi-ident) var(--hi-t-2), var(--hi-bg));
+  --hi-tint-3: color-mix(in oklab, var(--hi-ident) var(--hi-t-3), var(--hi-bg));
+  --hi-tint-4: color-mix(in oklab, var(--hi-ident) var(--hi-t-4), var(--hi-bg));
   --hi-glow-30: color-mix(in oklab, var(--hi-ident) 30%, transparent);
   --hi-glow-55: color-mix(in oklab, var(--hi-ident) 55%, transparent);
 }
@@ -48,19 +129,19 @@
   gap: 7px;
   min-height: 44px;
   padding: 9px 14px;
-  border: 1px solid var(--color-divider);
+  border: 1px solid var(--hi-rule);
   border-radius: 8px;
-  color: var(--color-neutral-300);
+  background: transparent;
+  color: var(--hi-ink-dim);
   font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
-  background: transparent;
   font-family: inherit;
 }
 .hi-chip[aria-pressed="true"] {
   border-color: var(--hi-ident);
   color: var(--hi-ident);
-  background: var(--hi-tint-14);
+  background: var(--hi-tint-2);
 }
 .hi-chip:focus-visible {
   outline: 2px solid var(--color-accent);
@@ -73,23 +154,28 @@
   gap: 8px;
   min-height: 52px;
   padding: 0 18px;
-  border: 1px solid var(--color-divider);
+  border: 1px solid var(--hi-rule);
   border-radius: 8px;
-  color: var(--color-text);
+  background: transparent;
+  color: var(--hi-ink);
   font-family: var(--font-heading);
   font-weight: 500;
   font-size: 16px;
   cursor: pointer;
   user-select: none;
   touch-action: none;
-  background: var(--color-surface);
 }
 .hi-hold[data-active="true"] {
   border-color: var(--hi-ident);
   color: var(--hi-ident);
-  background: color-mix(in oklab, var(--hi-ident) 16%, var(--hi-bg));
+  background: var(--hi-tint-3);
 }
 
+.hi-led-fixture {
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--hi-fixture);
+}
 .hi-led-bar {
   border-radius: 999px;
   background: var(--hi-led);

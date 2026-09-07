@@ -1,26 +1,37 @@
 /**
  * Home Intercom — LED bar state.
  * Resolves front/rear bar colour from room settings + live panel activity.
+ * LED colours are emitted light — identical in both themes; draw inside .hi-led-fixture.
  */
 
 import type { CSSProperties } from "react";
-import { ident, IDENT, resolveIdentity } from "./identity";
+import { litIdent, resolveIdentity } from "./identity";
 import type { Identity, Room } from "./identity";
 
 export type LedColorKey = "warm" | "amber" | "rose" | "teal" | "indigo" | "green";
 
 export const LED: Record<LedColorKey, { name: string; c: string }> = {
-  warm: { name: "Warm", c: "oklch(0.80 0.11 68)" },
-  amber: { name: "Amber", c: "oklch(0.77 0.14 48)" },
-  rose: { name: "Rose", c: "oklch(0.72 0.14 350)" },
-  teal: { name: "Teal", c: "oklch(0.76 0.12 197)" },
-  indigo: { name: "Indigo", c: "oklch(0.68 0.14 275)" },
-  green: { name: "Green", c: "oklch(0.77 0.13 148)" },
+  warm: { name: "Warm", c: "var(--hi-led-warm)" },
+  amber: { name: "Amber", c: "var(--hi-led-amber)" },
+  rose: { name: "Rose", c: "var(--hi-led-rose)" },
+  teal: { name: "Teal", c: "var(--hi-led-teal)" },
+  indigo: { name: "Indigo", c: "var(--hi-led-indigo)" },
+  green: { name: "Green", c: "var(--hi-led-green)" },
 };
 
 export const LED_KEYS: LedColorKey[] = ["warm", "amber", "rose", "teal", "indigo", "green"];
 
-export const LED_DND = "oklch(0.52 0.09 25)";
+/** Literal emitted values for firmware — not for CSS. */
+export const LED_EMITTED: Record<LedColorKey, string> = {
+  warm: "oklch(0.80 0.11 68)",
+  amber: "oklch(0.77 0.14 48)",
+  rose: "oklch(0.72 0.14 350)",
+  teal: "oklch(0.76 0.12 197)",
+  indigo: "oklch(0.68 0.14 275)",
+  green: "oklch(0.77 0.13 148)",
+};
+
+export const LED_DND = "var(--hi-led-dnd)";
 export const LED_OFF = "var(--hi-led-off)";
 
 export type FrontMode = "status" | "night" | "solid" | "off";
@@ -72,7 +83,7 @@ export function frontLed(
   if (o === "page" || o === "call" || o === "ring") {
     const whoLabel = activity.who ?? "Incoming";
     return {
-      color: ident(typeof activity.who === "string" ? activity.who : activity.who),
+      color: litIdent(typeof activity.who === "string" ? activity.who : activity.who),
       live: true,
       alpha: 1,
       why: `On air — ${whoLabel}`,
@@ -98,7 +109,7 @@ export function frontLed(
       };
     default:
       return {
-        color: IDENT[roomKey] ?? IDENT.Rumpus,
+        color: litIdent(roomKey),
         live: false,
         alpha: 1,
         why: "Status — idle",

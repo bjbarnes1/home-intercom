@@ -47,9 +47,9 @@ The intercom core is working end-to-end, including **real two-way audio**
   reminders, `IntercomEvent` audit log (metadata only — no audio), kids, chores
   + completions, calendar events, music state. Four committed migrations.
 - **Nocturne + identity colours** (`globals.css` + `src/styles/identity.css`) —
-  ground `#161826`, kitchen/everyone blurple accent, one hue per person/room/zone
-  (oklab blends). Cards, tags, buttons, hold-to-talk, LED bars, overlays.
-  Space Grotesk + Inter, Phosphor icons. See `docs/handoff/colours/`.
+  dark/light grounds (`data-theme`), kitchen/everyone blurple accent, one hue per
+  person/room/zone (oklab blends; LED bars use theme-stable `litIdent`). See
+  `docs/handoff/colours/`.
 
 ### Devices & control channel
 - **Pairing**: admin registers a device → 6-char code **+ QR**; the room phone

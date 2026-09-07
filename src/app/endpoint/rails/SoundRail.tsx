@@ -1,6 +1,8 @@
 "use client";
 
 import Toggle from "@/components/Toggle";
+import ThemeToggle from "@/components/ThemeToggle";
+import { useAppTheme } from "@/components/ThemeProvider";
 
 interface Props {
   dnd: boolean;
@@ -9,10 +11,11 @@ interface Props {
 
 /**
  * Per-device etiquette. DND persists via the device settings API.
- * Quiet hours, half-duplex, and front-LED cue mapping land with the hardware
- * kiosk (8" panel + LED bars) — not shipped as inert toggles.
+ * Theme is a room/panel preference (dark / light / auto via ambient light).
  */
 export default function SoundRail({ dnd, onDndChange }: Props) {
+  const { pref, theme, lux } = useAppTheme();
+
   return (
     <div className="flex-1 overflow-auto px-7 pb-8">
       <h3 className="mb-1 mt-1">Sound</h3>
@@ -29,6 +32,20 @@ export default function SoundRail({ dnd, onDndChange }: Props) {
           </div>
         </div>
         <Toggle on={dnd} onChange={onDndChange} label="Do not disturb" />
+      </div>
+
+      <div className="card mb-4 flex items-center gap-4 p-4">
+        <i className="ph ph-palette text-2xl text-accent" />
+        <div className="flex-1">
+          <div className="font-heading text-lg font-medium">Panel theme</div>
+          <div className="text-[13px] text-neutral-500">
+            {pref === "auto"
+              ? `Auto · currently ${theme}${lux ? ` · ${Math.round(lux)} lux` : ""}`
+              : `${pref === "light" ? "Light" : "Dark"} ground`}
+            . Auto follows this room&apos;s light sensor when available.
+          </div>
+        </div>
+        <ThemeToggle />
       </div>
 
       <div className="card p-4 text-[13px] text-neutral-400">

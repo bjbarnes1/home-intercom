@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { identStyle } from "@/lib/color/identity";
+import ThemeToggle from "@/components/ThemeToggle";
 import DevicesManager from "./DevicesManager";
 import TabBar from "./TabBar";
 import PageTalk from "./PageTalk";
@@ -83,6 +84,7 @@ export default function ControllerPage() {
                 </div>
               </div>
               <div className="flex gap-2">
+                <ThemeToggle />
                 <button
                   onClick={() => setShowDevices(true)}
                   className="btn btn-secondary min-h-9 px-2.5 text-xs"

@@ -1,5 +1,9 @@
 /* Home Intercom — identity colour map.
  * Mirrors handoff/colours/identity.css. Import from either side; do not fork.
+ *
+ * Identity is returned as a CSS custom property, never a literal, so the light
+ * ground is a pure CSS swap — no theme argument threaded through the app, no
+ * second map to keep in step.
  */
 
 export type Person = 'Gus' | 'Georgette' | 'Willoughby' | 'Raff' | 'Mum' | 'Dad';
@@ -7,22 +11,17 @@ export type Room = 'Kitchen' | 'Rumpus' | 'Lounge';
 export type Zone = 'Everyone' | 'Kids' | 'Downstairs';
 export type Identity = Person | Room | Zone;
 
-export const IDENT: Record<Identity, string> = {
-  Gus:        'oklch(0.75 0.115 205)',
-  Georgette:  'oklch(0.74 0.125 350)',
-  Willoughby: 'oklch(0.80 0.125 72)',
-  Raff:       'oklch(0.77 0.125 148)',
-  Mum:        'oklch(0.74 0.125 350)',
-  Dad:        'oklch(0.75 0.115 205)',
-  Kitchen:    'oklch(0.71 0.125 289)',
-  Rumpus:     'oklch(0.73 0.12 262)',
-  Lounge:     'oklch(0.75 0.13 28)',
-  Kids:       'oklch(0.75 0.12 320)',
-  Downstairs: 'oklch(0.74 0.11 240)',
-  Everyone:   'oklch(0.72 0.125 289)',
+export type Theme = 'dark' | 'light';
+
+const TOKEN: Record<Identity, string> = {
+  Gus: 'gus', Georgette: 'georgette', Willoughby: 'willoughby', Raff: 'raff',
+  Mum: 'mum', Dad: 'dad',
+  Kitchen: 'kitchen', Rumpus: 'rumpus', Lounge: 'lounge',
+  Kids: 'kids', Downstairs: 'downstairs', Everyone: 'everyone',
 };
 
-/** Plain-English colour name, for labels and accessibility copy. */
+/** Plain-English colour name, for labels and accessibility copy. Theme-stable:
+ *  the light ramp re-tunes lightness, not hue, so "amber" stays amber. */
 export const COLOR_NAME: Record<Identity, string> = {
   Gus: 'teal', Georgette: 'rose', Willoughby: 'amber', Raff: 'green',
   Mum: 'rose', Dad: 'teal',
@@ -39,8 +38,18 @@ export const ZONE_MEMBERS: Record<Zone, Identity[]> = {
 export const ACCENT_FALLBACK = 'var(--color-accent)';
 const GROUND = 'var(--hi-bg)';
 
-export const ident = (name?: string): string =>
-  (name && IDENT[name as Identity]) || ACCENT_FALLBACK;
+export const ident = (name?: string): string => {
+  const t = name && TOKEN[name as Identity];
+  return t ? `var(--hi-ident-${t})` : ACCENT_FALLBACK;
+};
+
+/** Identity as emitted light — for LED bars only, never re-tuned by theme.
+ *  A person's on-air colour is a physical light; it must read the same at noon
+ *  as at midnight, so it does not follow the screen's ground. */
+export const litIdent = (name?: string): string => {
+  const t = name && TOKEN[name as Identity];
+  return t ? `var(--hi-lit-${t})` : ACCENT_FALLBACK;
+};
 
 /** All blends run in oklab — hue-interpolating spaces skew warm tints magenta. */
 export const tint = (name: string | undefined, pct: number, base = GROUND): string =>
@@ -61,4 +70,21 @@ export const reaches = (target: string | undefined, room: Room): boolean => {
   if (!target) return false;
   if (target === room) return true;
   return (ZONE_MEMBERS[target as Zone] ?? []).includes(room);
+};
+
+/* --- Theme -----------------------------------------------------------------
+ * A panel's theme is a property of the room, not of the OS: the kitchen panel
+ * wants light in daylight and dark after dinner, and `auto` follows the room's
+ * own ambient-light sensor rather than a system setting. Apply the resolved
+ * value as data-theme on the panel root.
+ */
+
+export type ThemePref = Theme | 'auto';
+
+/** lux thresholds with a dead band, so a passing cloud can't flicker the panel. */
+export const resolveTheme = (pref: ThemePref, lux: number, current: Theme = 'dark'): Theme => {
+  if (pref !== 'auto') return pref;
+  if (lux > 120) return 'light';
+  if (lux < 60) return 'dark';
+  return current;
 };

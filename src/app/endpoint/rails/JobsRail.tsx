@@ -38,7 +38,7 @@ export default function JobsRail({ board, onTick }: Props) {
                 <div
                   className="grid h-9 w-9 flex-none place-items-center rounded-full font-heading text-base font-medium"
                   style={{
-                    background: "var(--hi-tint-22)",
+                    background: "var(--hi-tint-3)",
                     color: "var(--hi-ident)",
                   }}
                 >
@@ -72,7 +72,7 @@ export default function JobsRail({ board, onTick }: Props) {
                     className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-[13px] transition hover:bg-neutral-800"
                     style={
                       c.done
-                        ? { background: "var(--hi-tint-14)" }
+                        ? { background: "var(--hi-tint-2)" }
                         : undefined
                     }
                   >

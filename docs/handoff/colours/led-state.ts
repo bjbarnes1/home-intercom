@@ -1,25 +1,39 @@
 /* Home Intercom — LED bar state.
  * One pure function resolves what each bar shows, so the panel, the phone and
  * the firmware can never disagree about it.
+ *
+ * LED colours are emitted light: they are identical in both themes, and the
+ * bar is always drawn inside .hi-led-fixture (a dark housing) so a light UI
+ * doesn't have to lie about them.
  */
 
-import { ident, IDENT } from './identity';
+import { ident, litIdent } from './identity';
 import type { Identity, Room } from './identity';
 
 export type LedColorKey = 'warm' | 'amber' | 'rose' | 'teal' | 'indigo' | 'green';
 
 export const LED: Record<LedColorKey, { name: string; c: string }> = {
-  warm:   { name: 'Warm',   c: 'oklch(0.80 0.11 68)' },
-  amber:  { name: 'Amber',  c: 'oklch(0.77 0.14 48)' },
-  rose:   { name: 'Rose',   c: 'oklch(0.72 0.14 350)' },
-  teal:   { name: 'Teal',   c: 'oklch(0.76 0.12 197)' },
-  indigo: { name: 'Indigo', c: 'oklch(0.68 0.14 275)' },
-  green:  { name: 'Green',  c: 'oklch(0.77 0.13 148)' },
+  warm:   { name: 'Warm',   c: 'var(--hi-led-warm)' },
+  amber:  { name: 'Amber',  c: 'var(--hi-led-amber)' },
+  rose:   { name: 'Rose',   c: 'var(--hi-led-rose)' },
+  teal:   { name: 'Teal',   c: 'var(--hi-led-teal)' },
+  indigo: { name: 'Indigo', c: 'var(--hi-led-indigo)' },
+  green:  { name: 'Green',  c: 'var(--hi-led-green)' },
 };
 
 export const LED_KEYS: LedColorKey[] = ['warm', 'amber', 'rose', 'teal', 'indigo', 'green'];
 
-export const LED_DND = 'oklch(0.52 0.09 25)';
+/** Literal emitted values, for the firmware payload — not for CSS. */
+export const LED_EMITTED: Record<LedColorKey, string> = {
+  warm:   'oklch(0.80 0.11 68)',
+  amber:  'oklch(0.77 0.14 48)',
+  rose:   'oklch(0.72 0.14 350)',
+  teal:   'oklch(0.76 0.12 197)',
+  indigo: 'oklch(0.68 0.14 275)',
+  green:  'oklch(0.77 0.13 148)',
+};
+
+export const LED_DND = 'var(--hi-led-dnd)';
 export const LED_OFF = 'var(--hi-led-off)';
 
 export type FrontMode = 'status' | 'night' | 'solid' | 'off';
@@ -56,7 +70,7 @@ export interface LedState {
 export function frontLed(lights: RoomLights, activity: PanelActivity, room: Room): LedState {
   const o = activity.overlay;
   if (o === 'page' || o === 'call' || o === 'ring') {
-    return { color: ident(activity.who), live: true, alpha: 1, why: `On air — ${activity.who}` };
+    return { color: litIdent(activity.who), live: true, alpha: 1, why: `On air — ${activity.who}` };
   }
   if (o === 'reminder') {
     return { color: LED.amber.c, live: true, alpha: 1, why: 'Reminder speaking' };
@@ -71,7 +85,7 @@ export function frontLed(lights: RoomLights, activity: PanelActivity, room: Room
       color: LED[lights.frontColor].c, live: false, alpha: 1,
       why: `Solid ${LED[lights.frontColor].name.toLowerCase()}`,
     };
-    default: return { color: IDENT[room], live: false, alpha: 1, why: 'Status — idle' };
+    default: return { color: litIdent(room), live: false, alpha: 1, why: 'Status — idle' };
   }
 }
 
