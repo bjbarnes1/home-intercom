@@ -1,5 +1,11 @@
 export type Phase = "loading" | "unpaired" | "ready" | "error";
-export type Rail = "home" | "schedule" | "jobs" | "reminders" | "sound";
+export type Rail =
+  | "home"
+  | "messages"
+  | "schedule"
+  | "jobs"
+  | "reminders"
+  | "sound";
 
 export interface Incoming {
   title: string;

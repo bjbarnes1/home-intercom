@@ -97,35 +97,33 @@ The intercom core is working end-to-end, including **real two-way audio**
 **Needs your action (config):**
 - Set **`ANTHROPIC_API_KEY`** on Vercel to enable AI reminders (until then that
   one route returns a friendly "not configured"; everything else works).
-- Set **`OPENAI_API_KEY`** + **`BLOB_READ_WRITE_TOKEN`** for Ash neural announce
-  voice (without them, text announce still works via on-device TTS).
+- Set **`OPENAI_API_KEY`** + **`BLOB_READ_WRITE_TOKEN`** for Ash neural voice
+  (announce + reminder clips; without them, on-device TTS still works).
 - Set **`CRON_SECRET`** so only Vercel Cron can hit `/api/cron/tick`.
+- Apply migration **`5_etiquette_messages_leds`** on production if deploy does
+  not auto-migrate (`prisma migrate deploy`).
 
 **Agent delivery:** feature work follows [`docs/AGENT_TEAMS.md`](docs/AGENT_TEAMS.md)
 (program architect / PM / QA + per-feature product teams). Skills live under
 `.cursor/skills/home-intercom-*`.
 
-**Next features:**
-- **Recorded-voice broadcast** — record a clip on the controller, release →
-  plays on the endpoints (needs audio capture + a small clip store).
-- Reuse **Ash TTS** for scheduled reminders (announce path is wired; reminders
-  still use SpeechSynthesis).
-- **Local Piper TTS** — optional offline/home-node alternative to OpenAI.
-- Edit **Jobs / Schedule / Music** from the controller (currently seeded/managed
-  on the panel).
+**Next features (shipped recently):**
+- **Messages** rail on the wall panel (pages / calls / broadcasts / announces).
+- **Chime + quiet hours** on Sound (whisper reminders; pages still ring).
+- **Controller Manage** tab — Schedule / Jobs / Music CRUD + reminder on/off/delete.
+- **LED cue contract** — `led` control command + `POST /api/led` (panels with
+  `hasLeds` apply; others no-op).
+- **Ash TTS for reminders** (same path as announce when OpenAI + Blob are set).
 
-**Hardening / platform:**
-- **Latency (optional):** keep the intercom on **LiveKit Cloud** (privacy is not
-  a requirement — cloud is fine), but consider an **optional local media node**
-  so on-LAN audio stays low-latency instead of round-tripping to the cloud. See
-  "Future ideas → Local fast-path" below. `coturn`/tunnel only needed if we ever
-  self-host.
+**Still open:**
+- **Recorded-voice broadcast** — record a clip on the controller, release →
+  plays on the endpoints.
+- **Local Piper TTS** — optional offline/home-node alternative to OpenAI.
+- **Latency (optional):** local media node so on-LAN audio skips cloud round-trip.
 - **iOS audio unlock** (`room.startAudio()`) if inbound playback needs a tap.
 - **Web-push wake** for backgrounded/remote devices (Phase 4).
-- Quiet hours / half-duplex / LED cue mapping (Sound rail backlog).
-- Kiosk provisioning/hardening (Phase 5); native **Android** device (Phase 6).
+- Half duplex; kiosk soak (Phase 5); native **Android** device (Phase 6).
 - Separate **Neon branch per environment** before previews share prod data.
-- Open a PR / promote `claude/new-project-fx1pzn` to a `main` line when ready.
 
 > **Note on Next.js version:** the plan calls for Next 16; the registry resolved
 > to Next 15.5. App Router conventions are identical — a drop-in bump later.

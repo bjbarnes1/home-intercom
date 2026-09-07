@@ -22,7 +22,7 @@ export interface ReminderRow {
   nextRunAt: string | null;
 }
 
-export type Tab = "home" | "broadcast" | "reminders";
+export type Tab = "home" | "broadcast" | "reminders" | "household";
 
 export function roomIcon(name: string): string {
   const n = name.toLowerCase();

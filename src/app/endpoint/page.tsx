@@ -10,7 +10,6 @@ import { isWellFormedPairingCode } from "@/lib/devices/pairing";
 import type { MusicActionRequest } from "@/lib/music/actions";
 import { identStyle } from "@/lib/color/identity";
 import {
-  defaultRoomLights,
   frontLed,
   ledStyle,
   rearLed,
@@ -28,6 +27,8 @@ import { useDevicePolledJson } from "@/lib/client/usePolledJson";
 import PairingScreen from "./PairingScreen";
 import MusicPlayer from "./MusicPlayer";
 import HomeRail from "./rails/HomeRail";
+import MessagesRail from "./rails/MessagesRail";
+import type { MessageRow } from "./rails/MessagesRail";
 import ScheduleRail from "./rails/ScheduleRail";
 import JobsRail from "./rails/JobsRail";
 import RemindersRail from "./rails/RemindersRail";
@@ -38,6 +39,7 @@ import SpeakingOverlay from "./overlays/SpeakingOverlay";
 
 const RAIL_ITEMS: [Rail, string, string][] = [
   ["home", "ph-house", "Home"],
+  ["messages", "ph-chat-circle", "Messages"],
   ["schedule", "ph-calendar-dots", "Schedule"],
   ["jobs", "ph-list-checks", "Jobs"],
   ["reminders", "ph-bell-simple", "Reminders"],
@@ -49,6 +51,8 @@ const selectReminders = (json: unknown) =>
 const selectBoard = (json: unknown) => json as JobBoard;
 const selectSchedule = (json: unknown) => json as Schedule;
 const selectMusic = (json: unknown) => json as MusicState;
+const selectMessages = (json: unknown) =>
+  ((json as { messages?: MessageRow[] }).messages ?? []) as MessageRow[];
 
 export default function EndpointPage() {
   const media = useMediaSession();
@@ -61,6 +65,9 @@ export default function EndpointPage() {
     setRoom,
     dnd,
     setDoNotDisturb,
+    etiquette,
+    updateEtiquette,
+    roomLights,
     receiving,
     receiveError,
     livekitUrl,
@@ -104,10 +111,16 @@ export default function EndpointPage() {
     15_000,
     selectMusic,
   );
+  const { data: messages } = useDevicePolledJson(
+    ready,
+    "/api/endpoint/messages",
+    20_000,
+    selectMessages,
+  );
 
   const board = boardOverride ?? polledBoard;
 
-  const lights = useMemo(() => defaultRoomLights(), []);
+  const lights = roomLights;
   const ledActivity = useMemo(() => {
     if (media.ringing && !media.incoming) {
       return { overlay: "ring" as const, who: media.ringing.title, dnd };
@@ -192,9 +205,9 @@ export default function EndpointPage() {
   const playReminder = useCallback(
     (r: EndpointReminder) => {
       setSpeaking({ text: r.text, label: "Reminder" });
-      speak(r.text);
+      void speak(r.text, null, { chime: etiquette.chimeEnabled });
     },
-    [setSpeaking],
+    [setSpeaking, etiquette.chimeEnabled],
   );
 
   const claim = useCallback(async () => {
@@ -363,6 +376,9 @@ export default function EndpointPage() {
             onOpenReminders={() => setRail("reminders")}
           />
         )}
+        {rail === "messages" && (
+          <MessagesRail messages={messages ?? []} />
+        )}
         {rail === "reminders" && (
           <RemindersRail
             room={room}
@@ -378,7 +394,14 @@ export default function EndpointPage() {
           />
         )}
         {rail === "jobs" && <JobsRail board={board} onTick={tick} />}
-        {rail === "sound" && <SoundRail dnd={dnd} onDndChange={setDoNotDisturb} />}
+        {rail === "sound" && (
+          <SoundRail
+            dnd={dnd}
+            onDndChange={setDoNotDisturb}
+            etiquette={etiquette}
+            onEtiquetteChange={updateEtiquette}
+          />
+        )}
       </div>
 
       {media.ringing && !media.incoming && (

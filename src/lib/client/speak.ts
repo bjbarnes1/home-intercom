@@ -6,8 +6,16 @@
  */
 
 import { reportClientError } from "@/lib/client/reportError";
+import { playChime } from "@/lib/client/chime";
 
 let currentAudio: HTMLAudioElement | null = null;
+
+export type SpeakOptions = {
+  /** 0–1; defaults to 1. Quiet hours use a lower value. */
+  volume?: number;
+  /** Soft beep before speech (skipped when whisper). */
+  chime?: boolean;
+};
 
 export function stopSpeaking(): void {
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
@@ -20,14 +28,26 @@ export function stopSpeaking(): void {
   }
 }
 
-export function speak(text: string, audioUrl?: string | null): void {
+export async function speak(
+  text: string,
+  audioUrl?: string | null,
+  opts?: SpeakOptions,
+): Promise<void> {
   if (typeof window === "undefined") return;
   stopSpeaking();
 
+  const volume = Math.min(1, Math.max(0, opts?.volume ?? 1));
+  if (opts?.chime) {
+    await playChime();
+  }
+
   if (audioUrl) {
     const el = new Audio(audioUrl);
+    el.volume = volume;
     currentAudio = el;
-    el.play().catch((e) => {
+    try {
+      await el.play();
+    } catch (e) {
       reportClientError(e, {
         code: "speak.audio_play",
         route: "speak",
@@ -39,15 +59,15 @@ export function speak(text: string, audioUrl?: string | null): void {
           }
         })(),
       });
-      speakWithSynthesis(text);
-    });
+      speakWithSynthesis(text, volume);
+    }
     return;
   }
 
-  speakWithSynthesis(text);
+  speakWithSynthesis(text, volume);
 }
 
-function speakWithSynthesis(text: string): void {
+function speakWithSynthesis(text: string, volume: number): void {
   if (!("speechSynthesis" in window)) {
     reportClientError(new Error("speechSynthesis unavailable"), {
       code: "speak.synthesis_unavailable",
@@ -59,6 +79,7 @@ function speakWithSynthesis(text: string): void {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1;
     u.pitch = 1;
+    u.volume = volume;
     window.speechSynthesis.speak(u);
   } catch (e) {
     reportClientError(e, { code: "speak.synthesis", route: "speak" });

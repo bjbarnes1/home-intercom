@@ -31,11 +31,29 @@ export async function POST(req: Request) {
     ttlSeconds: 60 * 60, // an hour; refreshed each heartbeat
   });
 
+  const row = await prisma.device.findUniqueOrThrow({
+    where: { id: device.id },
+    select: {
+      doNotDisturb: true,
+      autoAnswer: true,
+      chimeEnabled: true,
+      quietHoursEnabled: true,
+      quietHoursStart: true,
+      quietHoursEnd: true,
+      hasLeds: true,
+    },
+  });
+
   return NextResponse.json({
     lobbyToken,
     livekitUrl: env.livekit.publicUrl,
-    doNotDisturb: device.doNotDisturb,
-    autoAnswer: device.autoAnswer,
+    doNotDisturb: row.doNotDisturb,
+    autoAnswer: row.autoAnswer,
+    chimeEnabled: row.chimeEnabled,
+    quietHoursEnabled: row.quietHoursEnabled,
+    quietHoursStart: row.quietHoursStart,
+    quietHoursEnd: row.quietHoursEnd,
+    hasLeds: row.hasLeds,
     mock: env.mockLocalServices,
   });
 }

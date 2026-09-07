@@ -110,6 +110,7 @@ export async function POST(req: Request) {
         initiatorUserId: user.id,
         targetDeviceId,
         targetZoneId,
+        summary: text.slice(0, 500),
       },
     });
 

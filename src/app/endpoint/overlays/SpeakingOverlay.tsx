@@ -36,7 +36,7 @@ export default function SpeakingOverlay({ room, speaking, onDismiss }: Props) {
           Got it
         </button>
         <button
-          onClick={() => speak(speaking.text, speaking.audioUrl)}
+          onClick={() => void speak(speaking.text, speaking.audioUrl)}
           className="btn btn-secondary min-h-14 px-7 text-base"
         >
           <i className="ph ph-repeat text-lg" />

@@ -10,13 +10,20 @@ export default function TabBar({
   setTab: (t: Tab) => void;
 }) {
   return (
-    <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md items-center border-t border-divider bg-bg px-6 pb-6 pt-2">
+    <nav className="fixed inset-x-0 bottom-0 mx-auto flex max-w-md items-center border-t border-divider bg-bg px-3 pb-6 pt-2">
       <button
         onClick={() => setTab("home")}
         className={`flex flex-1 flex-col items-center gap-1 ${tab === "home" ? "text-accent" : "text-neutral-500"}`}
       >
         <i className="ph-fill ph-house text-xl" />
         <span className="text-[10px]">Home</span>
+      </button>
+      <button
+        onClick={() => setTab("household")}
+        className={`flex flex-1 flex-col items-center gap-1 ${tab === "household" ? "text-accent" : "text-neutral-500"}`}
+      >
+        <i className="ph-fill ph-sliders-horizontal text-xl" />
+        <span className="text-[10px]">Manage</span>
       </button>
       <div className="flex flex-1 justify-center">
         <button

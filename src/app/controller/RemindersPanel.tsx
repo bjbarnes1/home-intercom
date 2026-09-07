@@ -76,9 +76,31 @@ export default function RemindersPanel({
                 {r.cron ? `Repeats · ${r.cron}` : "Once"}
               </div>
             </div>
-            <span className={`tag ${r.enabled ? "tag-accent" : "tag-neutral"}`}>
-              {r.enabled ? "On" : "Off"}
-            </span>
+            <div className="flex flex-col items-end gap-1">
+              <button
+                onClick={async () => {
+                  await fetch(`/api/reminders/${r.id}`, {
+                    method: "PATCH",
+                    headers: { "content-type": "application/json" },
+                    body: JSON.stringify({ enabled: !r.enabled }),
+                  });
+                  load();
+                }}
+                className={`tag ${r.enabled ? "tag-accent" : "tag-neutral"}`}
+              >
+                {r.enabled ? "On" : "Off"}
+              </button>
+              <button
+                onClick={async () => {
+                  await fetch(`/api/reminders/${r.id}`, { method: "DELETE" });
+                  load();
+                }}
+                className="text-[11px] text-neutral-500"
+                aria-label="Delete reminder"
+              >
+                Delete
+              </button>
+            </div>
           </div>
         ))}
       </div>

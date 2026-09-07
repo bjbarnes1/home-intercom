@@ -70,6 +70,8 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
   const connected = new Set(connectedList);
   const notConnected = resolved.targets.filter((id) => !connected.has(id));
 
+  const kindLabel =
+    input.kind === "page" ? "Page" : input.kind === "call" ? "Call" : "Broadcast";
   const event = await prisma.intercomEvent.create({
     data: {
       householdId: input.householdId,
@@ -79,6 +81,7 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
       initiatorUserId: input.initiatorUserId,
       targetDeviceId: input.targetDeviceId,
       targetZoneId: input.targetZoneId,
+      summary: `${kindLabel} · ${input.initiatorIdentity}`,
     },
     select: { id: true },
   });

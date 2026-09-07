@@ -9,6 +9,7 @@ import TabBar from "./TabBar";
 import PageTalk from "./PageTalk";
 import Broadcast from "./Broadcast";
 import RemindersPanel from "./RemindersPanel";
+import HouseholdPanel from "./HouseholdPanel";
 import type { DeviceRow, Tab, ZoneRow } from "./types";
 import { roomIcon } from "./types";
 
@@ -161,6 +162,7 @@ export default function ControllerPage() {
 
         {tab === "broadcast" && <Broadcast zones={zones} />}
         {tab === "reminders" && <RemindersPanel zones={zones} devices={devices} />}
+        {tab === "household" && <HouseholdPanel devices={devices} />}
       </main>
 
       <TabBar tab={tab} setTab={setTab} />

@@ -34,6 +34,9 @@ const ReminderCommandSchema = z.object({
   audioUrl: z.string().optional(),
   sound: z.string().optional(),
   reminderId: z.string(),
+  /** Quiet hours: softer playback, no chime. */
+  whisper: z.boolean().optional(),
+  chime: z.boolean().optional(),
 });
 
 const AnnounceCommandSchema = z.object({
@@ -42,6 +45,8 @@ const AnnounceCommandSchema = z.object({
   from: z.string().optional(),
   audioUrl: z.string().optional(),
   announcementId: z.string(),
+  whisper: z.boolean().optional(),
+  chime: z.boolean().optional(),
 });
 
 const HangupCommandSchema = z.object({
@@ -54,6 +59,25 @@ const PingCommandSchema = z.object({
   at: z.number(),
 });
 
+/** Hardware / panel LED cue — no-op on software-only panels without hasLeds. */
+const LedCommandSchema = z.object({
+  type: z.literal("led"),
+  front: z
+    .object({
+      mode: z.enum(["status", "night", "solid", "off", "pulse"]).optional(),
+      color: z.string().max(40).optional(),
+      brightness: z.number().min(0).max(100).optional(),
+    })
+    .optional(),
+  rear: z
+    .object({
+      on: z.boolean().optional(),
+      color: z.string().max(40).optional(),
+      brightness: z.number().min(0).max(100).optional(),
+    })
+    .optional(),
+});
+
 export const ControlCommandSchema = z.discriminatedUnion("type", [
   JoinRoomCommandSchema,
   RingCommandSchema,
@@ -61,6 +85,7 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   AnnounceCommandSchema,
   HangupCommandSchema,
   PingCommandSchema,
+  LedCommandSchema,
 ]);
 
 export type ControlCommand = z.infer<typeof ControlCommandSchema>;
@@ -70,6 +95,7 @@ export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
 export type HangupCommand = z.infer<typeof HangupCommandSchema>;
 export type PingCommand = z.infer<typeof PingCommandSchema>;
+export type LedCommand = z.infer<typeof LedCommandSchema>;
 
 export function encodeCommand(cmd: ControlCommand): Uint8Array {
   return new TextEncoder().encode(JSON.stringify(cmd));

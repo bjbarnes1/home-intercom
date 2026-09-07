@@ -180,6 +180,15 @@ model Device {
   // Per-device etiquette / behaviour.
   doNotDisturb Boolean @default(false)
   autoAnswer   Boolean @default(true) // pages auto-open on endpoints
+  /// Soft chime before announce/reminder speech on this panel.
+  chimeEnabled Boolean @default(true)
+  /// When enabled, reminders whisper (no chime, lower volume); pages still ring.
+  quietHoursEnabled Boolean @default(false)
+  /// Minutes from local midnight (0–1439). Window may wrap past midnight.
+  quietHoursStart Int?
+  quietHoursEnd   Int?
+  /// Endpoint advertises physical front/rear LED bars.
+  hasLeds Boolean @default(false)
 
   // Pairing + presence.
   pairingCode     String?   @unique // short code, cleared once ACTIVE
@@ -285,7 +294,7 @@ enum EventOutcome {
 }
 
 /// Audit log of every page / call / broadcast / reminder fired.
-/// No audio is recorded by default — this is metadata only.
+/// No audio is recorded by default — optional summary holds announce text etc.
 model IntercomEvent {
   id          String   @id @default(cuid())
   householdId String
@@ -294,6 +303,8 @@ model IntercomEvent {
   type    EventType
   outcome EventOutcome @default(INITIATED)
   roomName String? // LiveKit room, when applicable
+  /// Short human-readable body (announce text, reminder text, or label).
+  summary String?
 
   initiatorUserId String?
   initiator       User?   @relation("EventInitiator", fields: [initiatorUserId], references: [id], onDelete: SetNull)
