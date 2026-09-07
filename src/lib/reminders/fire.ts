@@ -6,6 +6,7 @@ import {
   loadHouseholdSnapshot,
   type HouseholdPresenceSnapshot,
 } from "@/lib/presence/snapshot";
+import { reportError } from "@/lib/errors/report";
 
 /**
  * Fire every reminder due at `now`. Same core for Vercel Cron or a home interval.
@@ -75,7 +76,14 @@ export async function fireDueReminders(now: Date): Promise<FireResult> {
             sound: r.sound ?? undefined,
             reminderId: r.id,
           })
-          .catch((e) => console.error(`reminder ${r.id} -> ${deviceId} failed`, e)),
+          .catch((e) =>
+            reportError(e, {
+              code: "reminder.send",
+              route: "fireDueReminders",
+              reminderId: r.id,
+              deviceId,
+            }),
+          ),
       ),
     );
     result.delivered++;
@@ -101,5 +109,11 @@ async function logEvent(
         startedAt: at,
       },
     })
-    .catch(() => {});
+    .catch((e) =>
+      reportError(e, {
+        code: "reminder.log_event",
+        route: "fireDueReminders",
+        outcome,
+      }),
+    );
 }

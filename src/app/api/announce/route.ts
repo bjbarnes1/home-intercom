@@ -8,6 +8,7 @@ import { resolveTargets } from "@/lib/zones/resolve";
 import { loadHouseholdSnapshot } from "@/lib/presence/snapshot";
 import { synthesizeAnnounce, openaiTtsConfigured } from "@/lib/tts/openai";
 import { storeAnnounceAudio, blobStoreConfigured } from "@/lib/tts/store";
+import { reportError, reportWarning, errorMessage } from "@/lib/errors/report";
 import { nanoid } from "nanoid";
 
 export const dynamic = "force-dynamic";
@@ -51,13 +52,32 @@ export async function POST(req: Request) {
 
     let audioUrl: string | undefined;
     let voice: "ash" | "browser-fallback" = "browser-fallback";
-    if (openaiTtsConfigured() && blobStoreConfigured()) {
+    let voiceError: string | null = null;
+
+    const openaiOk = openaiTtsConfigured();
+    const blobOk = blobStoreConfigured();
+    if (!openaiOk || !blobOk) {
+      voiceError = !openaiOk
+        ? "OPENAI_API_KEY is not set"
+        : "BLOB_READ_WRITE_TOKEN is not set";
+      reportWarning(new Error(voiceError), {
+        code: "announce.tts.not_configured",
+        route: "/api/announce",
+        openaiConfigured: openaiOk,
+        blobConfigured: blobOk,
+      });
+    } else {
       try {
         const mp3 = await synthesizeAnnounce(text);
         audioUrl = await storeAnnounceAudio(announcementId, mp3);
         voice = "ash";
       } catch (e) {
-        console.error("announce TTS failed; falling back to text", e);
+        voiceError = errorMessage(e);
+        reportError(e, {
+          code: "announce.tts",
+          route: "/api/announce",
+          announcementId,
+        });
       }
     }
 
@@ -72,7 +92,12 @@ export async function POST(req: Request) {
             ...(audioUrl ? { audioUrl } : {}),
           });
         } catch (e) {
-          console.error(`announce to ${deviceId} failed`, e);
+          reportError(e, {
+            code: "announce.send",
+            route: "/api/announce",
+            deviceId,
+            announcementId,
+          });
         }
       }),
     );
@@ -94,7 +119,8 @@ export async function POST(req: Request) {
       suppressedByDnd: resolved.suppressedByDnd,
       offline: resolved.offline,
       voice,
+      voiceError,
       audioUrl: audioUrl ?? null,
     });
-  });
+  }, { route: "/api/announce" });
 }

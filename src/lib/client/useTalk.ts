@@ -5,6 +5,7 @@ import { Room, RoomEvent, RemoteTrack } from "livekit-client";
 import { controllerIdentity } from "@/lib/client/identity";
 import { toWsUrl } from "@/lib/client/livekitUrl";
 import { attachRemoteAudio } from "@/lib/client/attachAudioTrack";
+import { reportClientError } from "@/lib/client/reportError";
 
 export type TalkStatus = "idle" | "connecting" | "live" | "error";
 
@@ -53,9 +54,15 @@ export function useTalk() {
           eventId: meta.eventId,
           deviceIds: meta.reached,
         }),
-      }).catch(() => {});
+      }).catch((e) =>
+        reportClientError(e, { code: "talk.hangup_request", route: "useTalk" }),
+      );
     }
-    if (room) await room.disconnect().catch(() => {});
+    if (room) {
+      await room.disconnect().catch((e) =>
+        reportClientError(e, { code: "talk.disconnect", route: "useTalk" }),
+      );
+    }
   }, []);
 
   const start = useCallback(
@@ -137,6 +144,7 @@ export function useTalk() {
         if (cancelled()) return { reached: 0 };
         setStatus("error");
         setMessage(e instanceof Error ? e.message : "Failed to start");
+        reportClientError(e, { code: "talk.start", route: "useTalk", kind: target.kind });
         return { reached: 0 };
       }
     },

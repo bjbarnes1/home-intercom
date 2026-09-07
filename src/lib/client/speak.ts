@@ -5,6 +5,8 @@
  * when provided; falls back to browser SpeechSynthesis.
  */
 
+import { reportClientError } from "@/lib/client/reportError";
+
 let currentAudio: HTMLAudioElement | null = null;
 
 export function stopSpeaking(): void {
@@ -25,8 +27,18 @@ export function speak(text: string, audioUrl?: string | null): void {
   if (audioUrl) {
     const el = new Audio(audioUrl);
     currentAudio = el;
-    el.play().catch(() => {
-      // Autoplay / network failure → browser TTS fallback.
+    el.play().catch((e) => {
+      reportClientError(e, {
+        code: "speak.audio_play",
+        route: "speak",
+        audioUrlHost: (() => {
+          try {
+            return new URL(audioUrl).host;
+          } catch {
+            return "invalid";
+          }
+        })(),
+      });
       speakWithSynthesis(text);
     });
     return;
@@ -36,14 +48,20 @@ export function speak(text: string, audioUrl?: string | null): void {
 }
 
 function speakWithSynthesis(text: string): void {
-  if (!("speechSynthesis" in window)) return;
+  if (!("speechSynthesis" in window)) {
+    reportClientError(new Error("speechSynthesis unavailable"), {
+      code: "speak.synthesis_unavailable",
+      route: "speak",
+    });
+    return;
+  }
   try {
     const u = new SpeechSynthesisUtterance(text);
     u.rate = 1;
     u.pitch = 1;
     window.speechSynthesis.speak(u);
-  } catch {
-    /* speech is best-effort */
+  } catch (e) {
+    reportClientError(e, { code: "speak.synthesis", route: "speak" });
   }
 }
 

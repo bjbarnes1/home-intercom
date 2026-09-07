@@ -1,0 +1,34 @@
+---
+description: Require structured error capture — no silent catches; report via reportError / reportClientError
+alwaysApply: true
+---
+
+# Error capture (home-intercom)
+
+Failures must be visible in Vercel Runtime Logs and, when useful, in the UI.
+
+## Required helpers
+
+- Server / shared: `reportError` / `reportWarning` from `@/lib/errors/report`
+- Client: `reportClientError` from `@/lib/client/reportError`
+- API wrappers: `withAuth` / `withRoute` from `@/lib/http` (they report unhandled exceptions)
+
+## Rules
+
+1. **Never empty `catch`.** At minimum call `reportError` / `reportClientError` / `reportWarning` with a stable `code` (e.g. `announce.tts`, `talk.start`).
+2. **Optional-service fallbacks** (OpenAI, Blob, LiveKit delete-room race) may continue, but must `reportWarning` or `reportError` and preferably return a reason field to the client (`voiceError`, etc.).
+3. **Do not** replace reporting with bare `console.error` / `console.log` for operational failures.
+4. New API routes use `withAuth` or `withRoute` so unexpected throws become logged 500s.
+5. Context must be safe: no secrets, tokens, passwords, or full device secrets. Prefer ids, routes, and short messages.
+6. Prefer one-line structured logs (helpers already emit `[hi:error]` JSON).
+
+## Example
+
+```ts
+try {
+  await synthesizeAnnounce(text);
+} catch (e) {
+  reportError(e, { code: "announce.tts", route: "/api/announce" });
+  // fallback path…
+}
+```

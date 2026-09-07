@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
 import { computeNextRun, validateCron } from "@/lib/reminders/schedule";
+import { reportError } from "@/lib/errors/report";
 
 export const dynamic = "force-dynamic";
 
@@ -115,12 +116,19 @@ export async function POST(req: Request) {
       });
     } catch (e) {
       if (e instanceof Anthropic.AuthenticationError) {
+        reportError(e, {
+          code: "reminders.parse.auth",
+          route: "/api/reminders/parse",
+        });
         return NextResponse.json(
           { error: "AI reminders aren't configured (missing ANTHROPIC_API_KEY)." },
           { status: 503 },
         );
       }
-      console.error("reminder parse failed", e);
+      reportError(e, {
+        code: "reminders.parse",
+        route: "/api/reminders/parse",
+      });
       return NextResponse.json({ error: "Couldn't understand that." }, { status: 502 });
     }
 

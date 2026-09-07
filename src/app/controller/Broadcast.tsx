@@ -43,7 +43,9 @@ export default function Broadcast({ zones }: { zones: ZoneRow[] }) {
         data.voice === "ash"
           ? " · Ash voice"
           : reached > 0
-            ? " · device voice (Ash not configured)"
+            ? data.voiceError
+              ? ` · device voice (${data.voiceError})`
+              : " · device voice (Ash unavailable)"
             : "";
       setResult(
         reached > 0

@@ -2,6 +2,7 @@ import { RoomServiceClient } from "livekit-server-sdk";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { controlSender } from "@/lib/livekit/control";
+import { reportError, reportWarning } from "@/lib/errors/report";
 
 function roomService(): RoomServiceClient | null {
   if (env.mockLocalServices) return null;
@@ -27,14 +28,25 @@ export async function hangupIntercom(opts: {
   if (opts.deviceIds.length > 0) {
     await sender
       .send(opts.deviceIds, { type: "hangup", eventId: opts.eventId })
-      .catch((e) => console.error("hangup send failed", e));
+      .catch((e) =>
+        reportError(e, {
+          code: "hangup.send",
+          route: "hangupIntercom",
+          eventId: opts.eventId,
+        }),
+      );
   }
 
   if (event.roomName) {
     const client = roomService();
     if (client) {
-      await client.deleteRoom(event.roomName).catch(() => {
-        /* room may already be gone */
+      await client.deleteRoom(event.roomName).catch((e) => {
+        reportWarning(e, {
+          code: "hangup.delete_room",
+          route: "hangupIntercom",
+          eventId: opts.eventId,
+          roomName: event.roomName,
+        });
       });
     }
   }
@@ -44,5 +56,11 @@ export async function hangupIntercom(opts: {
       where: { id: opts.eventId },
       data: { outcome: "ENDED", endedAt: new Date() },
     })
-    .catch(() => {});
+    .catch((e) =>
+      reportError(e, {
+        code: "hangup.event_update",
+        route: "hangupIntercom",
+        eventId: opts.eventId,
+      }),
+    );
 }

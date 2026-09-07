@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { mintToken } from "@/lib/livekit/token";
 import { controlSender } from "@/lib/livekit/control";
+import { reportError } from "@/lib/errors/report";
 import { pageRoom, callRoom, broadcastRoom } from "@/lib/livekit/rooms";
 import { resolveTargets } from "@/lib/zones/resolve";
 import { loadHouseholdSnapshot } from "@/lib/presence/snapshot";
@@ -111,7 +112,13 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
           await sender.send([deviceId], command);
         }
       } catch (e) {
-        console.error(`control send to ${deviceId} failed`, e);
+        reportError(e, {
+          code: "intercom.control_send",
+          route: "initiateIntercom",
+          deviceId,
+          kind: input.kind,
+          eventId: event.id,
+        });
       }
     }),
   );

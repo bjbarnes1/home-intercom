@@ -9,6 +9,7 @@ import {
 import { decodeCommand } from "@/lib/control/commands";
 import { speak, stopSpeaking } from "@/lib/client/speak";
 import { toWsUrl } from "@/lib/client/livekitUrl";
+import { reportClientError } from "@/lib/client/reportError";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
 
@@ -105,8 +106,11 @@ export function useEndpointPresence(media: Media) {
                 void _never;
               }
             }
-          } catch {
-            /* ignore malformed control message */
+          } catch (e) {
+            reportClientError(e, {
+              code: "endpoint.control_decode",
+              route: "useEndpointPresence",
+            });
           }
         });
         r.on(RoomEvent.Disconnected, () => {
@@ -123,11 +127,19 @@ export function useEndpointPresence(media: Media) {
           if (lobbyRef.current === r) lobbyRef.current = null;
           setReceiving(false);
           setReceiveError(e instanceof Error ? e.message : "Audio connection failed");
+          reportClientError(e, {
+            code: "endpoint.lobby_connect",
+            route: "useEndpointPresence",
+          });
         }
       }
     } catch (e) {
       setNote(e instanceof Error ? e.message : "Connection failed");
       setPhase((p) => (p === "ready" ? p : "error"));
+      reportClientError(e, {
+        code: "endpoint.heartbeat",
+        route: "useEndpointPresence",
+      });
     }
   }, [joinMedia, leaveMedia, setRinging]);
 
