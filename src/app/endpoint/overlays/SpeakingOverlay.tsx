@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { speak } from "@/lib/client/speak";
 import { identStyle, tint } from "@/lib/color/identity";
 import type { Speaking } from "../types";
@@ -7,11 +8,42 @@ import type { Speaking } from "../types";
 interface Props {
   room: string;
   speaking: Speaking;
+  /** Seconds before auto-dismiss (from Sound settings). */
+  dwellSec: number;
+  /** Remaining fraction 1 → 0 for the LED countdown bar. */
+  onCountdown: (remaining: number) => void;
   onDismiss: () => void;
 }
 
-export default function SpeakingOverlay({ room, speaking, onDismiss }: Props) {
+export default function SpeakingOverlay({
+  room,
+  speaking,
+  dwellSec,
+  onCountdown,
+  onDismiss,
+}: Props) {
   const who = speaking.label === "Reminder" ? undefined : speaking.label;
+  const [epoch, setEpoch] = useState(0);
+
+  useEffect(() => {
+    const totalMs = Math.max(1, dwellSec) * 1000;
+    const started = Date.now();
+    onCountdown(1);
+
+    const id = window.setInterval(() => {
+      const remaining = Math.max(0, 1 - (Date.now() - started) / totalMs);
+      onCountdown(remaining);
+      if (remaining <= 0) {
+        window.clearInterval(id);
+        onDismiss();
+      }
+    }, 50);
+
+    return () => {
+      window.clearInterval(id);
+    };
+  }, [speaking.text, speaking.label, speaking.audioUrl, dwellSec, epoch, onCountdown, onDismiss]);
+
   return (
     <div
       className="hi-tinted absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-14 text-center"
@@ -36,7 +68,10 @@ export default function SpeakingOverlay({ room, speaking, onDismiss }: Props) {
           Got it
         </button>
         <button
-          onClick={() => void speak(speaking.text, speaking.audioUrl)}
+          onClick={() => {
+            void speak(speaking.text, speaking.audioUrl);
+            setEpoch((n) => n + 1);
+          }}
           className="btn btn-secondary min-h-14 px-7 text-base"
         >
           <i className="ph ph-repeat text-lg" />

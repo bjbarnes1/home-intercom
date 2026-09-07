@@ -17,6 +17,10 @@ import {
   type RoomLights,
 } from "@/lib/color/led-state";
 import { minutesToHm } from "@/lib/etiquette/quietHours";
+import {
+  ANNOUNCE_DWELL_DEFAULT,
+  clampAnnounceDwellSec,
+} from "@/lib/etiquette/announceDwell";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
 
@@ -28,6 +32,7 @@ export interface EtiquetteSettings {
   quietHoursStart: string;
   quietHoursEnd: string;
   hasLeds: boolean;
+  announceDwellSec: number;
 }
 
 /**
@@ -46,6 +51,7 @@ export function useEndpointPresence(media: Media) {
     quietHoursStart: "22:00",
     quietHoursEnd: "07:00",
     hasLeds: false,
+    announceDwellSec: ANNOUNCE_DWELL_DEFAULT,
   });
   const [roomLights, setRoomLights] = useState<RoomLights>(() => defaultRoomLights());
   const [receiving, setReceiving] = useState(false);
@@ -120,6 +126,9 @@ export function useEndpointPresence(media: Media) {
         quietHoursEnd:
           data.quietHoursEnd != null ? minutesToHm(data.quietHoursEnd) : "07:00",
         hasLeds: !!data.hasLeds,
+        announceDwellSec: clampAnnounceDwellSec(
+          data.announceDwellSec ?? ANNOUNCE_DWELL_DEFAULT,
+        ),
       });
       setMock(!!data.mock);
       const wsUrl = toWsUrl(data.livekitUrl ?? "");
@@ -269,6 +278,9 @@ export function useEndpointPresence(media: Media) {
           quietHoursStart: saved.quietHoursStart,
           quietHoursEnd: saved.quietHoursEnd,
           hasLeds: saved.hasLeds,
+          announceDwellSec: clampAnnounceDwellSec(
+            saved.announceDwellSec ?? ANNOUNCE_DWELL_DEFAULT,
+          ),
         });
         if ("doNotDisturb" in saved) setDnd(!!saved.doNotDisturb);
       }

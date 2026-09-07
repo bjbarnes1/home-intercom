@@ -83,6 +83,7 @@ export default function EndpointPage() {
   const [schedDay, setSchedDay] = useState(0);
   const [musicOpen, setMusicOpen] = useState(false);
   const [boardOverride, setBoardOverride] = useState<JobBoard | null>(null);
+  const [speakProgress, setSpeakProgress] = useState(1);
   const autoPairTried = useRef(false);
 
   const ready = phase === "ready";
@@ -239,6 +240,19 @@ export default function EndpointPage() {
     }
   }, [phase, code, claim]);
 
+  useEffect(() => {
+    if (!speaking) setSpeakProgress(1);
+  }, [speaking]);
+
+  const onSpeakCountdown = useCallback((remaining: number) => {
+    setSpeakProgress(remaining);
+  }, []);
+
+  const dismissSpeakingAndReset = useCallback(() => {
+    setSpeakProgress(1);
+    dismissSpeaking();
+  }, [dismissSpeaking]);
+
   const clockBig = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   const dateLong = now.toLocaleDateString([], {
     weekday: "long",
@@ -259,13 +273,21 @@ export default function EndpointPage() {
     >
       <div
         className="hi-led-fixture absolute left-3 right-3 top-2 z-50"
-        title={front.why}
+        title={
+          speaking
+            ? `Message · ${Math.ceil(speakProgress * etiquette.announceDwellSec)}s`
+            : front.why
+        }
         aria-hidden
       >
         <div
-          className="hi-led-bar h-1.5"
-          data-live={front.live}
-          style={ledStyle(front)}
+          className="hi-led-bar h-1.5 origin-left"
+          data-live={speaking ? false : front.live}
+          data-countdown={speaking ? "true" : undefined}
+          style={{
+            ...ledStyle(front),
+            width: `${Math.max(0, speakProgress) * 100}%`,
+          }}
         />
       </div>
       <div
@@ -423,7 +445,9 @@ export default function EndpointPage() {
         <SpeakingOverlay
           room={room}
           speaking={speaking}
-          onDismiss={dismissSpeaking}
+          dwellSec={etiquette.announceDwellSec}
+          onCountdown={onSpeakCountdown}
+          onDismiss={dismissSpeakingAndReset}
         />
       )}
 

@@ -195,6 +195,10 @@
     opacity: 1;
   }
 }
+.hi-led-bar[data-countdown="true"] {
+  animation: none;
+  transition: none;
+}
 @media (prefers-reduced-motion: reduce) {
   .hi-led-bar[data-live="true"] {
     animation: none;

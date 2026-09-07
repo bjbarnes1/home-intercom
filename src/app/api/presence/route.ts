@@ -41,6 +41,7 @@ export async function POST(req: Request) {
       quietHoursStart: true,
       quietHoursEnd: true,
       hasLeds: true,
+      announceDwellSec: true,
     },
   });
 
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
     quietHoursStart: row.quietHoursStart,
     quietHoursEnd: row.quietHoursEnd,
     hasLeds: row.hasLeds,
+    announceDwellSec: row.announceDwellSec,
     mock: env.mockLocalServices,
   });
 }

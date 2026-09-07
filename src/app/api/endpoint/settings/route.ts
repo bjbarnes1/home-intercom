@@ -7,6 +7,12 @@ import {
   minutesToHm,
   parseHmToMinutes,
 } from "@/lib/etiquette/quietHours";
+import {
+  ANNOUNCE_DWELL_DEFAULT,
+  ANNOUNCE_DWELL_MAX,
+  ANNOUNCE_DWELL_MIN,
+  clampAnnounceDwellSec,
+} from "@/lib/etiquette/announceDwell";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +23,7 @@ const Settings = z.object({
   quietHoursStart: z.string().optional(), // "HH:MM"
   quietHoursEnd: z.string().optional(),
   hasLeds: z.boolean().optional(),
+  announceDwellSec: z.number().int().min(ANNOUNCE_DWELL_MIN).max(ANNOUNCE_DWELL_MAX).optional(),
 });
 
 function serializeSettings(d: {
@@ -27,6 +34,7 @@ function serializeSettings(d: {
   quietHoursStart: number | null;
   quietHoursEnd: number | null;
   hasLeds: boolean;
+  announceDwellSec: number;
 }) {
   return {
     doNotDisturb: d.doNotDisturb,
@@ -37,8 +45,22 @@ function serializeSettings(d: {
       d.quietHoursStart != null ? minutesToHm(d.quietHoursStart) : "22:00",
     quietHoursEnd: d.quietHoursEnd != null ? minutesToHm(d.quietHoursEnd) : "07:00",
     hasLeds: d.hasLeds,
+    announceDwellSec: clampAnnounceDwellSec(
+      d.announceDwellSec ?? ANNOUNCE_DWELL_DEFAULT,
+    ),
   };
 }
+
+const settingsSelect = {
+  doNotDisturb: true,
+  autoAnswer: true,
+  chimeEnabled: true,
+  quietHoursEnabled: true,
+  quietHoursStart: true,
+  quietHoursEnd: true,
+  hasLeds: true,
+  announceDwellSec: true,
+} as const;
 
 /**
  * GET /api/endpoint/settings — current per-device etiquette.
@@ -51,15 +73,7 @@ export async function GET(req: Request) {
     }
     const row = await prisma.device.findUniqueOrThrow({
       where: { id: device.id },
-      select: {
-        doNotDisturb: true,
-        autoAnswer: true,
-        chimeEnabled: true,
-        quietHoursEnabled: true,
-        quietHoursStart: true,
-        quietHoursEnd: true,
-        hasLeds: true,
-      },
+      select: settingsSelect,
     });
     return NextResponse.json(serializeSettings(row));
   }, { route: "/api/endpoint/settings" });
@@ -87,6 +101,7 @@ export async function PATCH(req: Request) {
       quietHoursStart?: number | null;
       quietHoursEnd?: number | null;
       hasLeds?: boolean;
+      announceDwellSec?: number;
     } = {};
 
     if (parsed.data.doNotDisturb !== undefined) {
@@ -100,6 +115,9 @@ export async function PATCH(req: Request) {
     }
     if (parsed.data.hasLeds !== undefined) {
       data.hasLeds = parsed.data.hasLeds;
+    }
+    if (parsed.data.announceDwellSec !== undefined) {
+      data.announceDwellSec = clampAnnounceDwellSec(parsed.data.announceDwellSec);
     }
     if (parsed.data.quietHoursStart !== undefined) {
       const m = parseHmToMinutes(parsed.data.quietHoursStart);
@@ -119,15 +137,7 @@ export async function PATCH(req: Request) {
     const updated = await prisma.device.update({
       where: { id: device.id },
       data,
-      select: {
-        doNotDisturb: true,
-        autoAnswer: true,
-        chimeEnabled: true,
-        quietHoursEnabled: true,
-        quietHoursStart: true,
-        quietHoursEnd: true,
-        hasLeds: true,
-      },
+      select: settingsSelect,
     });
 
     return NextResponse.json(serializeSettings(updated));

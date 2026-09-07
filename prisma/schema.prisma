@@ -182,6 +182,8 @@ model Device {
   autoAnswer   Boolean @default(true) // pages auto-open on endpoints
   /// Soft chime before announce/reminder speech on this panel.
   chimeEnabled Boolean @default(true)
+  /// Seconds to keep announce/reminder overlay visible before auto-return (default 30).
+  announceDwellSec Int @default(30)
   /// When enabled, reminders whisper (no chime, lower volume); pages still ring.
   quietHoursEnabled Boolean @default(false)
   /// Minutes from local midnight (0–1439). Window may wrap past midnight.

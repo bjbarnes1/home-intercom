@@ -100,6 +100,41 @@ export default function SoundRail({
         )}
       </div>
 
+      <div className="card mb-4 p-4">
+        <div className="mb-3 flex items-center gap-4">
+          <i className="ph ph-timer text-2xl text-accent" />
+          <div className="flex-1">
+            <div className="font-heading text-lg font-medium">
+              Message display time
+            </div>
+            <div className="text-[13px] text-neutral-500">
+              How long announces and reminders stay full-screen before returning
+              home. The top colour bar counts down.
+            </div>
+          </div>
+          <div className="font-heading text-lg font-medium tabular-nums text-accent">
+            {etiquette.announceDwellSec}s
+          </div>
+        </div>
+        <input
+          type="range"
+          min={5}
+          max={120}
+          step={5}
+          value={etiquette.announceDwellSec}
+          onChange={(e) =>
+            onEtiquetteChange({ announceDwellSec: Number(e.target.value) })
+          }
+          className="w-full accent-[var(--color-accent)]"
+          aria-label="Message display time in seconds"
+        />
+        <div className="mt-1 flex justify-between text-[11px] text-neutral-500">
+          <span>5s</span>
+          <span>30s default</span>
+          <span>120s</span>
+        </div>
+      </div>
+
       <div className="card mb-4 flex items-center gap-4 p-4">
         <i className="ph ph-palette text-2xl text-accent" />
         <div className="flex-1">
