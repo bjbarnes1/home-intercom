@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useTalk } from "@/lib/client/useTalk";
+import { identStyle } from "@/lib/color/identity";
 import type { DeviceRow } from "./types";
 
 export default function PageTalk({
@@ -26,13 +27,21 @@ export default function PageTalk({
   };
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col p-5">
+    <div
+      className="hi-tinted mx-auto flex min-h-screen max-w-md flex-col p-5"
+      style={identStyle(target.displayName)}
+    >
       <header className="flex items-center gap-3">
         <button onClick={onBack} className="btn btn-ghost min-h-9 px-2">
           <i className="ph ph-caret-left text-lg" />
         </button>
         <div className="flex-1">
-          <div className="font-heading text-lg font-medium">{target.displayName}</div>
+          <div
+            className="font-heading text-lg font-medium"
+            style={{ color: "var(--hi-ident)" }}
+          >
+            {target.displayName}
+          </div>
           <div className="text-xs text-neutral-500">
             {target.online ? "Online" : "Offline"}
           </div>
@@ -50,7 +59,7 @@ export default function PageTalk({
       <div className="flex flex-1 flex-col items-center justify-center gap-6">
         {live ? (
           <div className="flex flex-col items-center gap-3">
-            <span className="tag tag-accent uppercase tracking-wider">
+            <span className="tag tag-ident uppercase tracking-wider">
               {inCall ? "On call" : "On air"}
             </span>
             <div className="levels h-10">

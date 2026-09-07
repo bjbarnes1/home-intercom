@@ -1,5 +1,6 @@
 "use client";
 
+import { ident, identStyle } from "@/lib/color/identity";
 import type { Schedule } from "../types";
 
 interface Props {
@@ -51,14 +52,18 @@ export default function ScheduleRail({ schedule, schedDay, onSelectDay }: Props)
           day.events.map((e) => (
             <div
               key={e.id}
-              className="flex items-center gap-4 border-b border-divider py-3.5"
+              className="hi-tinted flex items-center gap-4 border-b border-divider py-3.5"
+              style={identStyle(e.who)}
             >
-              <div className="w-20 flex-none font-heading text-[17px] font-medium text-accent-300">
+              <div
+                className="w-20 flex-none font-heading text-[17px] font-medium"
+                style={{ color: "var(--hi-ident)" }}
+              >
                 {e.time}
               </div>
               <div
                 className="h-9 w-[3px] flex-none rounded"
-                style={{ background: e.color }}
+                style={{ background: e.who ? ident(e.who) : e.color }}
               />
               <div className="min-w-0 flex-1">
                 <div className="font-heading text-lg font-medium">{e.title}</div>
@@ -66,7 +71,7 @@ export default function ScheduleRail({ schedule, schedDay, onSelectDay }: Props)
                   <div className="mt-0.5 text-[13px] text-neutral-500">{e.who}</div>
                 )}
               </div>
-              {e.who && <span className="tag tag-neutral">{e.who}</span>}
+              {e.who && <span className="tag tag-ident">{e.who}</span>}
             </div>
           ))
         ) : (

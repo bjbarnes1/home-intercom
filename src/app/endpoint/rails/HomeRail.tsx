@@ -1,6 +1,7 @@
 "use client";
 
 import { reminderTime } from "@/lib/client/speak";
+import { identStyle } from "@/lib/color/identity";
 import type { EndpointReminder, JobBoard, Schedule } from "../types";
 
 interface Props {
@@ -25,6 +26,7 @@ export default function HomeRail({
   onOpenReminders,
 }: Props) {
   const openJobs = (board?.kids ?? []).reduce((n, k) => n + (k.total - k.doneToday), 0);
+  const nextWho = schedule?.nextEvent?.who ?? undefined;
 
   return (
     <div className="flex flex-1 flex-col justify-center px-7 pb-8">
@@ -33,8 +35,14 @@ export default function HomeRail({
       </div>
       <div className="mt-3 text-xl text-neutral-400">{dateLong}</div>
       <div className="mt-9 flex gap-3">
-        <button onClick={onOpenSchedule} className="card card-hover flex-1 p-4 text-left">
-          <div className="uplabel mb-1.5 text-accent">Next on the calendar</div>
+        <button
+          onClick={onOpenSchedule}
+          className="hi-tinted card card-hover flex-1 p-4 text-left"
+          style={identStyle(nextWho)}
+        >
+          <div className="uplabel mb-1.5" style={{ color: "var(--hi-ident)" }}>
+            Next on the calendar
+          </div>
           {schedule?.nextEvent ? (
             <>
               <div className="font-heading text-lg font-medium">
@@ -49,8 +57,14 @@ export default function HomeRail({
             <div className="text-sm text-neutral-500">Nothing coming up</div>
           )}
         </button>
-        <button onClick={onOpenJobs} className="card card-hover flex-1 p-4 text-left">
-          <div className="uplabel mb-1.5 text-accent">Jobs still open</div>
+        <button
+          onClick={onOpenJobs}
+          className="hi-tinted card card-hover flex-1 p-4 text-left"
+          style={identStyle("Kids")}
+        >
+          <div className="uplabel mb-1.5" style={{ color: "var(--hi-ident)" }}>
+            Jobs still open
+          </div>
           <div className="font-heading text-lg font-medium">
             {openJobs === 0 ? "All done" : `${openJobs} to go`}
           </div>
@@ -58,8 +72,14 @@ export default function HomeRail({
             {board?.weekDoneTotal ?? 0} done this week
           </div>
         </button>
-        <button onClick={onOpenReminders} className="card card-hover flex-1 p-4 text-left">
-          <div className="uplabel mb-1.5 text-accent">Next reminder</div>
+        <button
+          onClick={onOpenReminders}
+          className="hi-tinted card card-hover flex-1 p-4 text-left"
+          style={identStyle("Everyone")}
+        >
+          <div className="uplabel mb-1.5" style={{ color: "var(--hi-ident)" }}>
+            Next reminder
+          </div>
           {reminders[0] ? (
             <>
               <div className="font-heading text-lg font-medium">

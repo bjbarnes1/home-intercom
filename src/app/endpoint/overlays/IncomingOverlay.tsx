@@ -1,5 +1,6 @@
 "use client";
 
+import { identStyle, tint } from "@/lib/color/identity";
 import type { Incoming } from "../types";
 
 interface Props {
@@ -9,17 +10,21 @@ interface Props {
 }
 
 export default function IncomingOverlay({ room, incoming, onDismiss }: Props) {
+  const who = incoming.title;
   return (
     <div
-      className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-7 p-10"
+      className="hi-tinted absolute inset-0 z-40 flex flex-col items-center justify-center gap-7 p-10"
       style={{
-        background:
-          "linear-gradient(160deg, var(--color-accent-900), var(--color-bg) 62%)",
+        ...identStyle(who),
+        background: `linear-gradient(160deg, ${tint(who, 22)}, var(--color-bg) 62%)`,
       }}
     >
       <div className="flex items-center gap-2">
-        <span className="dot dot-online animate-breathe" />
-        <span className="text-xs uppercase tracking-[0.16em] text-accent-200">
+        <span className="dot dot-ident animate-breathe" />
+        <span
+          className="text-xs uppercase tracking-[0.16em]"
+          style={{ color: "var(--hi-ident)" }}
+        >
           On air · {room}
         </span>
       </div>

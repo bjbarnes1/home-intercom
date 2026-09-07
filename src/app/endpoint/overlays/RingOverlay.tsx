@@ -1,5 +1,6 @@
 "use client";
 
+import { identStyle, tint } from "@/lib/color/identity";
 import type { RingOffer } from "../types";
 
 interface Props {
@@ -10,22 +11,26 @@ interface Props {
 }
 
 export default function RingOverlay({ room, ringing, onAnswer, onDecline }: Props) {
+  const who = ringing.title;
   return (
     <div
-      className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-10"
+      className="hi-tinted absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-10"
       style={{
-        background:
-          "linear-gradient(160deg, var(--color-accent-900), var(--color-bg) 62%)",
+        ...identStyle(who),
+        background: `linear-gradient(160deg, ${tint(who, 22)}, var(--color-bg) 62%)`,
       }}
     >
-      <div className="text-xs uppercase tracking-[0.16em] text-accent-200">
+      <div
+        className="text-xs uppercase tracking-[0.16em]"
+        style={{ color: "var(--hi-ident)" }}
+      >
         Calling {room}
       </div>
       <div
         className="grid h-28 w-28 place-items-center rounded-full bg-surface"
         style={{ animation: "halo 1.6s ease-out infinite" }}
       >
-        <i className="ph-fill ph-phone text-4xl text-accent" />
+        <i className="ph-fill ph-phone text-4xl" style={{ color: "var(--hi-ident)" }} />
       </div>
       <div className="font-heading text-4xl font-medium">{ringing.title}</div>
       <div className="text-sm text-neutral-400">Two-way — they&apos;ll hear the room</div>

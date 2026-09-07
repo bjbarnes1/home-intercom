@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { reminderTime } from "@/lib/client/speak";
 import { useSpeechInput } from "@/lib/client/useSpeechInput";
+import { identStyle } from "@/lib/color/identity";
 import type { DeviceRow, ReminderRow, ZoneRow } from "./types";
 
 export default function RemindersPanel({
@@ -244,11 +245,9 @@ function NewReminder({
               onClick={() =>
                 setTarget(t.zoneId ? { zoneId: t.zoneId } : { deviceId: t.deviceId })
               }
-              className={`rounded-full px-3 py-1.5 text-[13px] transition ${
-                on
-                  ? "bg-accent text-[#141221]"
-                  : "border border-divider text-neutral-300 hover:border-accent"
-              }`}
+              aria-pressed={on}
+              className="hi-tinted hi-chip"
+              style={identStyle(t.name)}
             >
               {t.name}
             </button>

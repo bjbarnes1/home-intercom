@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getDeviceSecret,
   saveDeviceCredentials,
@@ -8,6 +8,13 @@ import {
 import { speak } from "@/lib/client/speak";
 import { isWellFormedPairingCode } from "@/lib/devices/pairing";
 import type { MusicActionRequest } from "@/lib/music/actions";
+import { identStyle } from "@/lib/color/identity";
+import {
+  defaultRoomLights,
+  frontLed,
+  ledStyle,
+  rearLed,
+} from "@/lib/color/led-state";
 import type {
   EndpointReminder,
   JobBoard,
@@ -99,6 +106,33 @@ export default function EndpointPage() {
   );
 
   const board = boardOverride ?? polledBoard;
+
+  const lights = useMemo(() => defaultRoomLights(), []);
+  const ledActivity = useMemo(() => {
+    if (media.ringing && !media.incoming) {
+      return { overlay: "ring" as const, who: media.ringing.title, dnd };
+    }
+    if (media.incoming) {
+      return { overlay: "page" as const, who: media.incoming.title, dnd };
+    }
+    if (speaking) {
+      return {
+        overlay:
+          speaking.label === "Reminder"
+            ? ("reminder" as const)
+            : ("page" as const),
+        who: speaking.label === "Reminder" ? undefined : speaking.label,
+        dnd,
+      };
+    }
+    return { overlay: null, dnd };
+  }, [media.ringing, media.incoming, speaking, dnd]);
+
+  const front = useMemo(
+    () => frontLed(lights, ledActivity, room),
+    [lights, ledActivity, room],
+  );
+  const rear = useMemo(() => rearLed(lights), [lights]);
 
   useEffect(() => {
     const p = new URLSearchParams(window.location.search).get("code");
@@ -206,11 +240,34 @@ export default function EndpointPage() {
   }
 
   return (
-    <div className="kiosk relative flex h-screen">
-      <nav className="flex w-56 flex-none flex-col gap-1.5 border-r border-divider p-5">
+    <div
+      className="hi-tinted kiosk relative flex h-screen"
+      style={identStyle(room)}
+    >
+      <div
+        className="hi-led-bar absolute left-3 right-3 top-2 z-50 h-1.5"
+        data-live={front.live}
+        style={ledStyle(front)}
+        title={front.why}
+        aria-hidden
+      />
+      <div
+        className="hi-led-bar absolute bottom-2 left-3 right-3 z-50 h-1"
+        data-live={rear.live}
+        style={ledStyle(rear)}
+        title={rear.why}
+        aria-hidden
+      />
+      <nav className="flex w-56 flex-none flex-col gap-1.5 border-r border-divider p-5 pt-6">
         <div className="px-2 pb-4">
-          <div className="font-heading text-lg font-medium">{room}</div>
+          <div
+            className="font-heading text-lg font-medium"
+            style={{ color: "var(--hi-ident)" }}
+          >
+            {room}
+          </div>
           <div className="text-[11px] text-neutral-500">Home intercom</div>
+          <div className="mt-1 text-[10px] text-neutral-600">{front.why}</div>
         </div>
         {RAIL_ITEMS.map(([key, icon, label]) => (
           <button
@@ -218,9 +275,12 @@ export default function EndpointPage() {
             onClick={() => setRail(key)}
             className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-[15px] transition ${
               rail === key
-                ? "bg-accent-900 text-accent-200"
+                ? "text-accent-200"
                 : "text-neutral-300 hover:bg-surface"
             }`}
+            style={
+              rail === key ? { background: "var(--hi-tint-22)" } : undefined
+            }
           >
             <i className={`ph ${icon} text-xl`} />
             {label}
@@ -229,8 +289,9 @@ export default function EndpointPage() {
         <div className="flex-1" />
         <div
           className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] ${
-            dnd ? "bg-accent-900 text-accent-200" : "text-neutral-500"
+            dnd ? "text-accent-200" : "text-neutral-500"
           }`}
+          style={dnd ? { background: "var(--hi-tint-14)" } : undefined}
         >
           <i className="ph ph-moon text-base" />
           {dnd ? "Do not disturb" : "Available"}

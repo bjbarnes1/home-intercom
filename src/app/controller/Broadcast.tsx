@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTalk } from "@/lib/client/useTalk";
+import { identStyle } from "@/lib/color/identity";
 import type { ZoneRow } from "./types";
 
 export default function Broadcast({ zones }: { zones: ZoneRow[] }) {
@@ -92,16 +93,19 @@ export default function Broadcast({ zones }: { zones: ZoneRow[] }) {
             <button
               key={z.id}
               onClick={() => setZoneId(z.id)}
-              className={`card flex items-center justify-between p-3 text-left ${on ? "ring-1 ring-accent" : "card-hover"}`}
+              aria-pressed={on}
+              className="hi-tinted hi-chip w-full justify-between"
+              style={identStyle(z.name)}
             >
-              <div>
+              <div className="text-left">
                 <div className="font-heading text-[15px] font-medium">{z.name}</div>
                 <div className="text-[11px] text-neutral-500">
                   {z.deviceCount} endpoints · {z.onlineCount} online
                 </div>
               </div>
               <i
-                className={`ph-fill ph-check-circle text-xl ${on ? "text-accent" : "text-neutral-700"}`}
+                className={`ph-fill ph-check-circle text-xl ${on ? "" : "text-neutral-700"}`}
+                style={on ? { color: "var(--hi-ident)" } : undefined}
               />
             </button>
           );
@@ -132,10 +136,13 @@ export default function Broadcast({ zones }: { zones: ZoneRow[] }) {
           </p>
         </>
       ) : (
-        <div className="flex flex-col items-center justify-center gap-5 py-6">
+        <div
+          className="hi-tinted flex flex-col items-center justify-center gap-5 py-6"
+          style={identStyle(selected?.name)}
+        >
           {live && (
             <div className="flex flex-col items-center gap-2">
-              <span className="tag tag-accent uppercase tracking-wider">
+              <span className="tag tag-ident uppercase tracking-wider">
                 Live to {selected?.name}
               </span>
               <div className="text-sm text-neutral-400">

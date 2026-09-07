@@ -46,9 +46,10 @@ The intercom core is working end-to-end, including **real two-way audio**
 - **Data model**: household (+timezone), users, sessions, devices, zones,
   reminders, `IntercomEvent` audit log (metadata only — no audio), kids, chores
   + completions, calendar events, music state. Four committed migrations.
-- **Nocturne design system** (`globals.css` via Tailwind `@theme`) — dark
-  lavender palette, cards, tags, buttons, toggle, hold-to-talk, level bars,
-  overlays. Space Grotesk + Inter, Phosphor icons.
+- **Nocturne + identity colours** (`globals.css` + `src/styles/identity.css`) —
+  ground `#161826`, kitchen/everyone blurple accent, one hue per person/room/zone
+  (oklab blends). Cards, tags, buttons, hold-to-talk, LED bars, overlays.
+  Space Grotesk + Inter, Phosphor icons. See `docs/handoff/colours/`.
 
 ### Devices & control channel
 - **Pairing**: admin registers a device → 6-char code **+ QR**; the room phone

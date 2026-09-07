@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { identStyle } from "@/lib/color/identity";
 import DevicesManager from "./DevicesManager";
 import TabBar from "./TabBar";
 import PageTalk from "./PageTalk";
@@ -102,9 +103,15 @@ export default function ControllerPage() {
                 <button
                   key={z.id}
                   onClick={() => setTab("broadcast")}
-                  className="card card-hover flex-1 p-3 text-left"
+                  className="hi-tinted card card-hover flex-1 p-3 text-left"
+                  style={identStyle(z.name)}
                 >
-                  <div className="font-heading text-[15px] font-medium">{z.name}</div>
+                  <div
+                    className="font-heading text-[15px] font-medium"
+                    style={{ color: "var(--hi-ident)" }}
+                  >
+                    {z.name}
+                  </div>
                   <div className="text-[11px] text-neutral-500">
                     {z.deviceCount} {z.deviceCount === 1 ? "room" : "rooms"}
                   </div>
@@ -122,13 +129,19 @@ export default function ControllerPage() {
                   key={d.id}
                   disabled={!d.online}
                   onClick={() => setPageTarget(d)}
-                  className="card card-hover flex items-center gap-3 p-3 disabled:cursor-default disabled:opacity-55"
+                  className="hi-tinted card card-hover flex items-center gap-3 p-3 disabled:cursor-default disabled:opacity-55"
+                  style={identStyle(d.displayName)}
                 >
-                  <i className={`ph ${roomIcon(d.displayName)} text-lg text-accent`} />
+                  <i
+                    className={`ph ${roomIcon(d.displayName)} text-lg`}
+                    style={{ color: "var(--hi-ident)" }}
+                  />
                   <span className="flex-1 text-left font-heading text-[15px] font-medium">
                     {d.displayName}
                   </span>
-                  <span className={`dot ${d.online ? "dot-online" : "dot-offline"}`} />
+                  <span
+                    className={`dot ${d.online ? "dot-ident" : "dot-offline"}`}
+                  />
                   <span className="text-[11px] text-neutral-500">
                     {d.online ? "Online" : "Offline"}
                   </span>

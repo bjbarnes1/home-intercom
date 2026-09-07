@@ -1,6 +1,7 @@
 "use client";
 
 import { speak } from "@/lib/client/speak";
+import { identStyle, tint } from "@/lib/color/identity";
 import type { Speaking } from "../types";
 
 interface Props {
@@ -10,15 +11,19 @@ interface Props {
 }
 
 export default function SpeakingOverlay({ room, speaking, onDismiss }: Props) {
+  const who = speaking.label === "Reminder" ? undefined : speaking.label;
   return (
     <div
-      className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-14 text-center"
+      className="hi-tinted absolute inset-0 z-40 flex flex-col items-center justify-center gap-6 p-14 text-center"
       style={{
-        background:
-          "linear-gradient(160deg, var(--color-neutral-900), var(--color-bg) 60%)",
+        ...identStyle(who ?? room),
+        background: `linear-gradient(160deg, ${tint(who ?? room, 14)}, var(--color-bg) 60%)`,
       }}
     >
-      <div className="flex items-center gap-2 text-xs uppercase tracking-[0.16em] text-accent">
+      <div
+        className="flex items-center gap-2 text-xs uppercase tracking-[0.16em]"
+        style={{ color: "var(--hi-ident)" }}
+      >
         <i className="ph-fill ph-megaphone-simple text-lg" />
         {speaking.label} · {room}
       </div>
