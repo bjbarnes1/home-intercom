@@ -301,6 +301,11 @@ actor APIClient {
         }
         guard (200..<300).contains(http.statusCode) else {
             if http.statusCode == 401 { throw APIError.unauthorized }
+            if http.statusCode == 404 {
+                throw APIError.featureNotDeployed(
+                    path: path, host: baseURL.host() ?? baseURL.absoluteString
+                )
+            }
             let message = (try? decoder.decode(ServerErrorBody.self, from: data))?.message ?? ""
             throw APIError.server(status: http.statusCode, message: message)
         }

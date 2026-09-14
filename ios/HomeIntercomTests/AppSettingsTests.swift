@@ -59,6 +59,17 @@ final class AuthErrorMessageTests: XCTestCase {
         )
     }
 
+    /// A 404 on an API route means the server is older than the app, not that
+    /// the app is broken — the bare "404" sent someone debugging the wrong end.
+    func testAMissingRouteBlamesTheDeployment() {
+        let message = APIError.featureNotDeployed(
+            path: "/api/location/people", host: "intercom.zeebee.au"
+        ).localizedDescription
+        XCTAssertTrue(message.contains("intercom.zeebee.au"))
+        XCTAssertTrue(message.contains("/api/location/people"))
+        XCTAssertTrue(message.contains("older deployment"))
+    }
+
     /// A cookie that doesn't stick used to bounce back to a blank sign-in screen
     /// with no explanation at all.
     func testACookieThatDoesNotStickExplainsItself() {

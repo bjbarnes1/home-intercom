@@ -7,6 +7,10 @@ enum APIError: LocalizedError, Equatable {
     /// "your session has expired" is nonsense on a sign-in screen: there is no
     /// session yet, and the real problem is the email or the password.
     case invalidCredentials(host: String)
+    /// The route isn't there. Nearly always means the server is running an
+    /// older deployment than this build of the app expects — a bare "404" sends
+    /// you looking at the app when the answer is on the server.
+    case featureNotDeployed(path: String, host: String)
     /// The server answered, but not happily. `message` is already human-readable.
     case server(status: Int, message: String)
     /// Couldn't reach the server at all (wrong URL, no network, server down).
@@ -21,6 +25,10 @@ enum APIError: LocalizedError, Equatable {
         case let .invalidCredentials(host):
             return "That email and password don't match an account on \(host). "
                 + "Check the address — it may not be the one you use elsewhere."
+        case let .featureNotDeployed(path, host):
+            return "\(host) doesn't have \(path) — it's running an older deployment "
+                + "than this app. Deploy the current code, or point Settings → Server "
+                + "somewhere that has it."
         case let .server(status, message):
             return message.isEmpty ? "The server returned an error (\(status))." : message
         case let .unreachable(detail):
