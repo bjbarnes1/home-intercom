@@ -1,0 +1,118 @@
+# Xcode project spec for the Home Intercom controller app.
+#
+# The .xcodeproj is *generated*, never committed — run `./Scripts/bootstrap.sh`
+# (or `xcodegen generate`) after changing this file or adding source files.
+# XcodeGen globs Sources/, so new .swift files are picked up automatically.
+
+name: HomeIntercom
+
+options:
+  bundleIdPrefix: com.barneswilkes
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+  minimumXcodeGenVersion: "2.38.0"
+
+packages:
+  LiveKit:
+    url: https://github.com/livekit/client-sdk-swift
+    # Pinned minor-compatible: 2.x is the current generation of the Swift SDK.
+    from: "2.0.14"
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    # Set DEVELOPMENT_TEAM in ios/Local.xcconfig (git-ignored) or in Xcode's
+    # Signing & Capabilities tab; leaving it empty is fine for the Simulator.
+    ENABLE_USER_SCRIPT_SANDBOXING: "YES"
+    SWIFT_STRICT_CONCURRENCY: minimal
+
+configFiles:
+  Debug: Local.xcconfig
+  Release: Local.xcconfig
+
+targets:
+  HomeIntercom:
+    type: application
+    platform: iOS
+    sources:
+      - path: HomeIntercom/Sources
+      - path: HomeIntercom/Resources/Assets.xcassets
+    dependencies:
+      - package: LiveKit
+        product: LiveKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.barneswilkes.homeintercom
+        PRODUCT_NAME: Home Intercom
+        # The product name has a space; pin the module name so
+        # `@testable import HomeIntercom` works.
+        PRODUCT_MODULE_NAME: HomeIntercom
+        INFOPLIST_KEY_CFBundleDisplayName: Intercom
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: "NO"
+    info:
+      path: HomeIntercom/Resources/Info.plist
+      properties:
+        CFBundleDisplayName: Intercom
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # Paging, calls and live broadcast all capture the microphone.
+        NSMicrophoneUsageDescription: >-
+          Home Intercom uses the microphone so you can page a room, talk on a
+          two-way call, and broadcast to the house.
+        # Keep audio alive when the screen locks mid-call. (No `voip` — that
+        # mode is for PushKit-woken calls, which this app doesn't do yet.)
+        UIBackgroundModes:
+          - audio
+        # The server is HTTPS; this exception only allows plain-HTTP to a
+        # dev server on your own LAN (e.g. http://192.168.1.20:3000).
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: >-
+          Lets the app reach a Home Intercom server running on your home
+          network instead of the cloud one.
+
+  HomeIntercomTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: HomeIntercomTests
+    dependencies:
+      - target: HomeIntercom
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.barneswilkes.homeintercom.tests
+        GENERATE_INFOPLIST_FILE: "YES"
+
+schemes:
+  HomeIntercom:
+    build:
+      targets:
+        HomeIntercom: all
+        HomeIntercomTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: true
+      targets:
+        - HomeIntercomTests
+    archive:
+      config: Release

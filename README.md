@@ -80,6 +80,18 @@ The intercom core is working end-to-end, including **real two-way audio**
   ("Say something" TTS + "Talk live"), Reminders (AI "ask in plain words" with
   optional speech input + manual form), and a **Devices** manager.
 
+### Native iOS controller (`ios/`)
+
+A SwiftUI app for the same Controller role, talking to this backend unchanged —
+sign-in reuses the `intercom_session` cookie, so no server work was needed. Home
+(zones + rooms with live presence), hold-to-talk page, two-way call, Broadcast
+("Say something" + "Talk live"), Reminders (AI + manual) and Settings. Media
+rides the LiveKit Swift SDK.
+
+The Xcode project is generated from `ios/project.yml` — `brew install xcodegen`
+then `cd ios && ./Scripts/bootstrap.sh`. See [`ios/README.md`](ios/README.md).
+Wall panels stay on the kiosk PWA.
+
 ### Wall panel / endpoint (kiosk PWA)
 - Pair → lobby → auto-answer; live-clock Home with summary cards; **Schedule**
   (calendar day view), **Jobs** (chore board, tap-to-tick + streaks),
@@ -121,7 +133,8 @@ The intercom core is working end-to-end, including **real two-way audio**
 - **Local Piper TTS** — optional offline/home-node alternative to OpenAI.
 - **Latency (optional):** local media node so on-LAN audio skips cloud round-trip.
 - **iOS audio unlock** (`room.startAudio()`) if inbound playback needs a tap.
-- **Web-push wake** for backgrounded/remote devices (Phase 4).
+- **Web-push wake** for backgrounded/remote devices (Phase 4). The native iOS
+  app needs the same thing (APNs + CallKit) before a locked phone can ring.
 - Half duplex; kiosk soak (Phase 5); native **Android** device (Phase 6).
 - Separate **Neon branch per environment** before previews share prod data.
 

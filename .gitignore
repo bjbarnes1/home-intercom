@@ -38,3 +38,12 @@ yarn-error.log*
 /.vitest
 .vercel
 .env*
+
+# iOS (Xcode project is generated from ios/project.yml by XcodeGen)
+/ios/*.xcodeproj
+/ios/*.xcworkspace
+/ios/HomeIntercom/Resources/Info.plist
+/ios/build/
+/ios/DerivedData/
+/ios/.swiftpm/
+/ios/Local.xcconfig

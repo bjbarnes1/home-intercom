@@ -1,0 +1,14 @@
+// Local, machine-specific build settings. Scripts/bootstrap.sh copies this to
+// Local.xcconfig (git-ignored) on first run — put your signing identity there,
+// not here.
+//
+// Find your team ID in Xcode → Settings → Accounts → your Apple ID → Manage
+// Certificates, or at https://developer.apple.com/account (Membership details).
+// Leave it empty to build and run in the Simulator; you only need a team to
+// install on a physical iPhone.
+
+DEVELOPMENT_TEAM =
+
+// Change this if com.barneswilkes.homeintercom is already taken on your
+// developer account (free accounts need a globally unique id).
+// PRODUCT_BUNDLE_IDENTIFIER = com.yourname.homeintercom
