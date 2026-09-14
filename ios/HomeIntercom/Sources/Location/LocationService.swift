@@ -51,6 +51,9 @@ final class LocationService: NSObject, ObservableObject {
     /// wakes us with only a few seconds of runtime, so looking a place up must
     /// not cost a round-trip.
     private var places: [String: Place] = [:]
+    /// Pending one-shot request from the places editor.
+    private var pendingFix: CheckedContinuation<CLLocationCoordinate2D, Error>?
+
     /// Set while a routine position report is in flight, so a burst of
     /// significant-change callbacks doesn't stack up duplicate POSTs. Crossings
     /// ignore it — an arrival is the signal that matters and must never be
@@ -159,6 +162,66 @@ final class LocationService: NSObject, ObservableObject {
     func reportNow() {
         guard sharing != .off else { return }
         manager.requestLocation()
+    }
+
+    enum FixError: LocalizedError {
+        case denied
+        case timedOut
+        case failed(String)
+
+        var errorDescription: String? {
+            switch self {
+            case .denied:
+                return "Location access is off. Turn it on in Settings to drop a pin where you are."
+            case .timedOut:
+                return "Couldn't get a fix. Try again outdoors, or move the map by hand."
+            case let .failed(reason):
+                return reason
+            }
+        }
+    }
+
+    /// One fix, right now, for the places editor — "add this spot as Home".
+    ///
+    /// Independent of sharing on purpose: adding a place is not reporting your
+    /// position to the household, so it shouldn't require consenting to that.
+    func currentCoordinate(timeout: Duration = .seconds(12)) async throws -> CLLocationCoordinate2D {
+        if authorization == .notDetermined {
+            manager.requestWhenInUseAuthorization()
+        }
+        guard authorization != .denied else { throw FixError.denied }
+
+        // A recent cached fix is good enough to centre a 150m circle, and saves
+        // waiting on the GPS.
+        if let cached = manager.location, cached.timestamp.timeIntervalSinceNow > -120 {
+            return cached.coordinate
+        }
+
+        // Only one in flight; a second request supersedes the first.
+        pendingFix?.resume(throwing: FixError.timedOut)
+        pendingFix = nil
+
+        let timeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: timeout)
+            guard !Task.isCancelled else { return }
+            await self?.failPendingFix(.timedOut)
+        }
+        defer { timeoutTask.cancel() }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            pendingFix = continuation
+            manager.requestLocation()
+        }
+    }
+
+    private func resolvePendingFix(_ coordinate: CLLocationCoordinate2D) {
+        pendingFix?.resume(returning: coordinate)
+        pendingFix = nil
+    }
+
+    private func failPendingFix(_ error: FixError) {
+        pendingFix?.resume(throwing: error)
+        pendingFix = nil
     }
 
     // MARK: - Reporting
@@ -279,6 +342,7 @@ extension LocationService: CLLocationManagerDelegate {
     ) {
         guard let latest = locations.last else { return }
         Task { @MainActor in
+            resolvePendingFix(latest.coordinate)
             report(location: latest, source: "significant")
         }
     }
@@ -299,6 +363,10 @@ extension LocationService: CLLocationManagerDelegate {
 
     nonisolated func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
         Task { @MainActor in
+            // Someone waiting on a pin drop needs to hear about any failure,
+            // even the transient ones.
+            failPendingFix(.failed(error.localizedDescription))
+
             // A transient "unknown location" is normal indoors and not worth
             // showing anyone; a denial already surfaces via authorization.
             guard (error as? CLError)?.code != .locationUnknown else { return }

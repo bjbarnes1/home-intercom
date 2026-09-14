@@ -73,7 +73,11 @@ struct SharingSettingsView: View {
                     .foregroundStyle(.secondary)
                 }
 
-                LabeledContent("Places monitored", value: "\(location.monitoredCount)")
+                NavigationLink {
+                    PlacesEditorView(canEdit: store.auth.user?.isAdmin == true)
+                } label: {
+                    LabeledContent("Places monitored", value: "\(location.monitoredCount)")
+                }
                 if location.overBudget > 0 {
                     Text(
                         "\(location.overBudget) place(s) beyond iOS's "

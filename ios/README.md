@@ -17,7 +17,7 @@ server's 30-day sliding window.
 | **Page / Call** | Hold-to-talk paging (one way) and two-way calls (rings first) | `POST /api/page`, `POST /api/page/hangup` + LiveKit |
 | **Broadcast** | "Say something" spoken by Ash TTS, or hold-to-broadcast live to a zone | `POST /api/announce`, `POST /api/page` + LiveKit |
 | **Reminders** | Plain-words reminders via Claude, plus a manual form; enable/disable/delete | `POST /api/reminders/parse`, `GET/POST /api/reminders`, `PATCH/DELETE /api/reminders/:id` |
-| **Where** | Family map with places, who's at what, battery on low phones | `GET /api/location/people`, `GET /api/location/places` |
+| **Where** | Family map with places, who's at what, battery on low phones; add/edit places | `GET /api/location/people`, `/api/location/places` CRUD |
 | **Settings** | Who's signed in, which server, location sharing, sign out | `GET /api/auth/me`, `GET/PATCH /api/location/sharing` |
 
 Device registration and pairing stay in the web controller — that's an
@@ -125,6 +125,10 @@ arrivals and departures plus a coarse last-known position. No continuous GPS.
 - **Sharing is enforced server-side.** Outside a running live share, every fix is
   stored rounded to ~100m; the phone doesn't get to decide. Switching sharing off
   deletes the history immediately.
+- **Places are edited on the phone**, not the web controller — adding "Home" is
+  a standing-in-the-kitchen job. *Use my location* for somewhere you are; pan
+  the map for somewhere you aren't (you can't stand in the playground to add
+  School). Admin-only to change; everyone can see the list.
 - `UIBackgroundModes` deliberately does **not** include `location` — that mode is
   for continuous updates, which this tier doesn't do.
 

@@ -37,6 +37,14 @@ struct WhereView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     NavigationLink {
+                        PlacesEditorView(canEdit: store.auth.user?.isAdmin == true)
+                    } label: {
+                        Image(systemName: "mappin.and.ellipse")
+                    }
+                    .accessibilityLabel("Places")
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    NavigationLink {
                         SharingSettingsView()
                     } label: {
                         Image(systemName: "person.badge.shield.checkmark")
@@ -46,8 +54,8 @@ struct WhereView: View {
             }
         }
         .task { await load() }
-        .onAppear(perform: startRefreshing)
-        .onDisappear(perform: stopRefreshing)
+        .onAppear { startRefreshing() }
+        .onDisappear { stopRefreshing() }
     }
 
     // MARK: - Map
@@ -90,6 +98,24 @@ struct WhereView: View {
                     Text("Nobody in the household yet.")
                         .font(.footnote)
                         .foregroundStyle(Theme.ground(for: scheme).inkDim)
+                }
+
+                if places.isEmpty && !people.isEmpty {
+                    NavigationLink {
+                        PlacesEditorView(canEdit: store.auth.user?.isAdmin == true)
+                    } label: {
+                        IdentityCard(identity: nil) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Label("Add your first place", systemImage: "mappin.and.ellipse")
+                                    .font(.subheadline.weight(.medium))
+                                    .foregroundStyle(Theme.ground(for: scheme).ink)
+                                Text("Arrivals and departures need somewhere to arrive at. Start with Home.")
+                                    .font(.caption)
+                                    .foregroundStyle(Theme.ground(for: scheme).inkDim)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
                 }
 
                 ForEach(people) { person in

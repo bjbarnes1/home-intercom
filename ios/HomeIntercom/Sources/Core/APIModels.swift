@@ -277,3 +277,27 @@ struct PatchSharingRequest: Codable {
     var liveMinutes: Int
 }
 
+struct CreatePlaceRequest: Codable {
+    let name: String
+    let lat: Double
+    let lng: Double
+    let radiusM: Int
+    var icon: String?
+}
+
+struct PatchPlaceRequest: Codable {
+    var name: String?
+    var lat: Double?
+    var lng: Double?
+    var radiusM: Int?
+    var icon: String?
+}
+
+struct PlaceResponse: Codable {
+    let place: Place
+    /// Set when this place pushes the household past iOS's region cap, so the
+    /// warning lands on the action that caused it rather than later, when a
+    /// geofence mysteriously never fires.
+    let warning: String?
+}
+

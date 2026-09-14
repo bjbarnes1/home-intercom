@@ -185,6 +185,24 @@ actor APIClient {
         )
     }
 
+    /// Admin-only. The response carries a warning when the household has just
+    /// gone past iOS's 20-region cap.
+    func createPlace(_ request: CreatePlaceRequest) async throws -> PlaceResponse {
+        try await send("/api/location/places", method: "POST", body: request)
+    }
+
+    func updatePlace(id: String, _ request: PatchPlaceRequest) async throws -> Place {
+        struct Envelope: Decodable { let place: Place }
+        let envelope: Envelope = try await send(
+            "/api/location/places/\(id)", method: "PATCH", body: request
+        )
+        return envelope.place
+    }
+
+    func deletePlace(id: String) async throws {
+        try await fireAndForget("/api/location/places/\(id)", method: "DELETE")
+    }
+
     /// Report a fix, plus any geofence crossings Core Location handed us. The
     /// server decides whether to store it and at what precision — sharing is
     /// enforced there, not here.
