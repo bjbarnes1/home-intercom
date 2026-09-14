@@ -62,13 +62,15 @@ account (or TestFlight) avoids re-installing weekly.
 ### From the command line
 
 ```bash
-# Unit tests on a simulator
-xcodebuild test -project HomeIntercom.xcodeproj -scheme HomeIntercom \
-  -destination 'platform=iOS Simulator,name=iPhone 15'
-
-# Build only
+# Build for any simulator, without naming one
 xcodebuild build -project HomeIntercom.xcodeproj -scheme HomeIntercom \
-  -destination 'platform=iOS Simulator,name=iPhone 15'
+  -destination 'generic/platform=iOS Simulator'
+
+# Tests need a concrete simulator. See what you actually have installed:
+xcrun simctl list devices available
+
+xcodebuild test -project HomeIntercom.xcodeproj -scheme HomeIntercom \
+  -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest'
 ```
 
 ## Pointing it at a server
