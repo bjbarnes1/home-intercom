@@ -301,3 +301,62 @@ struct PlaceResponse: Codable {
     let warning: String?
 }
 
+// MARK: - Place rules
+
+enum PlaceTrigger: String, Codable, CaseIterable, Hashable {
+    case arrive = "ARRIVE"
+    case depart = "DEPART"
+
+    var label: String {
+        switch self {
+        case .arrive: return "Arrives"
+        case .depart: return "Leaves"
+        }
+    }
+}
+
+/// "When Willoughby arrives Home, say *Willoughby's home* in the Kitchen."
+struct PlaceRule: Codable, Identifiable, Hashable {
+    let id: String
+    let placeId: String
+    let placeName: String
+    let trigger: PlaceTrigger
+    /// Nil means anyone in the household.
+    let subjectUserId: String?
+    let subjectName: String?
+    let template: String
+    let targetDeviceId: String?
+    let targetZoneId: String?
+    let enabled: Bool
+    let cooldownMinutes: Int
+    /// What it will actually say, rendered server-side.
+    let preview: String
+}
+
+struct PlaceRulesEnvelope: Codable { let rules: [PlaceRule] }
+
+struct CreatePlaceRuleRequest: Codable {
+    let placeId: String
+    let trigger: String
+    var subjectUserId: String?
+    let template: String
+    var targetDeviceId: String?
+    var targetZoneId: String?
+    var cooldownMinutes: Int
+    /// Speak it once on save, so you hear what you just built.
+    var testNow: Bool
+}
+
+struct CreatePlaceRuleResponse: Codable {
+    struct Created: Codable { let id: String; let template: String }
+    let rule: Created
+    /// The sentence that was spoken by the test, or nil if nothing was reached.
+    let spoken: String?
+}
+
+struct PatchPlaceRuleRequest: Codable {
+    var template: String?
+    var enabled: Bool?
+    var cooldownMinutes: Int?
+}
+

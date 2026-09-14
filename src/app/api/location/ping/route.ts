@@ -5,6 +5,8 @@ import { requireUser } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
 import { resolveSharing, allowsFullPrecision } from "@/lib/location/sharing";
 import { coarsenCoordinate } from "@/lib/location/retention";
+import { firePlaceRules } from "@/lib/location/rules";
+import type { PlaceTrigger } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -87,6 +89,9 @@ export async function POST(req: Request) {
 
     let arrivals = 0;
     let departures = 0;
+    /// Crossings that actually changed state, so a duplicate enter doesn't
+    /// announce twice.
+    const crossings: Array<{ placeId: string; trigger: PlaceTrigger }> = [];
 
     for (const event of body.events) {
       if (!known.has(event.placeId)) continue;
@@ -104,6 +109,7 @@ export async function POST(req: Request) {
             data: { userId: user.id, placeId: event.placeId, arrivedAt: at },
           });
           arrivals += 1;
+          crossings.push({ placeId: event.placeId, trigger: "ARRIVE" });
         }
       } else {
         const { count } = await prisma.placeVisit.updateMany({
@@ -111,8 +117,16 @@ export async function POST(req: Request) {
           data: { leftAt: at },
         });
         departures += count;
+        if (count > 0) {
+          crossings.push({ placeId: event.placeId, trigger: "DEPART" });
+        }
       }
     }
+
+    // "When Willoughby arrives Home, say Willoughby's home in the Kitchen."
+    // Never throws — an announcement that fails must not fail the report that
+    // triggered it, because losing the ping would lose the arrival itself.
+    const rules = await firePlaceRules(user.householdId, user.id, crossings, now);
 
     return NextResponse.json({
       stored: true,
@@ -121,6 +135,8 @@ export async function POST(req: Request) {
       precision: full ? "exact" : "coarse",
       arrivals,
       departures,
+      announced: rules.fired.map((f) => f.text),
+      skippedByCooldown: rules.skippedByCooldown,
     });
   }, { route: "/api/location/ping" });
 }

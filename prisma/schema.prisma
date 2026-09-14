@@ -34,6 +34,7 @@ model Household {
   calendarEvents CalendarEvent[]
   music     MusicState?
   places    Place[]
+  placeRules PlaceRule[]
 }
 
 /// Shared, household-wide music player state. Demo-backed today (a fixed
@@ -138,6 +139,8 @@ model User {
   locationPings    LocationPing[]
   placeVisits      PlaceVisit[]
   locationShare    LocationShare?
+  placeRuleSubjects PlaceRule[]    @relation("PlaceRuleSubject")
+  placeRuleFires    PlaceRuleFire[] @relation("PlaceRuleFireUser")
 
   @@index([householdId])
 }
@@ -210,6 +213,7 @@ model Device {
 
   zoneMemberships ZoneMembership[]
   reminders       Reminder[]
+  placeRules      PlaceRule[]
   events          IntercomEvent[] @relation("EventTargetDevice")
 
   @@index([householdId])
@@ -227,6 +231,7 @@ model Zone {
 
   memberships ZoneMembership[]
   reminders   Reminder[]
+  placeRules  PlaceRule[]
   events      IntercomEvent[] @relation("EventTargetZone")
 
   @@unique([householdId, name])
@@ -359,6 +364,7 @@ model Place {
   updatedAt   DateTime  @updatedAt
 
   visits PlaceVisit[]
+  rules  PlaceRule[]
 
   @@index([householdId])
 }
@@ -424,4 +430,64 @@ model LocationShare {
   /// mid-share cannot keep broadcasting precise positions.
   liveUntil DateTime?
   updatedAt DateTime          @updatedAt
+}
+
+enum PlaceTrigger {
+  ARRIVE
+  DEPART
+}
+
+/// "When Willoughby arrives Home, say *Willoughby's home* in the Kitchen."
+///
+/// The crossover an off-the-shelf tracker can't do: a geofence event is already
+/// on the server, and so is a house full of speakers. `{name}` and `{place}` in
+/// the template are substituted when it fires.
+model PlaceRule {
+  id          String       @id @default(cuid())
+  householdId String
+  household   Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  placeId     String
+  place       Place        @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  trigger     PlaceTrigger
+
+  /// Null means anyone in the household — "when *anyone* gets home".
+  subjectUserId String?
+  subject       User?   @relation("PlaceRuleSubject", fields: [subjectUserId], references: [id], onDelete: Cascade)
+
+  /// Spoken text. Supports {name} and {place}.
+  template String
+
+  /// Exactly one target, same rule as reminders and announcements.
+  targetDeviceId String?
+  targetDevice   Device? @relation(fields: [targetDeviceId], references: [id], onDelete: Cascade)
+  targetZoneId   String?
+  targetZone     Zone?   @relation(fields: [targetZoneId], references: [id], onDelete: Cascade)
+
+  enabled Boolean @default(true)
+
+  /// Minimum gap between fires for the same person. A phone sitting on the
+  /// geofence boundary can cross it repeatedly, and a house that announces
+  /// "Willoughby's home" five times gets the feature switched off.
+  cooldownMinutes Int @default(15)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  fires PlaceRuleFire[]
+
+  @@index([householdId])
+  @@index([placeId, trigger, enabled])
+}
+
+/// When a rule last spoke for a given person, so the cooldown has something to
+/// measure against. One row per rule per person, overwritten each time.
+model PlaceRuleFire {
+  id      String    @id @default(cuid())
+  ruleId  String
+  rule    PlaceRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  userId  String
+  user    User      @relation("PlaceRuleFireUser", fields: [userId], references: [id], onDelete: Cascade)
+  firedAt DateTime
+
+  @@unique([ruleId, userId])
 }

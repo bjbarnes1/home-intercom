@@ -132,8 +132,24 @@ enters Home, announce *Willoughby's home* on the kitchen panel." That's a
 one-line rule on top of machinery this repo already has — `POST /api/announce`
 already takes text and a zone. Life360 can't do that; your house can.
 
-Same shape: a reminder that fires on *arrival* rather than a clock. "Remind me
-to put the bins out when I get home."
+**Built.** `PlaceRule` holds the rules, the ping route fires them when a visit
+opens or closes, and everything announces through the same
+`deliverAnnouncement()` the controller uses — so arrivals respect each panel's
+do-not-disturb and murmur rather than call out inside its quiet hours.
+
+Two details that matter in practice:
+
+- **Cooldown.** A phone parked on the edge of a geofence crosses it over and
+  over. Without a per-rule, per-person cooldown the house announces the same
+  arrival five times and the feature gets switched off. Default 15 minutes, and
+  the stamp is written even when nothing was reached — the rule *did* fire;
+  that no speaker was connected isn't a reason to retry a minute later.
+- **Never fails the ping.** Firing is wrapped so a broken announcement can't
+  fail the location report that triggered it. Losing the ping would lose the
+  arrival itself.
+
+Still open, same shape: a reminder that fires on *arrival* rather than a clock.
+"Remind me to put the bins out when I get home."
 
 ---
 
@@ -194,10 +210,8 @@ rather than incidental. Decide them deliberately:
 
 ## Suggested order
 
-1. **Live location, places-only tier.** No hardware, no live-GPS battery
-   question, immediate value, and it exercises the whole pipeline.
-2. **Geofence → announce crossover.** Cheap once (1) exists, and it's the thing
-   that makes this better than an off-the-shelf app.
+1. ~~**Live location, places-only tier.**~~ Built.
+2. ~~**Geofence → announce crossover.**~~ Built.
 3. **Live-share tier**, with a hard expiry.
 4. **Proximity**, once there's a beacon in at least one room — ideally deferred
    until the custom LED device, which should carry one.

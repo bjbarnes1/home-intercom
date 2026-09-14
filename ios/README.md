@@ -17,7 +17,7 @@ server's 30-day sliding window.
 | **Page / Call** | Hold-to-talk paging (one way) and two-way calls (rings first) | `POST /api/page`, `POST /api/page/hangup` + LiveKit |
 | **Broadcast** | "Say something" spoken by Ash TTS, or hold-to-broadcast live to a zone | `POST /api/announce`, `POST /api/page` + LiveKit |
 | **Reminders** | Plain-words reminders via Claude, plus a manual form; enable/disable/delete | `POST /api/reminders/parse`, `GET/POST /api/reminders`, `PATCH/DELETE /api/reminders/:id` |
-| **Where** | Family map with places, who's at what, battery on low phones; add/edit places | `GET /api/location/people`, `/api/location/places` CRUD |
+| **Where** | Family map with places, who's at what, battery on low phones; add/edit places; arrival announcements | `/api/location/people`, `/api/location/places`, `/api/location/rules` |
 | **Settings** | Who's signed in, which server, location sharing, sign out | `GET /api/auth/me`, `GET/PATCH /api/location/sharing` |
 
 Device registration and pairing stay in the web controller — that's an
@@ -129,6 +129,10 @@ arrivals and departures plus a coarse last-known position. No continuous GPS.
   a standing-in-the-kitchen job. *Use my location* for somewhere you are; pan
   the map for somewhere you aren't (you can't stand in the playground to add
   School). Admin-only to change; everyone can see the list.
+- **Arrival announcements** turn a geofence crossing into speech on the house
+  speakers — "when anyone arrives Home, say *{name}'s home* in the Kitchen".
+  The form previews the rendered sentence as you type it and can speak it once
+  on save, because the only real test is hearing it come out of the kitchen.
 - `UIBackgroundModes` deliberately does **not** include `location` — that mode is
   for continuous updates, which this tier doesn't do.
 

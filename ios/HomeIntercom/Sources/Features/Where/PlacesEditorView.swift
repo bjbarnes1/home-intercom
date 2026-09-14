@@ -32,6 +32,16 @@ struct PlacesEditorView: View {
             }
 
             Section {
+                NavigationLink {
+                    PlaceRulesView(canEdit: canEdit)
+                } label: {
+                    Label("Arrival announcements", systemImage: "speaker.wave.2.fill")
+                }
+            } footer: {
+                Text("Say something on the speakers when someone arrives or leaves.")
+            }
+
+            Section {
                 if places.isEmpty && !isLoading {
                     Text("No places yet. Add Home first — it's the one that earns its keep.")
                         .font(.footnote)

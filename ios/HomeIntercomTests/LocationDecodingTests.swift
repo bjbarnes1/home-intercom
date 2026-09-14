@@ -106,3 +106,63 @@ final class LocationDecodingTests: XCTestCase {
         XCTAssertEqual(round.source, "region")
     }
 }
+
+/// The geofence → announcement crossover.
+final class PlaceRuleDecodingTests: XCTestCase {
+    func testDecodesARuleWithItsRenderedPreview() throws {
+        let json = """
+        {"rules":[{"id":"r1","placeId":"p1","placeName":"Home","trigger":"ARRIVE",
+        "subjectUserId":"u1","subjectName":"Willoughby","template":"{name}'s home",
+        "targetDeviceId":null,"targetZoneId":"z1","enabled":true,"cooldownMinutes":15,
+        "preview":"Willoughby's home"}]}
+        """.data(using: .utf8)!
+
+        let rules = try JSONDecoder().decode(PlaceRulesEnvelope.self, from: json).rules
+        let rule = try XCTUnwrap(rules.first)
+        XCTAssertEqual(rule.trigger, .arrive)
+        XCTAssertEqual(rule.subjectName, "Willoughby")
+        // The list shows the sentence, not the template.
+        XCTAssertEqual(rule.preview, "Willoughby's home")
+        XCTAssertEqual(rule.targetZoneId, "z1")
+    }
+
+    /// A rule with no subject means anyone in the household.
+    func testDecodesASubjectlessRule() throws {
+        let json = """
+        {"rules":[{"id":"r2","placeId":"p1","placeName":"Home","trigger":"DEPART",
+        "subjectUserId":null,"subjectName":null,"template":"Someone left {place}",
+        "targetDeviceId":"d1","targetZoneId":null,"enabled":false,"cooldownMinutes":0,
+        "preview":"Someone left Home"}]}
+        """.data(using: .utf8)!
+
+        let rule = try XCTUnwrap(
+            JSONDecoder().decode(PlaceRulesEnvelope.self, from: json).rules.first
+        )
+        XCTAssertNil(rule.subjectUserId)
+        XCTAssertNil(rule.subjectName)
+        XCTAssertEqual(rule.trigger, .depart)
+        XCTAssertFalse(rule.enabled)
+        XCTAssertEqual(rule.cooldownMinutes, 0)
+    }
+
+    /// `spoken` is nil when the test announcement reached no connected speaker —
+    /// the UI must not claim the house said something it didn't.
+    func testDecodesACreateWhoseTestReachedNobody() throws {
+        let json = """
+        {"rule":{"id":"r3","template":"{name}'s home"},"spoken":null}
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(CreatePlaceRuleResponse.self, from: json)
+        XCTAssertEqual(response.rule.id, "r3")
+        XCTAssertNil(response.spoken)
+    }
+
+    func testDecodesACreateThatWasSpokenAloud() throws {
+        let json = """
+        {"rule":{"id":"r4","template":"{name}'s home"},"spoken":"Willoughby's home"}
+        """.data(using: .utf8)!
+
+        let response = try JSONDecoder().decode(CreatePlaceRuleResponse.self, from: json)
+        XCTAssertEqual(response.spoken, "Willoughby's home")
+    }
+}

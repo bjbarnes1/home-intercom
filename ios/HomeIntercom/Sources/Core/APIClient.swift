@@ -203,6 +203,30 @@ actor APIClient {
         try await fireAndForget("/api/location/places/\(id)", method: "DELETE")
     }
 
+    // MARK: - Place rules
+
+    func placeRules() async throws -> [PlaceRule] {
+        let envelope: PlaceRulesEnvelope = try await get("/api/location/rules")
+        return envelope.rules
+    }
+
+    /// Admin-only. Set `testNow` to hear it once on save.
+    func createPlaceRule(_ request: CreatePlaceRuleRequest) async throws -> CreatePlaceRuleResponse {
+        try await send("/api/location/rules", method: "POST", body: request)
+    }
+
+    func setPlaceRuleEnabled(id: String, enabled: Bool) async throws {
+        struct Envelope: Decodable { let rule: Rule; struct Rule: Decodable { let id: String } }
+        let _: Envelope = try await send(
+            "/api/location/rules/\(id)", method: "PATCH",
+            body: PatchPlaceRuleRequest(template: nil, enabled: enabled, cooldownMinutes: nil)
+        )
+    }
+
+    func deletePlaceRule(id: String) async throws {
+        try await fireAndForget("/api/location/rules/\(id)", method: "DELETE")
+    }
+
     /// Report a fix, plus any geofence crossings Core Location handed us. The
     /// server decides whether to store it and at what precision — sharing is
     /// enforced there, not here.

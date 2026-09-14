@@ -100,6 +100,32 @@ struct WhereView: View {
                         .foregroundStyle(Theme.ground(for: scheme).inkDim)
                 }
 
+                if !places.isEmpty {
+                    NavigationLink {
+                        PlaceRulesView(canEdit: store.auth.user?.isAdmin == true)
+                    } label: {
+                        IdentityCard(identity: nil) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "speaker.wave.2.fill")
+                                    .foregroundStyle(Theme.ident("everyone", scheme: scheme))
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Arrival announcements")
+                                        .font(.subheadline.weight(.medium))
+                                        .foregroundStyle(Theme.ground(for: scheme).ink)
+                                    Text("Say something on the speakers when someone gets home.")
+                                        .font(.caption)
+                                        .foregroundStyle(Theme.ground(for: scheme).inkDim)
+                                }
+                                Spacer(minLength: 0)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(Theme.ground(for: scheme).inkDim)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 if places.isEmpty && !people.isEmpty {
                     NavigationLink {
                         PlacesEditorView(canEdit: store.auth.user?.isAdmin == true)
