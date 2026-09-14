@@ -13,7 +13,7 @@ struct ServerURLEditor: View {
     var body: some View {
         Form {
             Section {
-                TextField("https://intercom.example.com", text: $text)
+                TextField("https://intercom.zeebee.au", text: $text)
                     .textContentType(.URL)
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
@@ -56,7 +56,7 @@ struct ServerURLEditor: View {
 
     private func save() {
         guard let url = AppSettings.normalise(text) else {
-            error = "That doesn't look like a web address. Try something like https://intercom.example.com."
+            error = "That doesn't look like a web address. Try something like https://intercom.zeebee.au."
             return
         }
         guard url != store.baseURL else {

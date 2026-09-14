@@ -73,13 +73,14 @@ xcodebuild build -project HomeIntercom.xcodeproj -scheme HomeIntercom \
 
 ## Pointing it at a server
 
-The shipped default lives in one line — `AppSettings.shippedBaseURL` in
-`HomeIntercom/Sources/Core/AppSettings.swift`. Change it there for new installs.
+The shipped default is `https://intercom.zeebee.au`, set in one line —
+`AppSettings.shippedBaseURL` in `HomeIntercom/Sources/Core/AppSettings.swift`.
+Change it there for new installs.
 
 At runtime, **Settings → Server** (also reachable from the sign-in screen)
 repoints the app without a rebuild:
 
-- the deployed Vercel URL for normal use;
+- `https://intercom.zeebee.au` for normal use;
 - `http://192.168.1.20:3000` (your Mac's LAN IP, not `localhost`) to hit
   `npm run dev` from a physical phone — plain HTTP to a LAN address is allowed
   by the `NSAllowsLocalNetworking` exception in `project.yml`.

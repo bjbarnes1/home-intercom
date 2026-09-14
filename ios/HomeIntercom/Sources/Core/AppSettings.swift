@@ -13,7 +13,7 @@ final class AppSettings: ObservableObject {
 
     /// Shipped default. Edit this one line to point new installs somewhere else;
     /// an existing install keeps whatever the user typed in Settings.
-    static let shippedBaseURL = URL(string: "https://home-intercom.vercel.app")!
+    static let shippedBaseURL = URL(string: "https://intercom.zeebee.au")!
 
     private let defaults: UserDefaults
 
@@ -33,7 +33,7 @@ final class AppSettings: ObservableObject {
         self.lastTalkZoneID = defaults.string(forKey: Key.lastTalkZoneID)
     }
 
-    /// Accepts what someone actually types — "intercom.example.com",
+    /// Accepts what someone actually types — "intercom.zeebee.au",
     /// "http://192.168.1.20:3000", a trailing slash — and normalises it.
     /// Returns nil if there's no usable host.
     static func normalise(_ raw: String) -> URL? {
