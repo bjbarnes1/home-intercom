@@ -78,18 +78,39 @@ final class LocationService: NSObject, ObservableObject {
 
     // MARK: - Permission
 
-    /// Ask for Always. iOS shows "While Using" first and only offers the upgrade
-    /// later, so this may need calling more than once across sessions — that's
-    /// the platform's flow, not a bug here.
-    func requestAuthorization() {
+    /// Ask iOS for the next rung of location permission.
+    ///
+    /// The two-step is the platform's, not ours: from a standing start iOS will
+    /// only offer "While Using", and "Always" has to be requested separately
+    /// afterwards. So this needs calling twice — once to get in the door, once
+    /// to get the background access geofences actually need.
+    ///
+    /// Returns false when there is nothing left to ask and the only way forward
+    /// is the Settings app.
+    @discardableResult
+    func requestAuthorization() -> Bool {
         switch manager.authorizationStatus {
         case .notDetermined:
             manager.requestWhenInUseAuthorization()
+            return true
         case .authorizedWhenInUse:
+            // iOS shows this prompt only once per install. If it's already been
+            // shown and declined, the call quietly does nothing — hence the
+            // Settings fallback in the UI.
             manager.requestAlwaysAuthorization()
+            return true
         default:
-            break
+            return false
         }
+    }
+
+    /// Whether iOS has a Location row for this app in the Settings app yet.
+    ///
+    /// It only creates one once the app has actually asked. Sending someone to
+    /// Settings before that shows them a page with no location control on it,
+    /// which looks like a broken app rather than an unasked question.
+    var appearsInSystemSettings: Bool {
+        authorization != .notDetermined
     }
 
     // MARK: - Lifecycle

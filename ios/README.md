@@ -115,10 +115,14 @@ arrivals and departures plus a coarse last-known position. No continuous GPS.
   based, ~500m) for "roughly where is everyone", and region monitoring on the
   household's places for the signal that matters. Both wake even a *terminated*
   app, which is why this works at all as a native app.
-- **Always authorisation is required**, and iOS only offers it as an upgrade
-  after "While Using" — so the prompt may need accepting twice across sessions.
-  With "While Using", arrivals are simply missed. Sharing → Permission says which
-  one you're on.
+- **Always authorisation is required, and it takes two prompts.** From a
+  standing start iOS only offers "While Using"; "Always" must be requested
+  separately afterwards. Sharing → Permission says where you stand and offers
+  the right next step — asking in-app while the status is still undetermined,
+  and only deep-linking to Settings once iOS has a Location row to show. (It
+  creates one only after an app has asked, so sending someone there first shows
+  a page with no location control on it.) With "While Using", geofences fire
+  only while the app is open, so arrivals are missed exactly when they matter.
 - **iOS monitors at most 20 regions per app**, shared across the whole
   household. The server reports when you're over, because a geofence past the
   cap doesn't error — it just never fires.
