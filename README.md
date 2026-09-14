@@ -154,9 +154,13 @@ Bigger, exploratory features — not scheduled, captured so we don't lose them.
     flapping) → the media/session state moves to that room's endpoint. Data model
     would add `Person`↔`phone beacon` and a `presence` stream; ties into the
     existing Music state and (later) per-person profiles.
-  - Note: iOS restricts background BLE advertising, so the phone likely needs the
-    PWA/app foregrounded or a small companion app; worth prototyping on Android
-    endpoints first.
+  - **Correction:** this is pointed the wrong way for iOS. A backgrounded iPhone
+    puts its BLE service UUIDs in an undocumented "overflow area" only another
+    Apple device can decode, so an Android panel can't hear it. Invert it — the
+    **room device beacons**, the **phone monitors** the region via Core Location,
+    which survives backgrounding and app termination. See
+    [`docs/LOCATION.md`](docs/LOCATION.md), which also covers live location
+    sharing.
 
 - **Custom device with LED lighting.** The future in-house touchscreen device
   gains a **front-facing LED** for room lighting + notifications (e.g. gentle
