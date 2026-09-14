@@ -144,7 +144,7 @@ struct PlaceRulesView: View {
 private struct RuleRow: View {
     let rule: PlaceRule
     let canEdit: Bool
-    let onToggle: (Bool) -> Void
+    let onToggle: @MainActor (Bool) -> Void
 
     @Environment(\.colorScheme) private var scheme
 
@@ -165,7 +165,7 @@ private struct RuleRow: View {
 
             Spacer(minLength: 0)
 
-            Toggle("", isOn: Binding(get: { rule.enabled }, set: onToggle))
+            Toggle("", isOn: Binding(get: { rule.enabled }, set: { onToggle($0) }))
                 .labelsHidden()
                 .disabled(!canEdit)
                 .tint(Theme.ident(rule.placeName, scheme: scheme))

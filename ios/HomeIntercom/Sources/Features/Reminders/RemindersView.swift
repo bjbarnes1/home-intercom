@@ -175,8 +175,8 @@ struct RemindersView: View {
 private struct ReminderCard: View {
     let reminder: Reminder
     let target: String
-    let onToggle: (Bool) -> Void
-    let onDelete: () -> Void
+    let onToggle: @MainActor (Bool) -> Void
+    let onDelete: @MainActor () -> Void
 
     @Environment(\.colorScheme) private var scheme
 
@@ -194,14 +194,14 @@ private struct ReminderCard: View {
 
                 Spacer(minLength: 0)
 
-                Toggle("", isOn: Binding(get: { reminder.enabled }, set: onToggle))
+                Toggle("", isOn: Binding(get: { reminder.enabled }, set: { onToggle($0) }))
                     .labelsHidden()
                     .tint(Theme.ident(target, scheme: scheme))
             }
         }
         .opacity(reminder.enabled ? 1 : 0.55)
         .contextMenu {
-            Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+            Button("Delete", systemImage: "trash", role: .destructive) { onDelete() }
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(reminder.text). \(subtitle).")

@@ -5,7 +5,7 @@ import SwiftUI
 @MainActor
 struct ManualReminderForm: View {
     /// Called after a successful create so the list behind can reload.
-    let onSaved: () async -> Void
+    let onSaved: @MainActor () async -> Void
 
     @EnvironmentObject private var store: HouseholdStore
     @Environment(\.dismiss) private var dismiss

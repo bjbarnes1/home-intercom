@@ -43,7 +43,7 @@ struct PlaceDraft: Identifiable {
 @MainActor
 struct PlaceFormView: View {
     @State var draft: PlaceDraft
-    let onSaved: () async -> Void
+    let onSaved: @MainActor () async -> Void
 
     @EnvironmentObject private var store: HouseholdStore
     @EnvironmentObject private var location: LocationService

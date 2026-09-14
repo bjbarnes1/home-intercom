@@ -10,7 +10,7 @@ import SwiftUI
 struct PlaceRuleFormView: View {
     let places: [Place]
     /// Passed the spoken sentence when the test actually reached a speaker.
-    let onSaved: (String?) async -> Void
+    let onSaved: @MainActor (String?) async -> Void
 
     @EnvironmentObject private var store: HouseholdStore
     @Environment(\.dismiss) private var dismiss

@@ -320,12 +320,27 @@ final class TalkController: ObservableObject {
             try session.setCategory(
                 .playAndRecord,
                 mode: kind == .call ? .voiceChat : .videoChat,
-                options: [.defaultToSpeaker, .allowBluetooth, .allowBluetoothA2DP]
+                options: [.defaultToSpeaker, Self.bluetoothHandsFree, .allowBluetoothA2DP]
             )
             try session.setActive(true)
         } catch {
             // Non-fatal: LiveKit configures the session too, and a wrong route is
             // better than refusing to connect.
+        }
+    }
+
+    /// Hands-free Bluetooth, under whichever name the SDK knows.
+    ///
+    /// Xcode 26 marks `.allowBluetooth` "deprecated in iOS 8.0" and points at
+    /// `.allowBluetoothHFP`. The 8.0 is an Apple labelling bug — it wasn't
+    /// deprecated as recently as 18.6 — but the rename is real and the two
+    /// behave identically. Branching keeps the iOS 17 floor; collapse this to
+    /// `.allowBluetoothHFP` once the deployment target reaches 26.
+    private static var bluetoothHandsFree: AVAudioSession.CategoryOptions {
+        if #available(iOS 26.0, *) {
+            return .allowBluetoothHFP
+        } else {
+            return .allowBluetooth
         }
     }
 
@@ -345,10 +360,13 @@ final class TalkController: ObservableObject {
 /// LiveKit's delegate is a class protocol, and `TalkController` is `@MainActor`,
 /// so the callbacks land here and hop across.
 private final class RoomDelegateProxy: RoomDelegate {
-    private let onRemoteAudio: (Bool) -> Void
-    private let onDisconnect: () -> Void
+    private let onRemoteAudio: @Sendable (Bool) -> Void
+    private let onDisconnect: @Sendable () -> Void
 
-    init(onRemoteAudio: @escaping (Bool) -> Void, onDisconnect: @escaping () -> Void) {
+    init(
+        onRemoteAudio: @escaping @Sendable (Bool) -> Void,
+        onDisconnect: @escaping @Sendable () -> Void
+    ) {
         self.onRemoteAudio = onRemoteAudio
         self.onDisconnect = onDisconnect
     }

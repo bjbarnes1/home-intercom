@@ -170,6 +170,16 @@ Two deliberate choices:
   hue on the web and you change the same two numbers here — no second palette to
   keep in step. See `docs/handoff/colours/`.
 
+## Concurrency annotations
+
+The SwiftUI callback properties (`onToggle`, `onTap`, `onSaved`…) are declared
+`@MainActor`, and `RoomDelegateProxy`'s closures `@Sendable`. That isn't
+decoration: `Binding(get:set:)` and `RoomDelegate` now want isolated or Sendable
+function values, and without the annotations Xcode warns about data races that
+become hard errors in the Swift 6 language mode. Where one is passed straight
+into a parameter (`action:`, `set:`) it's wrapped in a closure formed at the
+call site, so the compiler infers the isolation rather than converting across it.
+
 ## Known rough edges
 
 None of this was compiled before it landed — it was written in a Linux

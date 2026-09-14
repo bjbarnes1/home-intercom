@@ -9,8 +9,8 @@ struct TalkButton: View {
     let isLive: Bool
     let isBusy: Bool
     var label: String = "Hold to talk"
-    let onPress: () -> Void
-    let onRelease: () -> Void
+    let onPress: @MainActor () -> Void
+    let onRelease: @MainActor () -> Void
 
     @Environment(\.colorScheme) private var scheme
     @State private var isPressed = false

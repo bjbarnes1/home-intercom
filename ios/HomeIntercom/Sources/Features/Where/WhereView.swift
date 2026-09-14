@@ -258,12 +258,12 @@ private struct PersonPin: View {
 private struct PersonRow: View {
     let person: PersonLocation
     let isViewer: Bool
-    let onTap: () -> Void
+    let onTap: @MainActor () -> Void
 
     @Environment(\.colorScheme) private var scheme
 
     var body: some View {
-        Button(action: onTap) {
+        Button { onTap() } label: {
             IdentityCard(identity: person.name) {
                 HStack(spacing: 12) {
                     ZStack {

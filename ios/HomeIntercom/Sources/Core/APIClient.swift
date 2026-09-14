@@ -309,14 +309,20 @@ actor APIClient {
 
     /// Prisma serialises dates as ISO-8601 *with* milliseconds
     /// (`2026-09-14T08:30:00.000Z`), which `.iso8601` rejects. Accept both.
-    private static let isoWithFraction: ISO8601DateFormatter = {
+    // `ISO8601DateFormatter` is documented as thread-safe for parsing, so one
+    // shared instance each is correct — `nonisolated(unsafe)` is the compiler's
+    // escape hatch for exactly this case, where the type predates Sendable.
+    nonisolated(unsafe) private static let isoWithFraction: ISO8601DateFormatter = {
         let f = ISO8601DateFormatter()
         f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return f
     }()
 
-    private static let isoPlain = ISO8601DateFormatter()
+    nonisolated(unsafe) private static let isoPlain = ISO8601DateFormatter()
 
+    /// `@Sendable` because `JSONDecoder.DateDecodingStrategy.custom` stores it
+    /// and may call it from any thread.
+    @Sendable
     private static func decodeISODate(_ decoder: Decoder) throws -> Date {
         let text = try decoder.singleValueContainer().decode(String.self)
         if let date = isoWithFraction.date(from: text) { return date }
