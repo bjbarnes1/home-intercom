@@ -33,3 +33,38 @@ final class AppSettingsTests: XCTestCase {
         XCTAssertNil(AppSettings.normalise("ftp://intercom.example.com"))
     }
 }
+
+/// "Your session has expired" on a sign-in screen is nonsense — there is no
+/// session yet — and it hid the real problem (a wrong email) behind a message
+/// about something else entirely.
+final class AuthErrorMessageTests: XCTestCase {
+    func testARejectedLoginBlamesTheCredentials() {
+        let message = APIError.invalidCredentials(host: "intercom.zeebee.au").localizedDescription
+        XCTAssertTrue(message.contains("don't match an account"))
+        // Names the host, because a wrong Server setting looks identical to a
+        // wrong password from the sign-in screen.
+        XCTAssertTrue(message.contains("intercom.zeebee.au"))
+        XCTAssertFalse(message.lowercased().contains("expired"))
+    }
+
+    func testAnExpiredSessionStillSaysSo() {
+        let message = APIError.unauthorized.localizedDescription
+        XCTAssertTrue(message.lowercased().contains("expired"))
+    }
+
+    func testTheTwoAreNotTheSameError() {
+        XCTAssertNotEqual(
+            APIError.unauthorized,
+            APIError.invalidCredentials(host: "intercom.zeebee.au")
+        )
+    }
+
+    /// A cookie that doesn't stick used to bounce back to a blank sign-in screen
+    /// with no explanation at all.
+    func testACookieThatDoesNotStickExplainsItself() {
+        let message = HouseholdStore.SessionNotEstablished(host: "intercom.zeebee.au")
+            .localizedDescription
+        XCTAssertTrue(message.contains("cookie"))
+        XCTAssertTrue(message.contains("intercom.zeebee.au"))
+    }
+}

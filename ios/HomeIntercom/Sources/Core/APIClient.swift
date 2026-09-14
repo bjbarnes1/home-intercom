@@ -39,11 +39,18 @@ actor APIClient {
 
     func login(email: String, password: String) async throws -> User {
         struct Body: Encodable { let email: String; let password: String }
-        let envelope: UserEnvelope = try await send(
-            "/api/auth/login", method: "POST",
-            body: Body(email: email, password: password)
-        )
-        return envelope.user
+        do {
+            let envelope: UserEnvelope = try await send(
+                "/api/auth/login", method: "POST",
+                body: Body(email: email, password: password)
+            )
+            return envelope.user
+        } catch APIError.unauthorized {
+            // The login route answers 401 for bad credentials. Only this call
+            // gets to reinterpret that — everywhere else a 401 really does mean
+            // the session went away.
+            throw APIError.invalidCredentials(host: baseURL.host() ?? baseURL.absoluteString)
+        }
     }
 
     func me() async throws -> User {

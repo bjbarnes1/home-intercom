@@ -3,6 +3,10 @@ import Foundation
 enum APIError: LocalizedError, Equatable {
     /// No session, or it expired — the UI should bounce to Login.
     case unauthorized
+    /// The login itself was rejected. Distinct from `unauthorized` because
+    /// "your session has expired" is nonsense on a sign-in screen: there is no
+    /// session yet, and the real problem is the email or the password.
+    case invalidCredentials(host: String)
     /// The server answered, but not happily. `message` is already human-readable.
     case server(status: Int, message: String)
     /// Couldn't reach the server at all (wrong URL, no network, server down).
@@ -14,6 +18,9 @@ enum APIError: LocalizedError, Equatable {
         switch self {
         case .unauthorized:
             return "Your session has expired. Sign in again."
+        case let .invalidCredentials(host):
+            return "That email and password don't match an account on \(host). "
+                + "Check the address — it may not be the one you use elsewhere."
         case let .server(status, message):
             return message.isEmpty ? "The server returned an error (\(status))." : message
         case let .unreachable(detail):

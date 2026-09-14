@@ -211,9 +211,13 @@ already applied to Neon and its migration is recorded in `_prisma_migrations`,
 so `prisma migrate deploy` against it is a clean no-op; re-run it after adding
 new migrations. Migrations live in `prisma/migrations/` and are committed.
 
-Sign in at `/login` (the seed creates `soph@example.com` / `bj@example.com`
-with password `changeme123` — override with `SEED_ADMIN_PASSWORD`, and change
-it before any real deployment). Then open `/controller` on your phone and
+Sign in at `/login`. The seed creates `soph@example.com` / `bj@example.com`
+with password `changeme123` (override with `SEED_ADMIN_PASSWORD`, and change it
+before any real deployment) — but note these are the addresses a *fresh* seed
+writes. An existing deployment may have had its emails edited since, so check
+the `User` table rather than assuming, and don't re-run the seed against
+production to "fix" a login: it upserts by email and would add a second
+account rather than change the one you have. Then open `/controller` on your phone and
 `/endpoint` on a room device (in **Fully Kiosk Browser** for the real kiosks).
 Without Docker, set `MOCK_LOCAL_SERVICES=true` to exercise the control flow
 without live media.

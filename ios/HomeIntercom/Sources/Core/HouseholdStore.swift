@@ -75,10 +75,29 @@ final class HouseholdStore: ObservableObject {
         }
     }
 
+    /// Thrown when the password was right but the session didn't survive the
+    /// next request — almost always a cookie that wasn't stored or replayed.
+    struct SessionNotEstablished: LocalizedError {
+        let host: String
+        var errorDescription: String? {
+            "Signed in, but the next request came back unauthorized — the session "
+            + "cookie from \(host) isn't sticking. Check that the server sets it for "
+            + "this exact host over HTTPS."
+        }
+    }
+
     func signIn(email: String, password: String) async throws {
         let user = try await api.login(email: email, password: password)
         auth = .signedIn(user)
         await refresh()
+
+        // `refresh()` quietly signs us back out on a 401, which is right for an
+        // expired session but silent and baffling one second after a successful
+        // login. Say what happened instead of bouncing to a blank sign-in screen.
+        guard auth.user != nil else {
+            throw SessionNotEstablished(host: baseURL.host() ?? baseURL.absoluteString)
+        }
+
         startPolling()
         await resumeLocationSharing()
     }
