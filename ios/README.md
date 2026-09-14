@@ -28,10 +28,25 @@ Xcode is macOS-only, so everything below runs on your Mac, not in a Linux
 container or a cloud session.
 
 ```bash
-brew install xcodegen      # once
+brew install xcodegen      # once — see below if you don't have Homebrew
 cd ios
 ./Scripts/bootstrap.sh     # generates HomeIntercom.xcodeproj
 open HomeIntercom.xcodeproj
+```
+
+No Homebrew? XcodeGen builds from the Swift toolchain Xcode already ships:
+
+```bash
+git clone https://github.com/yonaskolb/XcodeGen.git ~/XcodeGen
+cd ~/XcodeGen && make install
+```
+
+If `make install` can't write to `/usr/local`, don't install it at all — point
+the bootstrap script at the source checkout instead:
+
+```bash
+cd ios
+XCODEGEN="swift run --package-path ~/XcodeGen xcodegen" ./Scripts/bootstrap.sh
 ```
 
 On first open Xcode resolves the **LiveKit Swift SDK** from Swift Package
