@@ -33,6 +33,7 @@ model Household {
   chores    Chore[]
   calendarEvents CalendarEvent[]
   music     MusicState?
+  places    Place[]
 }
 
 /// Shared, household-wide music player state. Demo-backed today (a fixed
@@ -134,6 +135,9 @@ model User {
   initiatedEvents  IntercomEvent[] @relation("EventInitiator")
   createdReminders Reminder[]
   sessions         Session[]
+  locationPings    LocationPing[]
+  placeVisits      PlaceVisit[]
+  locationShare    LocationShare?
 
   @@index([householdId])
 }
@@ -320,4 +324,104 @@ model IntercomEvent {
   endedAt   DateTime?
 
   @@index([householdId, startedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Location & presence. Design note: docs/LOCATION.md
+//
+// Two rules shape these models, and both are deliberate:
+//
+//   Symmetric — everyone in the household sees the same map, children included.
+//   Asymmetric visibility is what makes this class of app feel like
+//   surveillance to the people inside it.
+//
+//   Short-lived — a leaked intercom log says who paged whom; a leaked location
+//   history says where a child was every day for years. History is coarsened
+//   after a day and deleted after a week (src/lib/location/retention.ts).
+// ---------------------------------------------------------------------------
+
+/// A named geofence: home, school, work, netball. Household-wide rather than
+/// per-person, because iOS monitors at most 20 regions *per app* — that budget
+/// is shared by everyone, so the places must be too.
+model Place {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name        String
+  lat         Float
+  lng         Float
+  /// Geofence radius in metres. iOS quietly clamps very small radii, and GPS
+  /// scatter near buildings is tens of metres, so the floor here is generous.
+  radiusM     Int       @default(150)
+  /// Icon hint for the UI (an SF Symbol name on iOS).
+  icon        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  visits PlaceVisit[]
+
+  @@index([householdId])
+}
+
+/// One location fix reported by a phone. Only the most recent fix per person is
+/// shown on the map; older rows exist so "left home at 8:15" can be answered,
+/// and are coarsened then pruned on a schedule.
+model LocationPing {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lat        Float
+  lng        Float
+  accuracyM  Float?
+  /// So the map can say "Raff's phone is on 4%" — the thing you actually want
+  /// to know when someone isn't where you expected.
+  batteryPct Int?
+  /// Which sensor produced it: "significant", "region" or "manual".
+  source     String   @default("significant")
+  /// Set once retention has rounded this row to ~100m, so the UI never implies
+  /// a precision the row no longer has.
+  coarse     Boolean  @default(false)
+  capturedAt DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId, capturedAt])
+  @@index([capturedAt])
+}
+
+/// An arrival at (and later departure from) a Place. Computed on the phone by
+/// Core Location, which is why the server never needs a stream of raw fixes to
+/// know someone got home.
+model PlaceVisit {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  placeId   String
+  place     Place     @relation(fields: [placeId], references: [id], onDelete: Cascade)
+  arrivedAt DateTime
+  leftAt    DateTime?
+
+  @@index([userId, arrivedAt])
+  @@index([placeId, leftAt])
+}
+
+enum LocationShareMode {
+  /// Nothing is reported, and the phone stops monitoring entirely.
+  OFF
+  /// Arrivals and departures, plus a coarse last-known position.
+  PLACES
+  /// High-accuracy and time-boxed. Reserved — not implemented yet.
+  LIVE
+}
+
+/// Consent as a first-class record, not an implicit consequence of having the
+/// app installed. Every household member can read every row, so "who is
+/// sharing" is never a hidden state.
+model LocationShare {
+  userId    String            @id
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mode      LocationShareMode @default(OFF)
+  /// When LIVE expires. Enforced server-side so a phone that goes offline
+  /// mid-share cannot keep broadcasting precise positions.
+  liveUntil DateTime?
+  updatedAt DateTime          @updatedAt
 }
