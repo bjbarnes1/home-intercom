@@ -10,6 +10,9 @@ struct HomeIntercomApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(store)
+                // Its own ObservableObject: views that show sharing state must
+                // observe it directly, or they'd never see it change.
+                .environmentObject(store.location)
                 .tint(.accentColor)
         }
         .onChange(of: scenePhase) { _, phase in

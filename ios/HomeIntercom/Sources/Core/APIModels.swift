@@ -153,3 +153,127 @@ struct PatchReminderRequest: Codable {
     var text: String?
     var enabled: Bool?
 }
+
+// MARK: - Location
+
+/// What someone has consented to share. Mirrors `LocationShareMode` in the
+/// Prisma schema.
+enum LocationShareMode: String, Codable, CaseIterable, Hashable {
+    /// Nothing is reported, and the phone stops monitoring entirely.
+    case off = "OFF"
+    /// Arrivals and departures, plus a coarse last-known position.
+    case places = "PLACES"
+    /// High-accuracy and time-boxed. Reserved — not implemented yet.
+    case live = "LIVE"
+
+    var label: String {
+        switch self {
+        case .off: return "Not sharing"
+        case .places: return "Places"
+        case .live: return "Live"
+        }
+    }
+}
+
+struct Place: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let lat: Double
+    let lng: Double
+    let radiusM: Int
+    let icon: String?
+}
+
+struct PlacesResponse: Codable {
+    let places: [Place]
+    /// iOS's per-app region cap, echoed by the server.
+    let maxMonitored: Int
+    /// How many places exceed it — a geofence past the cap never fires.
+    let overBudget: Int
+}
+
+/// One geofence crossing, computed on the phone by Core Location.
+struct PlaceEvent: Codable {
+    let placeId: String
+    /// "enter" or "exit".
+    let type: String
+    /// ISO-8601.
+    let at: String
+}
+
+struct LocationPingRequest: Codable {
+    let lat: Double
+    let lng: Double
+    var accuracyM: Double?
+    var batteryPct: Int?
+    var source: String
+    let capturedAt: String
+    var events: [PlaceEvent]
+}
+
+struct LocationPingResponse: Codable {
+    let stored: Bool
+    /// False once sharing is off — the phone should stop monitoring.
+    let reporting: Bool
+    let sharing: LocationShareMode
+    let precision: String?
+    let arrivals: Int?
+    let departures: Int?
+}
+
+struct LocationFix: Codable, Hashable {
+    let lat: Double
+    let lng: Double
+    let accuracyM: Double?
+    let batteryPct: Int?
+    /// True once retention has rounded this to ~100m.
+    let coarse: Bool
+    let capturedAt: Date
+}
+
+struct PlacePresence: Codable, Hashable {
+    let id: String
+    let name: String
+    let icon: String?
+    /// Nil when the place was derived from geometry rather than a real arrival.
+    let since: Date?
+}
+
+struct PersonLocation: Codable, Identifiable, Hashable {
+    let id: String
+    let name: String
+    let role: String
+    let sharing: LocationShareMode
+    let reporting: Bool
+    let liveUntil: Date?
+    /// Nil when they aren't sharing, or haven't reported yet.
+    let lastFix: LocationFix?
+    /// The place they're at right now, if any.
+    let at: PlacePresence?
+}
+
+struct PeopleLocationResponse: Codable {
+    let people: [PersonLocation]
+    let places: [Place]
+    let viewerId: String
+}
+
+struct RetentionPolicy: Codable, Hashable {
+    let coarsenAfterHours: Int
+    let deleteAfterDays: Int
+}
+
+struct SharingState: Codable, Hashable {
+    let mode: LocationShareMode
+    let liveUntil: Date?
+    let reporting: Bool
+    let retention: RetentionPolicy?
+    /// Returned by PATCH when switching off wipes history.
+    let clearedPings: Int?
+}
+
+struct PatchSharingRequest: Codable {
+    let mode: String
+    var liveMinutes: Int
+}
+

@@ -10,7 +10,7 @@ struct ControllerView: View {
     @State private var selection: Tab = .home
 
     enum Tab: Hashable {
-        case home, broadcast, reminders, settings
+        case home, broadcast, whereabouts, reminders, settings
     }
 
     var body: some View {
@@ -22,6 +22,10 @@ struct ControllerView: View {
             BroadcastView(user: user, api: store.api)
                 .tabItem { Label("Broadcast", systemImage: "megaphone.fill") }
                 .tag(Tab.broadcast)
+
+            WhereView()
+                .tabItem { Label("Where", systemImage: "map.fill") }
+                .tag(Tab.whereabouts)
 
             RemindersView()
                 .tabItem { Label("Reminders", systemImage: "bell.fill") }

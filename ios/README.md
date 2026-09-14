@@ -17,7 +17,8 @@ server's 30-day sliding window.
 | **Page / Call** | Hold-to-talk paging (one way) and two-way calls (rings first) | `POST /api/page`, `POST /api/page/hangup` + LiveKit |
 | **Broadcast** | "Say something" spoken by Ash TTS, or hold-to-broadcast live to a zone | `POST /api/announce`, `POST /api/page` + LiveKit |
 | **Reminders** | Plain-words reminders via Claude, plus a manual form; enable/disable/delete | `POST /api/reminders/parse`, `GET/POST /api/reminders`, `PATCH/DELETE /api/reminders/:id` |
-| **Settings** | Who's signed in, which server, sign out | `GET /api/auth/me`, `POST /api/auth/logout` |
+| **Where** | Family map with places, who's at what, battery on low phones | `GET /api/location/people`, `GET /api/location/places` |
+| **Settings** | Who's signed in, which server, location sharing, sign out | `GET /api/auth/me`, `GET/PATCH /api/location/sharing` |
 
 Device registration and pairing stay in the web controller — that's an
 admin-at-a-desk job with a QR code, not a phone job.
@@ -104,6 +105,28 @@ repoints the app without a rebuild:
 
 Changing the server signs you out and drops the old session cookie, so one
 household's cookie never rides along to another host.
+
+## Location notes
+
+The places-only tier of [`docs/LOCATION.md`](../docs/LOCATION.md) — geofence
+arrivals and departures plus a coarse last-known position. No continuous GPS.
+
+- **Two cheap sensors, no GPS burn.** Significant-change monitoring (cell-tower
+  based, ~500m) for "roughly where is everyone", and region monitoring on the
+  household's places for the signal that matters. Both wake even a *terminated*
+  app, which is why this works at all as a native app.
+- **Always authorisation is required**, and iOS only offers it as an upgrade
+  after "While Using" — so the prompt may need accepting twice across sessions.
+  With "While Using", arrivals are simply missed. Sharing → Permission says which
+  one you're on.
+- **iOS monitors at most 20 regions per app**, shared across the whole
+  household. The server reports when you're over, because a geofence past the
+  cap doesn't error — it just never fires.
+- **Sharing is enforced server-side.** Outside a running live share, every fix is
+  stored rounded to ~100m; the phone doesn't get to decide. Switching sharing off
+  deletes the history immediately.
+- `UIBackgroundModes` deliberately does **not** include `location` — that mode is
+  for continuous updates, which this tier doesn't do.
 
 ## Audio notes
 

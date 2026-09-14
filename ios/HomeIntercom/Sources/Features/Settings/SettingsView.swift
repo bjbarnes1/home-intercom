@@ -5,6 +5,7 @@ struct SettingsView: View {
     let user: User
 
     @EnvironmentObject private var store: HouseholdStore
+    @EnvironmentObject private var location: LocationService
     @State private var showingServerSheet = false
     @State private var confirmingSignOut = false
 
@@ -44,6 +45,17 @@ struct SettingsView: View {
                         Text(refreshError)
                             .font(.footnote)
                             .foregroundStyle(.red)
+                    }
+                }
+
+                Section {
+                    NavigationLink {
+                        SharingSettingsView()
+                    } label: {
+                        LabeledContent("Location sharing") {
+                            Text(location.sharing == .off ? "Off" : "On")
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
 

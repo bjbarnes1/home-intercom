@@ -162,6 +162,37 @@ actor APIClient {
         try await fireAndForget("/api/reminders/\(id)", method: "DELETE")
     }
 
+    // MARK: - Location
+
+    func places() async throws -> PlacesResponse {
+        try await get("/api/location/places")
+    }
+
+    func people() async throws -> PeopleLocationResponse {
+        try await get("/api/location/people")
+    }
+
+    func sharing() async throws -> SharingState {
+        try await get("/api/location/sharing")
+    }
+
+    /// Change *my own* sharing. There's no parameter for whose — the route is
+    /// self-only by design, so nobody can switch on someone else's sharing.
+    func setSharing(mode: LocationShareMode, liveMinutes: Int = 60) async throws -> SharingState {
+        try await send(
+            "/api/location/sharing", method: "PATCH",
+            body: PatchSharingRequest(mode: mode.rawValue, liveMinutes: liveMinutes)
+        )
+    }
+
+    /// Report a fix, plus any geofence crossings Core Location handed us. The
+    /// server decides whether to store it and at what precision — sharing is
+    /// enforced there, not here.
+    @discardableResult
+    func reportLocation(_ ping: LocationPingRequest) async throws -> LocationPingResponse {
+        try await send("/api/location/ping", method: "POST", body: ping)
+    }
+
     // MARK: - Transport
 
     private func get<Response: Decodable>(_ path: String) async throws -> Response {

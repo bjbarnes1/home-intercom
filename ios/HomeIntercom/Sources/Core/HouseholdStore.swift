@@ -31,6 +31,10 @@ final class HouseholdStore: ObservableObject {
 
     let settings: AppSettings
     private(set) var api: APIClient
+    /// Owned by the store rather than a view, because iOS relaunches a
+    /// terminated app to deliver a geofence crossing and the manager has to
+    /// exist before any view does.
+    private(set) lazy var location = LocationService(api: api)
 
     private var pollTask: Task<Void, Never>?
     private static let pollInterval: Duration = .seconds(5)
@@ -65,6 +69,7 @@ final class HouseholdStore: ObservableObject {
             auth = .signedIn(try await api.me())
             await refresh()
             startPolling()
+            await resumeLocationSharing()
         } catch {
             auth = .signedOut
         }
@@ -75,10 +80,12 @@ final class HouseholdStore: ObservableObject {
         auth = .signedIn(user)
         await refresh()
         startPolling()
+        await resumeLocationSharing()
     }
 
     func signOut() async {
         stopPolling()
+        location.stopMonitoring()
         try? await api.logout()
         devices = []
         zones = []
@@ -91,9 +98,11 @@ final class HouseholdStore: ObservableObject {
     func updateServer(to url: URL) async {
         stopPolling()
         api.clearCookies()
+        location.stopMonitoring()
         settings.baseURL = url
         baseURL = url
         api = APIClient(baseURL: url)
+        location.updateClient(api)
         devices = []
         zones = []
         refreshError = nil
@@ -132,6 +141,19 @@ final class HouseholdStore: ObservableObject {
     func stopPolling() {
         pollTask?.cancel()
         pollTask = nil
+    }
+
+    // MARK: - Location
+
+    /// Pick monitoring back up to match what this person already consented to,
+    /// so signing in on a new phone doesn't silently leave sharing dormant.
+    func resumeLocationSharing() async {
+        do {
+            let state = try await api.sharing()
+            await location.sync(sharing: state.mode)
+        } catch {
+            // Not fatal — the Where tab surfaces sharing state and can retry.
+        }
     }
 
     // MARK: - Lookups
