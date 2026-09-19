@@ -169,7 +169,7 @@ function PairingCard({
     QRCode.toDataURL(url, {
       margin: 1,
       width: 240,
-      color: { dark: "#e9e9ed", light: "#00000000" },
+      color: { dark: "#0F172A", light: "#00000000" },
     })
       .then(setQr)
       .catch(() => setQr(""));

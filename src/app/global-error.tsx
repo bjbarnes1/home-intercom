@@ -29,8 +29,8 @@ export default function GlobalError({
           minHeight: "100vh",
           display: "grid",
           placeItems: "center",
-          background: "#161826",
-          color: "#e9e9ed",
+          background: "#EEF2FA",
+          color: "#0F172A",
           fontFamily: "system-ui, sans-serif",
           padding: 24,
           textAlign: "center",
@@ -38,7 +38,7 @@ export default function GlobalError({
       >
         <div>
           <h1 style={{ fontSize: 22, fontWeight: 500 }}>Something went wrong</h1>
-          <p style={{ color: "#8b8b9c", fontSize: 14 }}>
+          <p style={{ color: "#475569", fontSize: 14 }}>
             The error was reported. You can try again.
           </p>
           <button
@@ -47,10 +47,10 @@ export default function GlobalError({
             style={{
               marginTop: 16,
               padding: "10px 16px",
-              borderRadius: 8,
+              borderRadius: 999,
               border: "none",
-              background: "oklch(0.72 0.125 289)",
-              color: "#141221",
+              background: "#3B5CF6",
+              color: "#FFFFFF",
               fontWeight: 500,
               cursor: "pointer",
             }}

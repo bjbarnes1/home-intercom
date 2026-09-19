@@ -35,7 +35,7 @@ export default function ScheduleRail({ schedule, schedDay, onSelectDay }: Props)
               onClick={() => onSelectDay(i)}
               className={`flex w-11 flex-col items-center gap-0.5 rounded-lg py-1.5 transition ${
                 i === schedDay
-                  ? "bg-accent text-[#141221]"
+                  ? "bg-accent on-accent"
                   : "text-neutral-400 hover:bg-surface"
               }`}
             >

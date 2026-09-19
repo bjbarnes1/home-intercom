@@ -37,7 +37,7 @@ export default function ThemeToggle({ className = "" }: { className?: string }) 
             onClick={() => setPref(o.value)}
             className={`grid h-8 w-8 place-items-center rounded-md text-sm transition ${
               on
-                ? "bg-accent text-[#141221]"
+                ? "bg-accent on-accent"
                 : "text-neutral-500 hover:bg-surface hover:text-neutral-300"
             }`}
           >

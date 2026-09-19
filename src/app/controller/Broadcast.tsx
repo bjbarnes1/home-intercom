@@ -78,7 +78,7 @@ export default function Broadcast({ zones }: { zones: ZoneRow[] }) {
             key={m}
             onClick={() => setMode(m)}
             className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition ${
-              mode === m ? "bg-accent text-[#141221]" : "card text-neutral-300"
+              mode === m ? "bg-accent on-accent" : "card text-neutral-300"
             }`}
           >
             <i className={`ph ${icon}`} />
