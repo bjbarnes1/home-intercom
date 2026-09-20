@@ -61,7 +61,7 @@ export async function GET(req: Request) {
       title: e.title,
       time: e.allDay ? "All day" : fmtTime(e.startsAt, tz),
       who: e.who,
-      color: e.color ?? "#9184d9",
+      color: e.color ?? "#3B5CF6",
     }));
     const dt = new Date(`${day}T00:00:00`);
     return {

@@ -83,7 +83,7 @@ export default function JobsRail({ board, onTick }: Props) {
                           ? {
                               borderColor: "var(--hi-ident)",
                               background: "var(--hi-ident)",
-                              color: "#141221",
+                              color: "var(--color-ink-inverse)",
                             }
                           : { borderColor: "var(--color-neutral-600)" }
                       }

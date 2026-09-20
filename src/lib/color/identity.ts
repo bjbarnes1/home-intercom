@@ -115,7 +115,7 @@ export const reaches = (target: string | undefined, room: Room): boolean => {
 export const resolveTheme = (
   pref: ThemePref,
   lux: number,
-  current: Theme = "dark",
+  current: Theme = "light",
 ): Theme => {
   if (pref !== "auto") return pref;
   if (lux > 120) return "light";
