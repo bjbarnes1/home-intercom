@@ -97,17 +97,22 @@ body {
     var(--color-bg);
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-heading);
-  font-weight: 500;
-  letter-spacing: -0.01em;
-}
+/* Element defaults belong in the base layer. Unlayered rules beat everything
+   Tailwind emits, so an unlayered `a { color }` silently wins over `text-*` on
+   every link in the app — which is exactly what it used to do. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
 
-a {
-  color: var(--color-accent);
+  a {
+    color: var(--color-accent);
+  }
 }
 
 .no-scrollbar {
