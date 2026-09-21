@@ -86,6 +86,20 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
   const { sinkRef, incoming, ringing, answerRing, declineRing, leaveMedia } = media;
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
 
+  /**
+   * Pull the music down under anything the house is saying — a ring, a live
+   * call, an announcement — and put it back afterwards.
+   *
+   * Down rather than off. A voice over music you can still hear reads as the
+   * house talking; silence reads as something having broken, and people reach
+   * for the volume instead of listening.
+   */
+  const interrupting = Boolean(ringing || incoming || speaking);
+  const duck = music.duck;
+  useEffect(() => {
+    duck(interrupting);
+  }, [duck, interrupting]);
+
   const answer = useCallback(() => {
     setConnectedAt(Date.now());
     answerRing();

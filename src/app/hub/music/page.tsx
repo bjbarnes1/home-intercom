@@ -283,10 +283,26 @@ function Player({ music }: { music: AppleMusic }) {
               <Icon name={music.isPlaying ? "pause" : "play"} size={22} />
             </button>
             <Transport label="Next track" icon="next" onClick={music.next} />
+            <button
+              type="button"
+              aria-label="Repeat this song"
+              aria-pressed={music.repeatOne}
+              onClick={music.toggleRepeatOne}
+              className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-none transition-colors active:scale-[0.97] ${
+                music.repeatOne ? "text-white" : "bg-transparent text-ink-muted"
+              }`}
+              style={music.repeatOne ? { background: "var(--color-accent)" } : undefined}
+            >
+              <Icon name="repeat" size={20} />
+            </button>
           </span>
 
-          <span className="flex w-44 items-center gap-2.5">
-            <Icon name="speaker" size={18} className="flex-none text-ink-muted" />
+          <span className="flex w-44 items-center gap-2.5" title={music.ducked ? "Turned down while the house is talking" : undefined}>
+            <Icon
+              name="speaker"
+              size={18}
+              className={`flex-none ${music.ducked ? "text-accent" : "text-ink-muted"}`}
+            />
             <input
               type="range"
               min={0}

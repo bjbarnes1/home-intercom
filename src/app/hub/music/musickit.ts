@@ -38,7 +38,8 @@ export type MusicKitEvent =
   | "nowPlayingItemDidChange"
   | "playbackTimeDidChange"
   | "authorizationStatusDidChange"
-  | "queueItemsDidChange";
+  | "queueItemsDidChange"
+  | "repeatModeDidChange";
 
 export interface MusicKitQueue {
   items: MusicKitItem[];
@@ -65,6 +66,8 @@ export interface MusicKitInstance {
   /** The queue as MusicKit holds it — what is playing and what follows. */
   queue: MusicKitQueue | null;
   nowPlayingItemIndex: number;
+  /** PlayerRepeatMode: 0 none, 1 this song, 2 the queue. */
+  repeatMode: number;
   /** Jump straight to a queue entry. */
   changeToMediaAtIndex(index: number): Promise<void>;
   authorize(): Promise<string>;
@@ -93,6 +96,7 @@ export interface MusicKitGlobal {
   }): Promise<MusicKitInstance>;
   getInstance(): MusicKitInstance | undefined;
   PlaybackStates: Record<string, number>;
+  PlayerRepeatMode: Record<string, number>;
 }
 
 declare global {

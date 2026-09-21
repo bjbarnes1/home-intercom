@@ -101,6 +101,17 @@ export interface AppleMusic {
   /** Jump to a queue entry. */
   playQueueIndex: (index: number) => void;
   /**
+   * Pull the music down under a voice, and put it back afterwards. Never to
+   * silence: a broadcast over music you can still hear reads as the house
+   * talking over itself, which is the point. Muting reads as a fault.
+   */
+  duck: (on: boolean) => void;
+  /** True while something is being said over the top. */
+  ducked: boolean;
+  /** Loop the song that is playing. */
+  repeatOne: boolean;
+  toggleRepeatOne: () => void;
+  /**
    * Send what is playing to another panel and fall silent. Resolves to null on
    * success, or the reason it could not go.
    */
@@ -131,6 +142,10 @@ export function useAppleMusic(): AppleMusic {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [recent, setRecent] = useState<Track[]>([]);
   const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [ducked, setDucked] = useState(false);
+  const [repeatOne, setRepeatOne] = useState(false);
+  /** The level to come back to. Tracks the slider even while ducked. */
+  const baseVolume = useRef(0.65);
   const [volume, setVolumeState] = useState(0.65);
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [active, setActive] = useState<Identity | null>(null);
@@ -180,6 +195,7 @@ export function useAppleMusic(): AppleMusic {
         kit.current = instance;
         setMusic(instance);
         setVolumeState(instance.volume);
+        baseVolume.current = instance.volume;
         setAccounts(linked);
         setDefaultWho(readDefault());
         setActive(opening?.who ?? null);
@@ -214,6 +230,11 @@ export function useAppleMusic(): AppleMusic {
             }
           : null,
       );
+    };
+
+    const readRepeat = () => {
+      const one = window.MusicKit?.PlayerRepeatMode?.one ?? 1;
+      setRepeatOne(music.repeatMode === one);
     };
 
     const readQueue = () => {
@@ -252,14 +273,17 @@ export function useAppleMusic(): AppleMusic {
     music.addEventListener("nowPlayingItemDidChange", readNowPlaying);
     music.addEventListener("nowPlayingItemDidChange", readQueue);
     music.addEventListener("queueItemsDidChange", readQueue);
+    music.addEventListener("repeatModeDidChange", readRepeat);
     music.addEventListener("playbackTimeDidChange", readTime);
     readState();
+    readRepeat();
 
     return () => {
       music.removeEventListener("playbackStateDidChange", readState);
       music.removeEventListener("nowPlayingItemDidChange", readNowPlaying);
       music.removeEventListener("nowPlayingItemDidChange", readQueue);
       music.removeEventListener("queueItemsDidChange", readQueue);
+      music.removeEventListener("repeatModeDidChange", readRepeat);
       music.removeEventListener("playbackTimeDidChange", readTime);
     };
   }, [music]);
@@ -445,9 +469,30 @@ export function useAppleMusic(): AppleMusic {
     setVolume: (value: number) => {
       if (!music) return;
       const clamped = Math.max(0, Math.min(1, value));
-      music.volume = clamped;
+      // Moving the slider while a voice is over the top sets the level to come
+      // back to, not the level right now.
+      baseVolume.current = clamped;
+      music.volume = ducked ? duckedLevel(clamped) : clamped;
       setVolumeState(clamped);
     },
+
+    repeatOne,
+    toggleRepeatOne: () => {
+      if (!music) return;
+      const modes = window.MusicKit?.PlayerRepeatMode;
+      const next = repeatOne ? (modes?.none ?? 0) : (modes?.one ?? 1);
+      music.repeatMode = next;
+      // Not every playback path supports it, and MusicKit only warns; read back
+      // rather than assume the button did anything.
+      setRepeatOne(music.repeatMode === (modes?.one ?? 1));
+    },
+
+    duck: (on: boolean) => {
+      if (!music) return;
+      setDucked(on);
+      music.volume = on ? duckedLevel(baseVolume.current) : baseVolume.current;
+    },
+    ducked,
     handOffTo: async (deviceId: string): Promise<string | null> => {
       const m = kit.current;
       const items = m?.queue?.items ?? [];
@@ -526,4 +571,13 @@ function toTrack(r: MusicKitResource): Track {
     artist: r.attributes?.artistName ?? "",
     length: formatLength(r.attributes?.durationInMillis),
   };
+}
+
+/**
+ * A quarter of the level it was at, with a floor so it never disappears.
+ * Proportional rather than absolute, so ducking music that was already quiet
+ * does not make it louder.
+ */
+export function duckedLevel(base: number): number {
+  return Math.max(0.05, base * 0.25);
 }
