@@ -177,6 +177,23 @@ reviewable and travels with the repo.
 AU-first is not AU-only. Going global means a region per customer cluster with
 data resident near them — a tenancy decision before a config one. See ADR-003.
 
+### ADR-004 — Device OS: AOSP or custom Linux?
+**2026-09-21 · OPEN — recommendation made, needs a week of measurement**
+
+See `docs/architecture/device-os.md`. Recommends AOSP, on the grounds that the
+panel runs in a browser either way (so "lean Linux" is not on the table, only
+whose browser and audio stack), that Web Bluetooth cannot scan at all — already
+blocking Follow-Me and costing a beacon per room — and that Apple Music's EME
+requirement probably makes Widevine a licensing project on custom Linux.
+
+That last point is flagged rather than asserted: it came from reading the
+MusicKit bundle, not from a test on hardware, and it is the highest-value thing
+to check first. §6 of the doc is a week of measurement on two dev boards that
+would settle it with evidence.
+
+Honest counterweight: the control-plane daemon is genuinely easier on Linux,
+which matters because LAN-first is why it exists.
+
 ### ADR-003 — Is Vercel the right platform?
 **2026-09-21 · OPEN — needs a decision**
 
