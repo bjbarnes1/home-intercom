@@ -13,21 +13,40 @@ function roomService(): RoomServiceClient | null {
 /**
  * End a page/call/broadcast: hangup control commands to endpoints and tear down
  * the LiveKit room so the controller disconnects too.
+ *
+ * The household is required, and the device list is derived from the stored
+ * event rather than taken from the caller. Both used to be the caller's to
+ * choose, which let any signed-in user — a child account included — end a
+ * conversation in someone else's house and delete their LiveKit room.
+ *
+ * Returns false when the event is not this household's, so a route can answer
+ * 404 rather than silently doing nothing.
  */
 export async function hangupIntercom(opts: {
   eventId: string;
-  deviceIds: string[];
-}): Promise<void> {
-  const event = await prisma.intercomEvent.findUnique({
-    where: { id: opts.eventId },
-    select: { id: true, roomName: true },
+  householdId: string;
+}): Promise<boolean> {
+  const event = await prisma.intercomEvent.findFirst({
+    where: { id: opts.eventId, householdId: opts.householdId },
+    select: { id: true, roomName: true, targetDeviceId: true, targetZoneId: true },
   });
-  if (!event) return;
+  if (!event) return false;
+
+  const deviceIds = event.targetDeviceId
+    ? [event.targetDeviceId]
+    : event.targetZoneId
+      ? (
+          await prisma.zoneMembership.findMany({
+            where: { zoneId: event.targetZoneId, zone: { householdId: opts.householdId } },
+            select: { deviceId: true },
+          })
+        ).map((m) => m.deviceId)
+      : [];
 
   const sender = controlSender();
-  if (opts.deviceIds.length > 0) {
+  if (deviceIds.length > 0) {
     await sender
-      .send(opts.deviceIds, { type: "hangup", eventId: opts.eventId })
+      .send(opts.householdId, deviceIds, { type: "hangup", eventId: opts.eventId })
       .catch((e) =>
         reportError(e, {
           code: "hangup.send",
@@ -63,4 +82,6 @@ export async function hangupIntercom(opts: {
         eventId: opts.eventId,
       }),
     );
+
+  return true;
 }

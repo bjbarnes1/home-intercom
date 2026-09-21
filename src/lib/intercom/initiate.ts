@@ -20,11 +20,25 @@ export type InitiateKind = "page" | "call" | "broadcast";
 
 export interface InitiateInput {
   householdId: string;
-  initiatorUserId?: string;
-  initiatorIdentity: string;
+  /**
+   * The signed-in user. Also the LiveKit participant identity, prefixed so a
+   * person can never collide with — and so evict, on LiveKit's duplicate
+   * identity rule — a device that happens to share the id.
+   */
+  initiatorUserId: string;
+  /** Display name for the audit summary. Never used as an identity. */
+  initiatorLabel: string;
   kind: InitiateKind;
   targetDeviceId?: string;
   targetZoneId?: string;
+}
+
+/** A target that is not this household's. Routes map it to a 404. */
+export class UnknownTargetError extends Error {
+  constructor(message = "Unknown target") {
+    super(message);
+    this.name = "UnknownTargetError";
+  }
 }
 
 export interface InitiateResult {
@@ -44,6 +58,27 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     now,
   );
 
+  /*
+   * Ownership is checked here, before a room name is built from the target or
+   * any token is minted. resolveTargets() already drops an id it does not
+   * recognise, but silently: the caller would still get back a duplex token
+   * for `call:<someone else's panel>` and could join a live conversation in
+   * another house. The target has to be rejected, not merely not-reached.
+   */
+  if (input.targetDeviceId) {
+    if (!devices.some((d) => d.id === input.targetDeviceId)) {
+      throw new UnknownTargetError("Unknown device");
+    }
+  } else if (input.targetZoneId) {
+    const zone = await prisma.zone.findFirst({
+      where: { id: input.targetZoneId, householdId: input.householdId },
+      select: { id: true },
+    });
+    if (!zone) throw new UnknownTargetError("Unknown zone");
+  } else {
+    throw new UnknownTargetError("No target given");
+  }
+
   // Pages and calls must still reach DND rooms; announces/reminders respect DND.
   const respectDoNotDisturb = input.kind !== "page" && input.kind !== "call";
 
@@ -54,19 +89,21 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
     { onlineOnly: true, respectDoNotDisturb },
   );
 
+  // No "adhoc" fallback: an absent target is rejected above, and a shared
+  // fallback room name is a room two households could both land in.
   const room =
     input.kind === "broadcast"
-      ? broadcastRoom(input.targetZoneId ?? "adhoc")
+      ? broadcastRoom(input.targetZoneId as string)
       : input.kind === "call"
-        ? callRoom(input.targetDeviceId ?? "adhoc")
-        : pageRoom(input.targetDeviceId ?? "adhoc");
+        ? callRoom(input.targetDeviceId as string)
+        : pageRoom(input.targetDeviceId as string);
 
   const endpointMode: JoinRoomCommand["mode"] =
     input.kind === "call" ? "duplex" : "listen";
   const initiatorRole = input.kind === "call" ? "duplex" : "talk";
 
   const sender = controlSender();
-  const connectedList = await sender.connected(resolved.targets);
+  const connectedList = await sender.connected(input.householdId, resolved.targets);
   const connected = new Set(connectedList);
   const notConnected = resolved.targets.filter((id) => !connected.has(id));
 
@@ -81,7 +118,7 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
       initiatorUserId: input.initiatorUserId,
       targetDeviceId: input.targetDeviceId,
       targetZoneId: input.targetZoneId,
-      summary: `${kindLabel} · ${input.initiatorIdentity}`,
+      summary: `${kindLabel} · ${input.initiatorLabel}`,
     },
     select: { id: true },
   });
@@ -102,7 +139,7 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
             token,
             mode: endpointMode,
           };
-          await sender.send([deviceId], command);
+          await sender.send(input.householdId, [deviceId], command);
         } else {
           const command: JoinRoomCommand = {
             type: "join",
@@ -112,7 +149,7 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
             autoAnswer: true,
             eventId: event.id,
           };
-          await sender.send([deviceId], command);
+          await sender.send(input.householdId, [deviceId], command);
         }
       } catch (e) {
         reportError(e, {
@@ -127,7 +164,7 @@ export async function initiateIntercom(input: InitiateInput): Promise<InitiateRe
   );
 
   const initiatorToken = await mintToken({
-    identity: input.initiatorIdentity,
+    identity: `user:${input.initiatorUserId}`,
     name: "Controller",
     room,
     role: initiatorRole,

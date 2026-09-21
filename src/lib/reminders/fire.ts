@@ -76,7 +76,7 @@ export async function fireDueReminders(now: Date): Promise<FireResult> {
       snap.zoneMembership,
       { onlineOnly: true },
     );
-    const connected = await sender.connected(resolved.targets);
+    const connected = await sender.connected(r.householdId, resolved.targets);
 
     if (connected.length === 0) {
       result.missed++;
@@ -112,7 +112,7 @@ export async function fireDueReminders(now: Date): Promise<FireResult> {
           : false;
         const doChime = !whisper && (d?.chimeEnabled ?? true);
         return sender
-          .send([deviceId], {
+          .send(r.householdId, [deviceId], {
             type: "reminder",
             text: r.text,
             sound: r.sound ?? undefined,

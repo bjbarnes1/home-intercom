@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireUser } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
-import { initiateIntercom } from "@/lib/intercom/initiate";
+import { initiateIntercom, UnknownTargetError } from "@/lib/intercom/initiate";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -10,7 +10,6 @@ export const dynamic = "force-dynamic";
 const Initiate = z
   .object({
     kind: z.enum(["page", "call", "broadcast"]),
-    initiatorIdentity: z.string().min(1),
     targetDeviceId: z.string().optional(),
     targetZoneId: z.string().optional(),
   })
@@ -31,14 +30,25 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
     }
 
-    const result = await initiateIntercom({
-      householdId: user.householdId,
-      initiatorUserId: user.id,
-      initiatorIdentity: parsed.data.initiatorIdentity,
-      kind: parsed.data.kind,
-      targetDeviceId: parsed.data.targetDeviceId,
-      targetZoneId: parsed.data.targetZoneId,
-    });
+    // The identity and the label both come from the session. A caller used to
+    // supply initiatorIdentity, which is the LiveKit participant identity —
+    // sending a device's own id there evicted that device from the room.
+    let result;
+    try {
+      result = await initiateIntercom({
+        householdId: user.householdId,
+        initiatorUserId: user.id,
+        initiatorLabel: user.name,
+        kind: parsed.data.kind,
+        targetDeviceId: parsed.data.targetDeviceId,
+        targetZoneId: parsed.data.targetZoneId,
+      });
+    } catch (e) {
+      if (e instanceof UnknownTargetError) {
+        return NextResponse.json({ error: "Unknown target" }, { status: 404 });
+      }
+      throw e;
+    }
 
     return NextResponse.json({
       ...result,

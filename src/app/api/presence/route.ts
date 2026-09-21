@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
 import { mintToken } from "@/lib/livekit/token";
-import { LOBBY_ROOM } from "@/lib/livekit/rooms";
+import { lobbyRoom } from "@/lib/livekit/rooms";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +27,7 @@ export async function POST(req: Request) {
   const lobbyToken = await mintToken({
     identity: device.id,
     name: device.displayName,
-    room: LOBBY_ROOM,
+    room: lobbyRoom(device.householdId),
     role: "lobby",
     ttlSeconds: 60 * 60, // an hour; refreshed each heartbeat
   });

@@ -77,7 +77,7 @@ export async function POST(req: Request) {
         );
       }
 
-      await controlSender().send([target.id], {
+      await controlSender().send(from.householdId, [target.id], {
         type: "musicHandoff",
         trackIds,
         startIndex,

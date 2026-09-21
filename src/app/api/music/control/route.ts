@@ -55,7 +55,11 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "That panel is asleep" }, { status: 409 });
       }
 
-      await controlSender().send([target.id], { type: "musicControl", action, value });
+      await controlSender().send(me.householdId, [target.id], {
+        type: "musicControl",
+        action,
+        value,
+      });
       return NextResponse.json({ ok: true });
     },
     { route: "/api/music/control" },

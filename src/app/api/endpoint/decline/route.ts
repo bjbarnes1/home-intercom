@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
 import { hangupIntercom } from "@/lib/intercom/hangup";
 
@@ -25,18 +24,15 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const event = await prisma.intercomEvent.findFirst({
-    where: { id: parsed.data.eventId, householdId: device.householdId },
-    select: { id: true, targetDeviceId: true },
+  // hangupIntercom scopes the lookup itself now, so this route no longer
+  // pre-reads the event — it just passes the panel's household through.
+  const ended = await hangupIntercom({
+    eventId: parsed.data.eventId,
+    householdId: device.householdId,
   });
-  if (!event) {
+  if (!ended) {
     return NextResponse.json({ error: "Unknown event" }, { status: 404 });
   }
-
-  await hangupIntercom({
-    eventId: event.id,
-    deviceIds: event.targetDeviceId ? [event.targetDeviceId] : [device.id],
-  });
 
   return NextResponse.json({ ok: true });
 }

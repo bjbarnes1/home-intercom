@@ -6,20 +6,26 @@ import { hangupIntercom } from "@/lib/intercom/hangup";
 
 export const dynamic = "force-dynamic";
 
+// deviceIds used to be taken from the body. They come from the event now.
 const Body = z.object({
   eventId: z.string().min(1),
-  deviceIds: z.array(z.string()).default([]),
 });
 
 /** POST /api/page/hangup — controller ended the session; clear endpoints + room. */
 export async function POST(req: Request) {
   return withAuth(async () => {
-    await requireUser();
+    const user = await requireUser();
     const parsed = Body.safeParse(await req.json().catch(() => null));
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
-    await hangupIntercom(parsed.data);
+    const ended = await hangupIntercom({
+      eventId: parsed.data.eventId,
+      householdId: user.householdId,
+    });
+    if (!ended) {
+      return NextResponse.json({ error: "Unknown event" }, { status: 404 });
+    }
     return NextResponse.json({ ok: true });
   });
 }

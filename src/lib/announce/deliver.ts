@@ -58,7 +58,7 @@ export async function deliverAnnouncement(input: AnnounceInput): Promise<Announc
   );
 
   const sender = controlSender();
-  const reached = await sender.connected(resolved.targets);
+  const reached = await sender.connected(input.householdId, resolved.targets);
   const announcementId = nanoid(12);
 
   const { audioUrl, voice, voiceError } = await synthesize(input.text, announcementId);
@@ -99,7 +99,7 @@ export async function deliverAnnouncement(input: AnnounceInput): Promise<Announc
       if (whisper) whispered.push(deviceId);
 
       try {
-        await sender.send([deviceId], {
+        await sender.send(input.householdId, [deviceId], {
           type: "announce",
           text: input.text,
           from: input.from,

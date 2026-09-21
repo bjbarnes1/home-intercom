@@ -1,6 +1,6 @@
 import { RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
 import { env } from "@/lib/env";
-import { LOBBY_ROOM } from "@/lib/livekit/rooms";
+import { lobbyRoom } from "@/lib/livekit/rooms";
 import { encodeCommand, type ControlCommand } from "@/lib/control/commands";
 
 /**
@@ -11,19 +11,27 @@ import { encodeCommand, type ControlCommand } from "@/lib/control/commands";
  */
 
 export interface ControlSender {
-  send(deviceIds: string[], command: ControlCommand): Promise<void>;
-  /** Of the given device ids, which are actually connected to the lobby. */
-  connected(deviceIds: string[]): Promise<string[]>;
+  send(householdId: string, deviceIds: string[], command: ControlCommand): Promise<void>;
+  /** Of the given device ids, which are connected to that household's lobby. */
+  connected(householdId: string, deviceIds: string[]): Promise<string[]>;
 }
 
 class MockControlSender implements ControlSender {
-  public readonly sent: { deviceIds: string[]; command: ControlCommand }[] = [];
-  async send(deviceIds: string[], command: ControlCommand): Promise<void> {
-    this.sent.push({ deviceIds, command });
+  public readonly sent: {
+    householdId: string;
+    deviceIds: string[];
+    command: ControlCommand;
+  }[] = [];
+  async send(
+    householdId: string,
+    deviceIds: string[],
+    command: ControlCommand,
+  ): Promise<void> {
+    this.sent.push({ householdId, deviceIds, command });
     // eslint-disable-next-line no-console
     console.info(`[mock control] -> ${deviceIds.join(", ")}: ${command.type}`);
   }
-  async connected(deviceIds: string[]): Promise<string[]> {
+  async connected(_householdId: string, deviceIds: string[]): Promise<string[]> {
     // In mock mode there is no real lobby; treat all as reachable.
     return deviceIds;
   }
@@ -40,19 +48,23 @@ class LiveKitControlSender implements ControlSender {
       env.livekit.apiSecret,
     );
   }
-  async send(deviceIds: string[], command: ControlCommand): Promise<void> {
+  async send(
+    householdId: string,
+    deviceIds: string[],
+    command: ControlCommand,
+  ): Promise<void> {
     await this.client.sendData(
-      LOBBY_ROOM,
+      lobbyRoom(householdId),
       encodeCommand(command),
       DataPacket_Kind.RELIABLE,
       { destinationIdentities: deviceIds },
     );
   }
 
-  async connected(deviceIds: string[]): Promise<string[]> {
+  async connected(householdId: string, deviceIds: string[]): Promise<string[]> {
     if (deviceIds.length === 0) return [];
     try {
-      const participants = await this.client.listParticipants(LOBBY_ROOM);
+      const participants = await this.client.listParticipants(lobbyRoom(householdId));
       const present = new Set(participants.map((p) => p.identity));
       return deviceIds.filter((id) => present.has(id));
     } catch {

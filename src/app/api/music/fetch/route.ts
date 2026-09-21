@@ -69,7 +69,7 @@ export async function POST(req: Request) {
         );
       }
 
-      await controlSender().send([source.id], {
+      await controlSender().send(me.householdId, [source.id], {
         type: "musicFetch",
         toDeviceId: me.id,
         from: me.room ?? me.displayName,
