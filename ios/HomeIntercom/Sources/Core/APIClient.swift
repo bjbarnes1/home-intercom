@@ -242,6 +242,40 @@ actor APIClient {
         try await send("/api/location/ping", method: "POST", body: ping)
     }
 
+    // MARK: - Pairing
+
+    /// Register a wall panel and get the code to type into it.
+    func createDevice(displayName: String, room: String?, type: String = "ENDPOINT") async throws -> PendingDevice {
+        let response: CreateDeviceResponse = try await send(
+            "/api/devices",
+            method: "POST",
+            body: CreateDeviceRequest(displayName: displayName, room: room, type: type)
+        )
+        return response.device
+    }
+
+    // MARK: - Room beacons
+
+    func roomBeacons() async throws -> RoomBeaconsResponse {
+        try await get("/api/ble/beacons")
+    }
+
+    func createRoomBeacon(_ request: CreateRoomBeaconRequest) async throws -> RoomBeacon {
+        let response: CreateRoomBeaconResponse = try await send(
+            "/api/ble/beacons", method: "POST", body: request
+        )
+        return response.beacon
+    }
+
+    /// Report which room beacons this phone can hear, and how strongly.
+    func reportBeaconSightings(_ sightings: [BeaconSighting]) async throws -> BeaconSightingsResponse {
+        try await send(
+            "/api/ble/sightings",
+            method: "POST",
+            body: BeaconSightingsRequest(sightings: sightings)
+        )
+    }
+
     // MARK: - Transport
 
     private func get<Response: Decodable>(_ path: String) async throws -> Response {

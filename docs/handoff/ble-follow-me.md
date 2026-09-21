@@ -62,15 +62,40 @@ Losing the signal is deliberately **not** a move. A phone face-down on a sofa
 stops being heard, and stopping the music for that would be the most annoying
 thing this feature could do.
 
+## The iOS side
+
+`BeaconService.swift` monitors **one** region for the whole household, not one
+per room. iOS allows twenty monitored regions per app in total and
+`LocationService` is already spending that budget on places — a region
+constrained only by UUID covers every room for a single slot, and the rooms are
+told apart by ranging inside it, which is where the RSSI comes from anyway.
+
+The two mechanisms do different jobs and neither is asked to do the other's:
+
+- **Monitoring** (background, survives termination) says they are home and
+  moving about. It is what wakes the app.
+- **Ranging** (foreground, plus a short window after a background crossing)
+  says which room. It is throttled to one report every ten seconds, because a
+  person standing still does not need ten writes a minute.
+
+A sighting with `rssi == 0` is dropped: that is CoreLocation's "unknown", and
+taken at face value it reads as the strongest possible signal.
+
 ## Still to do
 
-1. **iOS**: register the household's beacon regions, monitor them, POST crossings.
-   `LocationService.swift` is the place; permissions are already requested there.
-2. **Beacon setup UI**: place a beacon in a room and tie it to that room's panel.
-3. **The toggle**: `followMeMusic` is on `User` and honoured by the API, but no
+1. **Beacon setup UI in the app.** `POST /api/ble/beacons` exists and
+   `createRoomBeacon` is on the client, but no screen calls it — beacons have
+   to be added by hand for now.
+2. **The toggle**: `followMeMusic` is on `User` and honoured by the API, but no
    screen sets it yet.
+3. **Acting on `followTo`.** `BeaconService.onFollow` fires with the panel id;
+   nothing is listening. The phone is not the thing that plays music, so this
+   wants to reach the panel — most likely by calling the handoff API rather
+   than doing anything locally.
 4. **Tuning on real hardware.** The defaults are reasoned, not measured. Walk the
    house with logging on before trusting them.
+5. **Nothing here has been compiled.** There is no Swift toolchain in the
+   environment this was written in, so the Swift is careful but unverified.
 
 ## Worth knowing before the hardware order
 
