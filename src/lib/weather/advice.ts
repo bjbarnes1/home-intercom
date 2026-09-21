@@ -42,7 +42,7 @@ const LAYERS: { from: number; advice: string }[] = [
 
 /** What to wear, and the one reason that explains it. */
 export function dressFor(input: DressingInput): Dressing {
-  const { apparentC, airC, rainChance, gustKmh, uvIndex } = input;
+  const { apparentC, rainChance, gustKmh, uvIndex } = input;
 
   const base = LAYERS.find((l) => apparentC >= l.from)?.advice ?? LAYERS[LAYERS.length - 1].advice;
   const wet = rainChance >= 50;

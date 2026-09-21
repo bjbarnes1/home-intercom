@@ -1,17 +1,18 @@
 import type { Metadata, Viewport } from "next";
+import { BRAND } from "@/lib/brand";
 import "./globals.css";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
 import ClientErrorBridge from "@/components/ClientErrorBridge";
 import { ThemeProvider } from "@/components/ThemeProvider";
 
 export const metadata: Metadata = {
-  title: "Home Intercom",
-  description: "Page, call, broadcast and remind across the house.",
+  title: BRAND.appName,
+  description: BRAND.description,
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Intercom",
+    title: BRAND.appleWebAppTitle,
   },
 };
 

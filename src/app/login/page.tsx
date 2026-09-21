@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
+import { BRAND } from "@/lib/brand";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -43,7 +44,7 @@ export default function LoginPage() {
         <span className="mx-auto mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-accent-900 text-accent">
           <i className="ph-fill ph-device-mobile-speaker text-3xl" />
         </span>
-        <h1 className="m-0 text-2xl">Home Intercom</h1>
+        <h1 className="m-0 text-2xl">{BRAND.name}</h1>
         <p className="mt-1 text-sm text-neutral-500">Sign in to the controller.</p>
       </header>
 

@@ -37,7 +37,6 @@ export const ZONE_MEMBERS: Record<Zone, Identity[]> = {
 };
 
 export const ACCENT_FALLBACK = "var(--color-accent)";
-const GROUND = "var(--hi-bg)";
 
 /** Map display names / aliases ("Gus's room", "Soph", "BJ") onto identity keys. */
 export function resolveIdentity(name?: string | null): Identity | undefined {

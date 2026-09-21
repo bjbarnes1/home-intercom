@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
 import { MusicActionSchema } from "@/lib/music/actions";
 import { applyMusicAction, serializeMusic } from "@/lib/music/state";

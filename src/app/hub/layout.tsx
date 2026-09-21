@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import HubRuntime from "./HubRuntime";
+import { BRAND } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "famOS Hub",
+  title: BRAND.panel,
   description: "The family display.",
 };
 

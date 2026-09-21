@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import Icon, { type IconName } from "./Icon";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Hub prototype — Nav Dock.
@@ -65,7 +66,7 @@ export default function NavDock() {
             f
           </span>
           <DockLabel expanded={expanded} className="font-heading text-base font-extrabold text-white">
-            famOS
+            {BRAND.name}
           </DockLabel>
         </span>
 

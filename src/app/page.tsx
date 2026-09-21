@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Role picker. The same PWA serves two roles:
@@ -15,7 +16,7 @@ export default function Home() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-10 p-6">
       <header className="text-center">
         <div className="uplabel text-accent mb-2">Barnes / Wilkes</div>
-        <h1 className="m-0 text-3xl">Home Intercom</h1>
+        <h1 className="m-0 text-3xl">{BRAND.name}</h1>
         <p className="mx-auto mt-3 max-w-xs text-sm text-neutral-400">
           Page the kids, broadcast to the house, set spoken reminders.
         </p>

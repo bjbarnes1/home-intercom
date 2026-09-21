@@ -6,6 +6,7 @@ import Avatar from "../_components/Avatar";
 import Icon from "../_components/Icon";
 import OverlayCard, { BackdropSketch } from "../_components/OverlayCard";
 import { useNow } from "../_components/Clock";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Who's using the Hub? — the profile switcher.
@@ -21,7 +22,7 @@ export default function ProfileSwitch() {
     <OverlayCard width={860} backdrop={<BackdropSketch hero={now?.time ?? ""} rows={3} />}>
       <span className="flex items-center gap-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-        <span className="text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-ink-muted">famOS Hub</span>
+        <span className="text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-ink-muted">{BRAND.panel}</span>
       </span>
 
       <h1 className="mt-2.5 font-heading text-[32px] font-bold leading-10 tracking-tight text-text">

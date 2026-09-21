@@ -28,6 +28,7 @@ import {
   writeDefault,
   type LinkedAccount,
 } from "./accounts";
+import { BRAND } from "@/lib/brand";
 
 /**
  * Apple Music, wired to the Hub's Music screen.
@@ -241,7 +242,7 @@ export function useAppleMusic(): AppleMusic {
 
         const instance = await global.configure({
           developerToken: json.token,
-          app: { name: "famOS Hub", build: "1" },
+          app: { name: BRAND.appName, build: "1" },
           // Opening straight on someone's token avoids a visible unauthorised
           // flash on a screen that is simply left on.
           ...(opening ? { musicUserToken: opening.token } : {}),
@@ -384,7 +385,6 @@ export function useAppleMusic(): AppleMusic {
     };
     // Deliberately once per account: re-running on every queue change would
     // undo what the listener has just done.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [music, status, active]);
 
   // Remember where we are, so a reload can come back to it.

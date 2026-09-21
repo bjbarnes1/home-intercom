@@ -28,7 +28,6 @@ class MockControlSender implements ControlSender {
     command: ControlCommand,
   ): Promise<void> {
     this.sent.push({ householdId, deviceIds, command });
-    // eslint-disable-next-line no-console
     console.info(`[mock control] -> ${deviceIds.join(", ")}: ${command.type}`);
   }
   async connected(_householdId: string, deviceIds: string[]): Promise<string[]> {
