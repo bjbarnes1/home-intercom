@@ -41,6 +41,13 @@ export type MusicKitEvent =
 
 export interface MusicKitInstance {
   isAuthorized: boolean;
+  /**
+   * The listener's Music User Token. Readable after authorize() and assignable,
+   * which is how the Hub switches between household members without revoking
+   * anyone. Assigning "" clears it, which is what makes the next authorize()
+   * actually prompt instead of returning the token already held.
+   */
+  musicUserToken: string;
   /** 0–1. */
   volume: number;
   /** Seconds. */
@@ -68,6 +75,8 @@ export interface MusicKitGlobal {
   configure(options: {
     developerToken: string;
     app: { name: string; build: string };
+    /** Opens straight onto an account the Hub already holds a token for. */
+    musicUserToken?: string;
   }): Promise<MusicKitInstance>;
   getInstance(): MusicKitInstance | undefined;
   PlaybackStates: Record<string, number>;

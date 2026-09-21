@@ -3,7 +3,9 @@
 import { ident } from "@/lib/color/identity";
 import BaseLayer, { Eyebrow, Hero } from "../_components/BaseLayer";
 import Icon from "../_components/Icon";
+import Avatar from "../_components/Avatar";
 import { PEOPLE, SPEAKERS } from "../data";
+import type { Identity } from "@/lib/color/identity";
 import { useState } from "react";
 import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
 
@@ -20,22 +22,19 @@ import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
  */
 export default function Music() {
   const music = useAppleMusic();
+  const [adding, setAdding] = useState(false);
 
   return (
     <BaseLayer people={PEOPLE.map((p) => p.key)}>
       <Hero title="Music" eyebrow={eyebrowFor(music)}>
-        {music.status === "ready" ? (
-          <button
-            type="button"
-            onClick={music.signOut}
-            className="h-11 flex-none cursor-pointer rounded-full border-none bg-surface px-[18px] text-[13px] font-semibold text-text shadow-card transition-transform active:scale-[0.97]"
-          >
-            Sign out of Apple Music
-          </button>
+        {music.status === "ready" || music.status === "unlinked" ? (
+          <AccountBar music={music} onAdd={() => setAdding(true)} />
         ) : null}
       </Hero>
 
-      {music.status === "ready" ? <Player music={music} /> : <Gate music={music} />}
+      {music.status === "ready" ? <Player music={music} /> : <Gate music={music} onAdd={() => setAdding(true)} />}
+
+      {music.status === "ready" && music.active ? <AccountActions music={music} /> : null}
 
       <div className="flex min-h-0 flex-grow gap-5">
         <div className="flex min-w-0 flex-grow flex-col gap-2">
@@ -136,6 +135,17 @@ export default function Music() {
           </div>
         </div>
       </div>
+
+      {adding ? (
+        <PersonPicker
+          taken={music.accounts.map((a) => a.who)}
+          onClose={() => setAdding(false)}
+          onPick={(who) => {
+            setAdding(false);
+            music.link(who);
+          }}
+        />
+      ) : null}
     </BaseLayer>
   );
 }
@@ -146,26 +156,28 @@ function eyebrowFor(music: AppleMusic): string {
       return "Connecting to Apple Music";
     case "unconfigured":
       return "Apple Music is not set up on this Hub";
-    case "unauthorized":
-      return "Sign in to play";
+    case "unlinked":
+      return "No Apple Music account linked yet";
     case "error":
       return music.error ?? "Apple Music is unavailable";
     default:
-      return "Apple Music · playing across the house";
+      return music.linking
+        ? "Waiting for Apple…"
+        : `Apple Music · ${music.active ?? "nobody"}'s library`;
   }
 }
 
 /** Everything that is not a working player: one honest sentence and one action. */
-function Gate({ music }: { music: AppleMusic }) {
+function Gate({ music, onAdd }: { music: AppleMusic; onAdd: () => void }) {
   const copy: Record<string, { title: string; body: string }> = {
     loading: { title: "Connecting…", body: "Starting Apple Music on this Hub." },
     unconfigured: {
       title: "Apple Music is not set up",
       body: "Add the MusicKit credentials to this server and the player appears here. Until then there is nothing to play.",
     },
-    unauthorized: {
-      title: "Sign in to Apple Music",
-      body: "The Hub plays from the household's own Apple Music account. An Apple Music subscription is required.",
+    unlinked: {
+      title: "Link an Apple Music account",
+      body: "Everyone signs in with their own Apple ID, so the Hub plays your library and your playlists rather than a shared account. An Apple Music subscription is required.",
     },
     error: { title: "Apple Music is unavailable", body: music.error ?? "Something went wrong starting playback." },
   };
@@ -183,13 +195,13 @@ function Gate({ music }: { music: AppleMusic }) {
         <span className="font-heading text-xl font-bold leading-7 text-text">{title}</span>
         <span className="max-w-[560px] text-[15px] leading-5 text-ink-muted">{body}</span>
       </span>
-      {music.status === "unauthorized" ? (
+      {music.status === "unlinked" ? (
         <button
           type="button"
-          onClick={music.signIn}
+          onClick={onAdd}
           className="h-13 flex-none cursor-pointer rounded-full border-none bg-accent px-7 text-sm font-bold text-white transition-transform active:scale-[0.97]"
         >
-          Sign in
+          Link an account
         </button>
       ) : null}
     </div>
@@ -344,5 +356,151 @@ function Artwork({
     >
       <Icon name="music" size={glyph} className="text-accent" />
     </span>
+  );
+}
+
+/**
+ * Whose account is playing.
+ *
+ * The public player is a shared object, so the selector is right here rather
+ * than behind a settings screen: anyone at the Hub can put their own library on
+ * without signing into anything else. A ring marks the account the Hub opens on.
+ */
+function AccountBar({ music, onAdd }: { music: AppleMusic; onAdd: () => void }) {
+  const name = (who: Identity) => PEOPLE.find((p) => p.key === who)?.name ?? who;
+
+  return (
+    <span className="flex min-w-0 flex-none items-center gap-2">
+      {music.accounts.map((a) => {
+        const on = a.who === music.active;
+        return (
+          <button
+            key={a.who}
+            type="button"
+            aria-pressed={on}
+            onClick={() => music.switchTo(a.who)}
+            title={a.who === music.defaultWho ? `${name(a.who)} — opens here by default` : name(a.who)}
+            className={`flex h-11 cursor-pointer items-center gap-2 rounded-full border-none py-1.5 pl-1.5 pr-4 transition-transform active:scale-[0.97] ${
+              on ? "bg-accent" : "bg-surface shadow-card"
+            }`}
+          >
+            <Avatar
+              who={a.who}
+              size={32}
+              ring={a.who === music.defaultWho ? (on ? "rgba(255,255,255,0.9)" : "var(--color-accent)") : undefined}
+            />
+            <span className={`text-[13px] font-semibold ${on ? "text-white" : "text-text"}`}>{name(a.who)}</span>
+          </button>
+        );
+      })}
+
+      <button
+        type="button"
+        onClick={onAdd}
+        disabled={music.linking}
+        aria-label="Link another Apple Music account"
+        className="flex h-11 cursor-pointer items-center gap-2 rounded-full border-none bg-surface px-4 text-[13px] font-semibold text-text transition-transform active:scale-[0.97] disabled:opacity-50"
+        style={{ boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.1)" }}
+      >
+        <Icon name="plus" size={16} />
+        {music.accounts.length ? "Add" : "Link an account"}
+      </button>
+    </span>
+  );
+}
+
+/** Which household member is about to sign in — Apple only knows about Apple IDs. */
+function PersonPicker({
+  taken,
+  onClose,
+  onPick,
+}: {
+  taken: Identity[];
+  onClose: () => void;
+  onPick: (who: Identity) => void;
+}) {
+  const available = PEOPLE.filter((p) => !taken.includes(p.key));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-8"
+      style={{ background: "rgba(15,23,42,0.45)" }}
+      onClick={onClose}
+    >
+      <div
+        className="flex w-[560px] max-w-full flex-col gap-4 rounded-[24px] bg-surface-2 p-6 shadow-overlay"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="flex flex-col gap-1">
+          <span className="font-heading text-xl font-bold leading-7 text-text">Who is signing in?</span>
+          <span className="text-[13px] leading-[18px] text-ink-muted">
+            Apple will ask for that person&rsquo;s own Apple ID next.
+          </span>
+        </span>
+
+        <div className="grid grid-cols-3 gap-3">
+          {available.map((p) => (
+            <button
+              key={p.key}
+              type="button"
+              onClick={() => onPick(p.key)}
+              className="flex cursor-pointer flex-col items-center gap-2 rounded-xl border-none bg-surface p-4 shadow-card transition-transform active:scale-[0.97]"
+            >
+              <Avatar who={p.key} size={48} />
+              <span className="text-[13px] font-semibold leading-[18px] text-text">{p.name}</span>
+            </button>
+          ))}
+          {!available.length ? (
+            <span className="col-span-3 py-2 text-[13px] leading-[18px] text-ink-muted">
+              Everyone in the house has already linked an account.
+            </span>
+          ) : null}
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-12 cursor-pointer self-center rounded-full border-none bg-surface px-8 text-sm font-bold text-text transition-transform active:scale-[0.97]"
+          style={{ boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.1)" }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** What can be done with the account currently playing. Quiet until it is wanted. */
+function AccountActions({ music }: { music: AppleMusic }) {
+  const who = music.active;
+  if (!who) return null;
+  const name = PEOPLE.find((p) => p.key === who)?.name ?? who;
+  const isDefault = who === music.defaultWho;
+
+  return (
+    <div className="flex flex-none items-center gap-3 px-1">
+      <span className="text-[13px] leading-[18px] text-ink-muted">
+        Playing from <span className="font-semibold text-text">{name}</span>&rsquo;s Apple Music
+        {isDefault ? " · opens here by default" : null}
+      </span>
+
+      {!isDefault ? (
+        <button
+          type="button"
+          onClick={() => music.makeDefault(who)}
+          className="h-8 cursor-pointer rounded-full border-none bg-transparent px-3 text-[13px] font-semibold text-accent transition-transform active:scale-[0.97]"
+        >
+          Make default
+        </button>
+      ) : null}
+
+      <button
+        type="button"
+        onClick={() => music.forget(who)}
+        className="ml-auto h-8 cursor-pointer rounded-full border-none bg-transparent px-3 text-[13px] font-semibold text-ink-muted transition-transform active:scale-[0.97]"
+      >
+        Forget this account
+      </button>
+    </div>
   );
 }
