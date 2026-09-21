@@ -35,6 +35,10 @@ final class HouseholdStore: ObservableObject {
     /// terminated app to deliver a geofence crossing and the manager has to
     /// exist before any view does.
     private(set) lazy var location = LocationService(api: api)
+    /// Which room this phone is in, from the household's beacons. Separate from
+    /// LocationService because it answers a different question with a different
+    /// sensor — one says which building, the other which room inside it.
+    private(set) lazy var beacons = BeaconService(api: api)
 
     private var pollTask: Task<Void, Never>?
     private static let pollInterval: Duration = .seconds(5)
@@ -100,11 +104,14 @@ final class HouseholdStore: ObservableObject {
 
         startPolling()
         await resumeLocationSharing()
+        // Rooms only mean anything once we know which beacons the house has.
+        await beacons.start()
     }
 
     func signOut() async {
         stopPolling()
         location.stopMonitoring()
+        beacons.stop()
         try? await api.logout()
         devices = []
         zones = []
@@ -118,10 +125,12 @@ final class HouseholdStore: ObservableObject {
         stopPolling()
         api.clearCookies()
         location.stopMonitoring()
+        beacons.stop()
         settings.baseURL = url
         baseURL = url
         api = APIClient(baseURL: url)
         location.updateClient(api)
+        beacons.updateClient(api)
         devices = []
         zones = []
         refreshError = nil

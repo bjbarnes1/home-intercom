@@ -17,8 +17,13 @@ const INITIALS: Partial<Record<Identity, string>> = {
   Raff: "R",
 };
 
-export function initialFor(who: Identity): string {
-  return INITIALS[who] ?? who.slice(0, 1);
+/**
+ * Known household members get the initial the family would write; anyone else —
+ * a device name, a guest, a room the panel has never seen — gets their first
+ * letter. A live house has more names in it than a fixture list.
+ */
+export function initialFor(who: string): string {
+  return INITIALS[who as Identity] ?? who.trim().slice(0, 1).toUpperCase();
 }
 
 export default function Avatar({
@@ -27,7 +32,7 @@ export default function Avatar({
   ring,
   className = "",
 }: {
-  who: Identity;
+  who: string;
   size?: number;
   /** Colour of a separating ring, for overlapping stacks. */
   ring?: string;

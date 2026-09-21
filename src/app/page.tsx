@@ -3,7 +3,12 @@ import Link from "next/link";
 /**
  * Role picker. The same PWA serves two roles:
  *  - Controller: a parent's phone that initiates pages/calls/broadcasts.
- *  - Endpoint:   a fixed station (kiosk phone / wall panel).
+ *  - Wall panel: a fixed station in a room, which is the Hub.
+ *
+ * The panel link goes to /hub. The original panel is still served at /endpoint
+ * while the Hub is proven on hardware — both run the same engine — but nothing
+ * routes to it any more, because sending someone to the old interface from the
+ * front door is how you end up testing the wrong thing.
  */
 export default function Home() {
   return (
@@ -34,16 +39,14 @@ export default function Home() {
         </Link>
 
         <Link
-          href="/endpoint"
+          href="/hub"
           className="card card-hover flex items-center gap-4 p-5"
         >
           <span className="grid h-12 w-12 flex-none place-items-center rounded-full bg-accent-900 text-accent">
             <i className="ph-fill ph-speaker-high text-2xl" />
           </span>
           <span className="min-w-0">
-            <span className="block font-heading text-lg font-medium">
-              Endpoint / wall panel
-            </span>
+            <span className="block font-heading text-lg font-medium">Wall panel</span>
             <span className="block text-sm text-neutral-500">
               Fixed station in a room
             </span>

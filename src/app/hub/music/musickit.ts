@@ -14,6 +14,14 @@ export interface MusicKitArtwork {
 
 export interface MusicKitItem {
   id: string;
+  /** "songs", "library-songs"… which decides the descriptor to ask for it with. */
+  type?: string;
+  /**
+   * A library item usually carries the catalog id of the same recording.
+   * Preferred when present: catalog ids resolve on any account, library ids
+   * only on the one that owns them.
+   */
+  playParams?: { id?: string; catalogId?: string; isLibrary?: boolean };
   title?: string;
   artistName?: string;
   albumName?: string;
@@ -37,7 +45,15 @@ export type MusicKitEvent =
   | "playbackStateDidChange"
   | "nowPlayingItemDidChange"
   | "playbackTimeDidChange"
-  | "authorizationStatusDidChange";
+  | "authorizationStatusDidChange"
+  | "queueItemsDidChange"
+  | "repeatModeDidChange";
+
+export interface MusicKitQueue {
+  items: MusicKitItem[];
+  /** Index of the item playing now. */
+  position: number;
+}
 
 export interface MusicKitInstance {
   isAuthorized: boolean;
@@ -55,6 +71,19 @@ export interface MusicKitInstance {
   currentPlaybackDuration: number;
   playbackState: number;
   nowPlayingItem: MusicKitItem | null;
+  /** The queue as MusicKit holds it — what is playing and what follows. */
+  queue: MusicKitQueue | null;
+  nowPlayingItemIndex: number;
+  /** Apple Music storefront, e.g. "au". Search is per-storefront. */
+  storefrontId: string;
+  /** PlayerRepeatMode: 0 none, 1 this song, 2 the queue. */
+  repeatMode: number;
+  /** Jump straight to a queue entry. */
+  changeToMediaAtIndex(index: number): Promise<void>;
+  /** Insert right after the track playing. The only supported way in. */
+  playNext(options: Record<string, unknown>): Promise<void>;
+  /** Add to the end of the queue. */
+  playLater(options: Record<string, unknown>): Promise<void>;
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
   play(): Promise<void>;
@@ -63,6 +92,7 @@ export interface MusicKitInstance {
   skipToNextItem(): Promise<void>;
   skipToPreviousItem(): Promise<void>;
   seekToTime(seconds: number): Promise<void>;
+  /** `{ songs: string[], startWith?: number }` or `{ playlist: string }`. */
   setQueue(options: Record<string, unknown>): Promise<void>;
   addEventListener(event: MusicKitEvent, handler: () => void): void;
   removeEventListener(event: MusicKitEvent, handler: () => void): void;
@@ -80,6 +110,7 @@ export interface MusicKitGlobal {
   }): Promise<MusicKitInstance>;
   getInstance(): MusicKitInstance | undefined;
   PlaybackStates: Record<string, number>;
+  PlayerRepeatMode: Record<string, number>;
 }
 
 declare global {

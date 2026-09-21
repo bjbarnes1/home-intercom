@@ -21,6 +21,11 @@ import {
   ANNOUNCE_DWELL_DEFAULT,
   clampAnnounceDwellSec,
 } from "@/lib/etiquette/announceDwell";
+import type {
+  MusicControlCommand,
+  MusicFetchCommand,
+  MusicHandoffCommand,
+} from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
 
@@ -35,12 +40,30 @@ export interface EtiquetteSettings {
   announceDwellSec: number;
 }
 
+export interface PresenceHandlers {
+  /**
+   * Another panel has handed this one its music. Optional: a surface with no
+   * player of its own ignores the command rather than pretending to take it.
+   */
+  onMusicHandoff?: (cmd: MusicHandoffCommand) => void;
+  /**
+   * Another panel is asking for what this one is playing. Optional for the
+   * same reason: a surface with no player has nothing to hand over.
+   */
+  onMusicFetch?: (cmd: MusicFetchCommand) => void;
+  /** Somebody at another panel is working this one's player. */
+  onMusicControl?: (cmd: MusicControlCommand) => void;
+}
+
 /**
  * Presence heartbeat + lobby control channel for a paired wall device.
  * Owns phase, DND from server, and dispatch of control commands into media/TTS.
  */
-export function useEndpointPresence(media: Media) {
+export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {}) {
   const { joinMedia, leaveMedia, setRinging } = media;
+  // Held in a ref so a new handler identity does not tear down the lobby.
+  const handlersRef = useRef(handlers);
+  handlersRef.current = handlers;
   const [phase, setPhase] = useState<Phase>("loading");
   const [note, setNote] = useState("");
   const [room, setRoom] = useState("This room");
@@ -115,6 +138,9 @@ export function useEndpointPresence(media: Media) {
         return;
       }
       const data = await res.json();
+      // Which room this panel is. Sent every beat, so renaming it in the
+      // controller reaches the panel without anybody touching it.
+      if (typeof data.room === "string" && data.room) setRoom(data.room);
       setDnd(!!data.doNotDisturb);
       setEtiquette({
         chimeEnabled: data.chimeEnabled !== false,
@@ -184,6 +210,15 @@ export function useEndpointPresence(media: Media) {
                 });
                 break;
               }
+              case "musicHandoff":
+                handlersRef.current.onMusicHandoff?.(cmd);
+                break;
+              case "musicFetch":
+                handlersRef.current.onMusicFetch?.(cmd);
+                break;
+              case "musicControl":
+                handlersRef.current.onMusicControl?.(cmd);
+                break;
               case "hangup":
                 setRinging(null);
                 leaveMedia();

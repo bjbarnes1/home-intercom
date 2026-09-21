@@ -81,8 +81,9 @@ targets:
         #
         # No `voip` — that mode is for PushKit-woken calls. No `location`
         # either: that one is for *continuous* background updates, and this app
-        # only uses significant-change and region monitoring, both of which wake
-        # even a terminated app on their own. The LIVE sharing tier will need it.
+        # only uses significant-change and region monitoring — including the
+        # beacon region for rooms — all of which wake even a terminated app on
+        # their own. The LIVE sharing tier will need it.
         UIBackgroundModes:
           - audio
         # Geofencing needs Always: iOS only monitors regions in the background
@@ -93,9 +94,12 @@ targets:
           Shows where your family is on the Home Intercom map.
         NSLocationAlwaysAndWhenInUseUsageDescription: >-
           Lets Home Intercom tell your household when you arrive at or leave
-          places like home and school, even when the app is closed. Positions
-          older than a day are rounded to about 100m, and everything is deleted
-          after a week. Everyone in the household sees the same map.
+          places like home and school, and which room you are in at home, even
+          when the app is closed. Rooms are read from Bluetooth beacons in the
+          house and are only used to follow your music; only the room you are in
+          now is kept, never a history. Positions older than a day are rounded
+          to about 100m, and everything is deleted after a week. Everyone in the
+          household sees the same map.
         # The server is HTTPS; this exception only allows plain-HTTP to a
         # dev server on your own LAN (e.g. http://192.168.1.20:3000).
         NSAppTransportSecurity:

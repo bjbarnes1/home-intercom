@@ -1,13 +1,16 @@
 "use client";
 
-import { ident } from "@/lib/color/identity";
 import BaseLayer, { Eyebrow, Hero } from "../_components/BaseLayer";
 import Icon from "../_components/Icon";
 import Avatar from "../_components/Avatar";
-import { PEOPLE, SPEAKERS } from "../data";
+import { PEOPLE } from "../data";
 import type { Identity } from "@/lib/color/identity";
 import { useState } from "react";
-import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
+import PlayingOn from "./PlayingOn";
+import QueueLists from "./QueueLists";
+import SearchOverlay from "./SearchOverlay";
+import { useHub, useHubMusic } from "../HubRuntime";
+import { formatTime, type AppleMusic } from "./useAppleMusic";
 
 /**
  * Music — what is playing, and where.
@@ -21,15 +24,29 @@ import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
  * not Apple's.
  */
 export default function Music() {
-  const music = useAppleMusic();
+  const music = useHubMusic();
   const [adding, setAdding] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   return (
     <BaseLayer people={PEOPLE.map((p) => p.key)}>
       <Hero title="Music" eyebrow={eyebrowFor(music)}>
-        {music.status === "ready" || music.status === "unlinked" ? (
-          <AccountBar music={music} onAdd={() => setAdding(true)} />
-        ) : null}
+        <span className="flex min-w-0 flex-none items-center gap-2">
+          {music.status === "ready" ? (
+            <button
+              type="button"
+              onClick={() => setSearching(true)}
+              className="flex h-11 flex-none cursor-pointer items-center gap-2 rounded-full border-none bg-surface px-4 text-[13px] font-semibold text-text transition-transform active:scale-[0.97]"
+              style={{ boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.1)" }}
+            >
+              <Icon name="search" size={16} />
+              Search
+            </button>
+          ) : null}
+          {music.status === "ready" || music.status === "unlinked" ? (
+            <AccountBar music={music} onAdd={() => setAdding(true)} />
+          ) : null}
+        </span>
       </Hero>
 
       {music.status === "ready" ? <Player music={music} /> : <Gate music={music} onAdd={() => setAdding(true)} />}
@@ -64,77 +81,13 @@ export default function Music() {
             ) : null}
           </div>
 
-          <span className="px-1 pt-2">
-            <Eyebrow tone="ink">Recently played</Eyebrow>
-          </span>
-          <div className="flex min-h-0 flex-grow flex-col gap-0.5 overflow-y-auto rounded-xl bg-surface p-2 shadow-card">
-            {music.recent.map((t) => (
-              <span
-                key={t.id}
-                className="flex items-center gap-3.5 rounded-xl px-3 py-2 text-left"
-              >
-                <span
-                  className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
-                  style={{ background: "rgba(59,92,246,0.10)" }}
-                >
-                  <Icon name="music" size={17} className="text-accent" />
-                </span>
-                <span className="flex min-w-0 flex-grow flex-col">
-                  <span className="truncate text-[13px] font-semibold leading-[18px] text-text">{t.title}</span>
-                  <span className="truncate text-xs leading-4 text-ink-muted">{t.artist}</span>
-                </span>
-                <span className="flex-none text-xs font-medium leading-4 text-ink-muted tabular-nums">{t.length}</span>
-              </span>
-            ))}
-            {!music.recent.length ? (
-              <span className="px-3 py-3 text-[13px] leading-[18px] text-ink-muted">
-                Nothing played on this Hub yet.
-              </span>
-            ) : null}
-          </div>
+          <QueueLists music={music} />
         </div>
 
-        <div className="flex w-[300px] min-w-0 flex-none flex-col gap-2 max-[1200px]:w-[240px]">
-          <span className="px-1">
-            <Eyebrow tone="ink">Playing on</Eyebrow>
-          </span>
-          <div className="flex min-h-0 flex-grow flex-col gap-1 overflow-y-auto rounded-xl bg-surface p-2 shadow-card">
-            {SPEAKERS.map((s) => (
-              <button
-                key={s.name}
-                type="button"
-                aria-pressed={!!s.playing && music.isPlaying}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border-none px-3.5 py-2.5 text-left transition-colors ${
-                  s.playing && music.isPlaying ? "" : "bg-transparent hover:bg-bg"
-                }`}
-                style={s.playing && music.isPlaying ? { background: "var(--color-accent)" } : undefined}
-              >
-                <span
-                  className="flex h-9 w-9 flex-none items-center justify-center rounded-xl"
-                  style={{
-                    background: s.playing && music.isPlaying ? "rgba(255,255,255,0.22)" : "rgba(59,92,246,0.10)",
-                    color: s.playing && music.isPlaying ? "#FFFFFF" : s.key ? ident(s.key) : "var(--color-accent)",
-                  }}
-                >
-                  <Icon name="speaker" size={17} />
-                </span>
-                <span className="flex min-w-0 flex-grow flex-col">
-                  <span className={`truncate text-[13px] font-semibold leading-[18px] ${s.playing && music.isPlaying ? "text-white" : "text-text"}`}>
-                    {s.name}
-                  </span>
-                  <span className={`truncate text-xs leading-4 ${s.playing && music.isPlaying ? "text-white" : "text-ink-muted"}`}>
-                    {s.playing && !music.isPlaying ? "Available" : s.where}
-                  </span>
-                </span>
-                <span
-                  className="h-2.5 w-2.5 flex-none rounded-full"
-                  style={{ background: s.playing && music.isPlaying ? "#FFFFFF" : "rgba(15,23,42,0.18)" }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
+        <PlayingOn music={music} />
       </div>
+
+      {searching ? <SearchOverlay music={music} onClose={() => setSearching(false)} /> : null}
 
       {adding ? (
         <PersonPicker
@@ -161,9 +114,11 @@ function eyebrowFor(music: AppleMusic): string {
     case "error":
       return music.error ?? "Apple Music is unavailable";
     default:
-      return music.linking
-        ? "Waiting for Apple…"
-        : `Apple Music · ${music.active ?? "nobody"}'s library`;
+      if (music.linking) return "Waiting for Apple…";
+      // Browsers will not start audio without a tap, so a restored queue sits
+      // ready and says so rather than looking like nothing happened.
+      if (music.resumed && !music.isPlaying) return "Where you left off · press play";
+      return `Apple Music · ${music.active ?? "nobody"}'s library`;
   }
 }
 
@@ -209,6 +164,7 @@ function Gate({ music, onAdd }: { music: AppleMusic; onAdd: () => void }) {
 }
 
 function Player({ music }: { music: AppleMusic }) {
+  const { room } = useHub();
   const np = music.nowPlaying;
   const progress = np && np.duration > 0 ? (np.elapsed / np.duration) * 100 : 0;
 
@@ -223,7 +179,8 @@ function Player({ music }: { music: AppleMusic }) {
               {np?.title ?? "Nothing playing"}
             </span>
             <span className="truncate text-[13px] leading-[18px] text-ink-muted">
-              {np?.artist || "Choose a playlist to start"}
+              {np?.artist ||
+                (music.resumed ? "Picked up where you left off — press play" : "Choose a playlist to start")}
             </span>
           </span>
           <span
@@ -231,7 +188,9 @@ function Player({ music }: { music: AppleMusic }) {
             style={{ background: "rgba(59,92,246,0.10)" }}
           >
             <Icon name="home" size={15} className="text-accent" />
-            <span className="text-xs font-semibold leading-4 text-text">Kitchen Hub</span>
+            {/* The room this panel actually is, as the household named it —
+                every panel used to call itself the kitchen. */}
+            <span className="text-xs font-semibold leading-4 text-text">{room}</span>
           </span>
         </span>
 
@@ -270,10 +229,26 @@ function Player({ music }: { music: AppleMusic }) {
               <Icon name={music.isPlaying ? "pause" : "play"} size={22} />
             </button>
             <Transport label="Next track" icon="next" onClick={music.next} />
+            <button
+              type="button"
+              aria-label="Repeat this song"
+              aria-pressed={music.repeatOne}
+              onClick={music.toggleRepeatOne}
+              className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-none transition-colors active:scale-[0.97] ${
+                music.repeatOne ? "text-white" : "bg-transparent text-ink-muted"
+              }`}
+              style={music.repeatOne ? { background: "var(--color-accent)" } : undefined}
+            >
+              <Icon name="repeat" size={20} />
+            </button>
           </span>
 
-          <span className="flex w-44 items-center gap-2.5">
-            <Icon name="speaker" size={18} className="flex-none text-ink-muted" />
+          <span className="flex w-44 items-center gap-2.5" title={music.ducked ? "Turned down while the house is talking" : undefined}>
+            <Icon
+              name="speaker"
+              size={18}
+              className={`flex-none ${music.ducked ? "text-accent" : "text-ink-muted"}`}
+            />
             <input
               type="range"
               min={0}

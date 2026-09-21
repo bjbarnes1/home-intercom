@@ -360,3 +360,70 @@ struct PatchPlaceRuleRequest: Codable {
     var cooldownMinutes: Int?
 }
 
+
+// MARK: - Pairing a wall panel
+
+struct CreateDeviceRequest: Codable {
+    let displayName: String
+    var room: String?
+    /// "ENDPOINT" for a wall panel, "CONTROLLER" for a phone.
+    var type: String
+}
+
+/// What the server hands back when a panel is registered. The pairing code is
+/// shown once and typed into the panel; it is cleared server-side on claim.
+struct PendingDevice: Codable {
+    let id: String
+    let displayName: String
+    let pairingCode: String?
+}
+
+struct CreateDeviceResponse: Codable { let device: PendingDevice }
+
+// MARK: - Room beacons
+
+struct RoomBeacon: Codable, Identifiable, Equatable {
+    let id: String
+    let label: String
+    let uuid: String
+    let major: Int
+    let minor: Int
+    /// The panel in this room, when one has been tied to the beacon.
+    let deviceId: String?
+}
+
+struct RoomBeaconsResponse: Codable {
+    let beacons: [RoomBeacon]
+    /// The household's single beacon UUID — the one region a phone monitors.
+    let uuid: String?
+}
+
+struct CreateRoomBeaconRequest: Codable {
+    let label: String
+    let uuid: String
+    let major: Int
+    let minor: Int
+    var deviceId: String?
+}
+
+struct CreateRoomBeaconResponse: Codable { let beacon: RoomBeacon }
+
+/// One heard beacon. `at` is milliseconds since the epoch, which is what the
+/// server's own clock arithmetic expects.
+struct BeaconSighting: Codable {
+    let beaconId: String
+    let rssi: Int
+    let at: Int
+}
+
+struct BeaconSightingsRequest: Codable { let sightings: [BeaconSighting] }
+
+/// Where the server now believes this person is, and whether the music should
+/// follow them there.
+struct BeaconSightingsResponse: Codable {
+    let beaconId: String?
+    let label: String?
+    let moved: Bool
+    /// The panel to hand the music to, when they asked for it to follow.
+    let followTo: String?
+}

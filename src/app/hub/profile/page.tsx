@@ -1,8 +1,11 @@
+"use client";
+
 import Link from "next/link";
-import { CLOCK, PEOPLE } from "../data";
+import { PEOPLE } from "../data";
 import Avatar from "../_components/Avatar";
 import Icon from "../_components/Icon";
 import OverlayCard, { BackdropSketch } from "../_components/OverlayCard";
+import { useNow } from "../_components/Clock";
 
 /**
  * Who's using the Hub? — the profile switcher.
@@ -12,8 +15,10 @@ import OverlayCard, { BackdropSketch } from "../_components/OverlayCard";
  * is never the only way out.
  */
 export default function ProfileSwitch() {
+  const now = useNow();
+
   return (
-    <OverlayCard width={860} backdrop={<BackdropSketch hero={CLOCK.time} rows={3} />}>
+    <OverlayCard width={860} backdrop={<BackdropSketch hero={now?.time ?? ""} rows={3} />}>
       <span className="flex items-center gap-2.5">
         <span className="h-2.5 w-2.5 rounded-full bg-accent" />
         <span className="text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-ink-muted">famOS Hub</span>

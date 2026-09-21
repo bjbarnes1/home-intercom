@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@/lib/color/identity";
+import { getDeviceSecret } from "@/lib/client/identity";
+import {
+  love,
+  lovedIds,
+  searchCatalog,
+  storefront,
+  unlove,
+  type LovableKind,
+} from "@/lib/music/appleApi";
+import { clearResume, queueDescriptor, readResume, saveResume } from "./resume";
+import { indexAfterMove, reorder } from "@/lib/music/reorder";
 import {
   artworkUrl,
   loadMusicKit,
@@ -61,6 +72,19 @@ export interface Track {
   length: string;
 }
 
+export interface SearchResults {
+  songs: Track[];
+  playlists: Playlist[];
+}
+
+export type RemoteAction = "play" | "pause" | "next" | "previous" | "volume";
+
+export interface QueueItem extends Track {
+  /** Position in MusicKit's queue, so tapping can jump straight to it. */
+  index: number;
+  playing: boolean;
+}
+
 export interface AppleMusic {
   status: MusicStatus;
   error: string | null;
@@ -76,6 +100,8 @@ export interface AppleMusic {
   nowPlaying: NowPlaying | null;
   playlists: Playlist[];
   recent: Track[];
+  /** What is playing and what follows it. Empty until something is queued. */
+  queue: QueueItem[];
   volume: number;
   /** Sign a household member in with their own Apple ID. */
   link: (who: Identity) => void;
@@ -89,6 +115,57 @@ export interface AppleMusic {
   seek: (fraction: number) => void;
   setVolume: (value: number) => void;
   playPlaylist: (id: string) => void;
+  /** Jump to a queue entry. */
+  playQueueIndex: (index: number) => void;
+  /**
+   * Pull the music down under a voice, and put it back afterwards. Never to
+   * silence: a broadcast over music you can still hear reads as the house
+   * talking over itself, which is the point. Muting reads as a fault.
+   */
+  duck: (on: boolean) => void;
+  /** True while something is being said over the top. */
+  ducked: boolean;
+  /** Loop the song that is playing. */
+  repeatOne: boolean;
+  toggleRepeatOne: () => void;
+  /** Catalog search. Empty term gives empty results rather than everything. */
+  search: (term: string) => Promise<SearchResults>;
+  /** Put a track straight after the one playing. */
+  queueNext: (songId: string) => void;
+  /** Put a track at the end of the queue. */
+  queueLater: (songId: string) => void;
+  /**
+   * Move a queue entry. MusicKit has no reorder call, so this hands it a whole
+   * new queue and puts the playhead back — see the note on reordering below.
+   */
+  reorderQueue: (from: number, to: number) => void;
+  /** True while a reorder is re-seating the queue. */
+  reordering: boolean;
+  /** Ids the listener has loved, for whatever is currently on screen. */
+  loved: Set<string>;
+  toggleLove: (kind: LovableKind, id: string) => void;
+  /**
+   * True when the queue was restored after a reload and is sitting where it
+   * left off. Browsers will not start audio without a tap, so the panel waits
+   * for one rather than pretending it is playing.
+   */
+  resumed: boolean;
+  /**
+   * Send what is playing to another panel and fall silent. Resolves to null on
+   * success, or the reason it could not go.
+   */
+  handOffTo: (deviceId: string) => Promise<string | null>;
+  /** Pick up what another panel was playing. */
+  acceptHandoff: (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => void;
+  /**
+   * Ask the panel that is playing to hand over to this one. Resolves to null
+   * once the request is away, or the reason it could not be made.
+   */
+  bringHere: (fromDeviceId: string) => Promise<string | null>;
+  /** Work another panel's player — transport and volume, from this one. */
+  controlRemote: (deviceId: string, action: RemoteAction, value?: number) => Promise<string | null>;
+  /** Apply an instruction that arrived from another panel. */
+  applyRemote: (action: RemoteAction, value?: number) => void;
 }
 
 /** Milliseconds to "3:56". */
@@ -112,6 +189,18 @@ export function useAppleMusic(): AppleMusic {
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [recent, setRecent] = useState<Track[]>([]);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
+  const [ducked, setDucked] = useState(false);
+  const [repeatOne, setRepeatOne] = useState(false);
+  const [loved, setLoved] = useState<Set<string>>(new Set());
+  const [resumed, setResumed] = useState(false);
+  const [reordering, setReordering] = useState(false);
+  /** Needed for the REST calls MusicKit has no helper for. */
+  const developerToken = useRef<string>("");
+  /** Resolved once, lazily. Catalog search will not work without it. */
+  const storefrontId = useRef<string>("");
+  /** The level to come back to. Tracks the slider even while ducked. */
+  const baseVolume = useRef(0.65);
   const [volume, setVolumeState] = useState(0.65);
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [active, setActive] = useState<Identity | null>(null);
@@ -138,6 +227,7 @@ export function useAppleMusic(): AppleMusic {
           setStatus("unconfigured");
           return;
         }
+        developerToken.current = json.token ?? "";
         if (!json.token) {
           // Credentials are set but unusable — the server knows why, so say it.
           setError(json.reason ?? "The Apple Music credentials on this server are not usable");
@@ -161,6 +251,7 @@ export function useAppleMusic(): AppleMusic {
         kit.current = instance;
         setMusic(instance);
         setVolumeState(instance.volume);
+        baseVolume.current = instance.volume;
         setAccounts(linked);
         setDefaultWho(readDefault());
         setActive(opening?.who ?? null);
@@ -197,10 +288,35 @@ export function useAppleMusic(): AppleMusic {
       );
     };
 
+    const readRepeat = () => {
+      const one = window.MusicKit?.PlayerRepeatMode?.one ?? 1;
+      setRepeatOne(music.repeatMode === one);
+    };
+
+    const readQueue = () => {
+      const q = music.queue;
+      if (!q?.items?.length) {
+        setQueue([]);
+        return;
+      }
+      const at = music.nowPlayingItemIndex ?? q.position ?? 0;
+      setQueue(
+        q.items.map((item, i) => ({
+          id: `${item.id}-${i}`,
+          title: item.title ?? "Unknown track",
+          artist: item.artistName ?? "",
+          length: formatLength(item.playbackDuration),
+          index: i,
+          playing: i === at,
+        })),
+      );
+    };
+
     const readState = () => {
       const playingState = window.MusicKit?.PlaybackStates?.playing;
       setPlaying(music.playbackState === playingState);
       readNowPlaying();
+      readQueue();
     };
 
     const readTime = () => {
@@ -211,15 +327,94 @@ export function useAppleMusic(): AppleMusic {
 
     music.addEventListener("playbackStateDidChange", readState);
     music.addEventListener("nowPlayingItemDidChange", readNowPlaying);
+    music.addEventListener("nowPlayingItemDidChange", readQueue);
+    music.addEventListener("queueItemsDidChange", readQueue);
+    music.addEventListener("repeatModeDidChange", readRepeat);
     music.addEventListener("playbackTimeDidChange", readTime);
     readState();
+    readRepeat();
 
     return () => {
       music.removeEventListener("playbackStateDidChange", readState);
       music.removeEventListener("nowPlayingItemDidChange", readNowPlaying);
+      music.removeEventListener("nowPlayingItemDidChange", readQueue);
+      music.removeEventListener("queueItemsDidChange", readQueue);
+      music.removeEventListener("repeatModeDidChange", readRepeat);
       music.removeEventListener("playbackTimeDidChange", readTime);
     };
   }, [music]);
+
+  /**
+   * Put the queue back where it was.
+   *
+   * A wall panel gets reloaded — a deploy, a crash, the power — and coming back
+   * to silence with an empty queue is the moment it stops feeling like an
+   * appliance. The position is restored but playback is not started: no browser
+   * will begin audio without a gesture, so the panel sits ready and the first
+   * tap on play picks up mid-song.
+   */
+  useEffect(() => {
+    if (!music || status !== "ready" || !active) return;
+    const point = readResume();
+    if (!point) return;
+
+    let alive = true;
+    void (async () => {
+      try {
+        await music.setQueue({ ...queueDescriptor(point.tracks), startWith: point.index });
+        if (point.time > 0) await music.seekToTime(point.time);
+        if (alive) setResumed(true);
+      } catch (e) {
+        // Say why rather than clearing in silence. A queue that quietly fails
+        // to come back looks exactly like one that was never saved, which is
+        // the hardest possible thing to be told about.
+        clearResume();
+        if (alive) {
+          setError(
+            e instanceof Error
+              ? `Could not pick up where you left off: ${e.message}`
+              : "Could not pick up where you left off",
+          );
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // Deliberately once per account: re-running on every queue change would
+    // undo what the listener has just done.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [music, status, active]);
+
+  // Remember where we are, so a reload can come back to it.
+  useEffect(() => {
+    if (!music || status !== "ready") return;
+
+    const remember = () => {
+      const items = music.queue?.items ?? [];
+      if (!items.length) return;
+      saveResume({
+        tracks: items.slice(0, 100).map((i) => ({
+          // A library track's catalog id resolves anywhere; its library id
+          // only resolves on the account that owns it.
+          id: i.playParams?.catalogId ?? i.id,
+          type: i.playParams?.catalogId ? "songs" : (i.type ?? "songs"),
+        })),
+        index: Math.max(0, music.nowPlayingItemIndex ?? 0),
+        time: Math.max(0, Math.floor(music.currentPlaybackTime ?? 0)),
+      });
+    };
+
+    // Often enough to lose only seconds, rarely enough not to thrash storage.
+    const id = window.setInterval(remember, 10_000);
+    window.addEventListener("pagehide", remember);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("pagehide", remember);
+      remember();
+    };
+  }, [music, status]);
 
   // The active listener's own library. Re-reads whenever the account changes,
   // so switching person actually switches whose playlists are on screen.
@@ -298,6 +493,7 @@ export function useAppleMusic(): AppleMusic {
       setActive(who);
       setNowPlaying(null);
       setPlaying(false);
+      setQueue([]);
       setStatus("ready");
     },
     [accounts, active],
@@ -347,6 +543,51 @@ export function useAppleMusic(): AppleMusic {
     setDefaultWho(who);
   }, []);
 
+  // Other panels need to know whether a handoff has anywhere to land here. The
+  // token itself stays on this device; only its existence is reported.
+  useEffect(() => {
+    if (status === "loading" || status === "unconfigured") return;
+    const secret = getDeviceSecret();
+    if (!secret) return;
+
+    const report = () =>
+      fetch("/api/music/linked", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-device-secret": secret },
+        body: JSON.stringify({
+          linked: accounts.length > 0,
+          // Only while actually playing: a paused panel is not playing
+          // anything, and should not claim a song on everyone else's screen.
+          nowPlaying:
+            isPlaying && nowPlaying
+              ? { title: nowPlaying.title.slice(0, 200), artist: nowPlaying.artist.slice(0, 200) }
+              : null,
+        }),
+      }).catch(() => {
+        /* the next tick reports again */
+      });
+
+    void report();
+    // Refreshed inside the staleness window, so the other panels' view of this
+    // one expires on its own if this panel stops talking.
+    const id = window.setInterval(report, 30_000);
+    return () => window.clearInterval(id);
+  }, [accounts.length, status, isPlaying, nowPlaying]);
+
+  const refreshLoved = useCallback(
+    async (ids: string[], kind: LovableKind) => {
+      const m = kit.current;
+      if (!m || !developerToken.current || !m.musicUserToken || !ids.length) return;
+      const found = await lovedIds(
+        { developerToken: developerToken.current, musicUserToken: m.musicUserToken },
+        kind,
+        ids,
+      ).catch(() => new Set<string>());
+      if (found.size) setLoved((prev) => new Set([...prev, ...found]));
+    },
+    [],
+  );
+
   const guard = useCallback(
     (fn: (m: MusicKitInstance) => Promise<unknown> | void) => () => {
       if (!music) return;
@@ -368,6 +609,7 @@ export function useAppleMusic(): AppleMusic {
     nowPlaying,
     playlists,
     recent,
+    queue,
     volume,
     link,
     forget,
@@ -384,8 +626,282 @@ export function useAppleMusic(): AppleMusic {
     setVolume: (value: number) => {
       if (!music) return;
       const clamped = Math.max(0, Math.min(1, value));
-      music.volume = clamped;
+      // Moving the slider while a voice is over the top sets the level to come
+      // back to, not the level right now.
+      baseVolume.current = clamped;
+      music.volume = ducked ? duckedLevel(clamped) : clamped;
       setVolumeState(clamped);
+    },
+
+    loved,
+    resumed,
+
+    search: async (term: string): Promise<SearchResults> => {
+      const m = kit.current;
+      const query = term.trim();
+      if (!m || query.length < 2) return { songs: [], playlists: [] };
+
+      const auth = { developerToken: developerToken.current, musicUserToken: m.musicUserToken };
+      if (!auth.developerToken) {
+        setError("Search needs the Apple Music credentials on this server");
+        return { songs: [], playlists: [] };
+      }
+
+      try {
+        // Resolve the storefront before searching rather than trusting whatever
+        // MusicKit has so far. Catalog search is per-storefront, and an
+        // unresolved one produced `/v1/catalog/undefined/search` — a 404 that
+        // looked exactly like "nothing found".
+        if (!storefrontId.current) {
+          storefrontId.current = m.storefrontId || (await storefront(auth)) || "";
+        }
+        if (!storefrontId.current) {
+          setError("Apple Music has not said which storefront this account is in");
+          return { songs: [], playlists: [] };
+        }
+
+        const found = await searchCatalog(auth, storefrontId.current, query);
+        const songs: Track[] = found.songs.map((t) => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          length: formatLength(t.durationMs),
+        }));
+        const playlists: Playlist[] = found.playlists.map((p) => ({
+          id: p.id,
+          name: p.name,
+          artwork: p.artworkUrl ? p.artworkUrl.replace("{w}", "120").replace("{h}", "120") : null,
+        }));
+
+        setError(null);
+        // Mark what is already loved, so the heart is right as it appears.
+        void refreshLoved(songs.map((t) => t.id), "songs");
+        return { songs, playlists };
+      } catch (e) {
+        // A failed search and a search with no matches look identical on screen
+        // otherwise, and they want very different things done about them.
+        setError(e instanceof Error ? `Search failed: ${e.message}` : "Search is unavailable");
+        return { songs: [], playlists: [] };
+      }
+    },
+
+    queueNext: (songId: string) => {
+      const m = kit.current;
+      if (!m) return;
+      void m
+        .playNext({ song: songId })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "That would not queue"));
+    },
+
+    reordering,
+
+    /**
+     * Reordering costs a queue reload, because MusicKit gives us no other way:
+     * `remove` is deprecated and there is no move. So the new order goes in
+     * through setQueue, and the playhead is put back by seeking to where it was.
+     *
+     * The track that was playing is located by working the move out
+     * arithmetically rather than by looking its id up again — a family queue
+     * can hold the same song twice, and an id lookup would eventually resume
+     * the wrong copy.
+     */
+    reorderQueue: (from: number, to: number) => {
+      const m = kit.current;
+      const items = m?.queue?.items ?? [];
+      if (!m || !items.length || from === to) return;
+      if (from < 0 || from >= items.length) return;
+
+      const current = Math.max(0, m.nowPlayingItemIndex ?? 0);
+      const ids = reorder(items.map((i) => i.id), from, to);
+      const startWith = indexAfterMove(current, from, Math.max(0, Math.min(to, items.length - 1)));
+      const at = Math.max(0, m.currentPlaybackTime ?? 0);
+      const wasPlaying = isPlaying;
+
+      setReordering(true);
+      void (async () => {
+        try {
+          await m.setQueue({ songs: ids, startWith });
+          if (at > 0) await m.seekToTime(at);
+          if (wasPlaying) await m.play();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "The queue would not take that order");
+        } finally {
+          setReordering(false);
+        }
+      })();
+    },
+
+    queueLater: (songId: string) => {
+      const m = kit.current;
+      if (!m) return;
+      void m
+        .playLater({ song: songId })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "That would not queue"));
+    },
+
+    toggleLove: (kind: LovableKind, id: string) => {
+      const m = kit.current;
+      const auth = m && {
+        developerToken: developerToken.current,
+        musicUserToken: m.musicUserToken,
+      };
+      if (!auth?.developerToken || !auth.musicUserToken) return;
+
+      const on = loved.has(id);
+      // Move the heart now and put it back if Apple disagrees: a tap that waits
+      // on a round trip feels broken on a wall panel.
+      setLoved((prev) => {
+        const next = new Set(prev);
+        if (on) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+
+      void (on ? unlove(auth, kind, id) : love(auth, kind, id)).catch((e: unknown) => {
+        setLoved((prev) => {
+          const next = new Set(prev);
+          if (on) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setError(e instanceof Error ? e.message : "Apple Music would not save that");
+      });
+    },
+
+    repeatOne,
+    toggleRepeatOne: () => {
+      if (!music) return;
+      const modes = window.MusicKit?.PlayerRepeatMode;
+      const next = repeatOne ? (modes?.none ?? 0) : (modes?.one ?? 1);
+      music.repeatMode = next;
+      // Not every playback path supports it, and MusicKit only warns; read back
+      // rather than assume the button did anything.
+      setRepeatOne(music.repeatMode === (modes?.one ?? 1));
+    },
+
+    duck: (on: boolean) => {
+      if (!music) return;
+      setDucked(on);
+      music.volume = on ? duckedLevel(baseVolume.current) : baseVolume.current;
+    },
+    ducked,
+    handOffTo: async (deviceId: string): Promise<string | null> => {
+      const m = kit.current;
+      const items = m?.queue?.items ?? [];
+      if (!m || !items.length) return "There is nothing playing to hand over";
+
+      const secret = getDeviceSecret();
+      if (!secret) return "This Hub is not paired to the house";
+
+      try {
+        const res = await fetch("/api/music/handoff", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-device-secret": secret },
+          body: JSON.stringify({
+            toDeviceId: deviceId,
+            // Catalog ids where they exist: the panel receiving this may be
+            // signed in as somebody else, and a library id means nothing there.
+            trackIds: items.slice(0, 100).map((i) => i.playParams?.catalogId ?? i.id),
+            startIndex: Math.max(0, m.nowPlayingItemIndex ?? 0),
+            startTime: Math.max(0, Math.floor(m.currentPlaybackTime ?? 0)),
+          }),
+        });
+        const json = (await res.json()) as { error?: string };
+        if (!res.ok) return json.error ?? "That panel could not take it";
+
+        // Only now stop: one subscription streams to one device, and going
+        // quiet before the other end is told would lose the music entirely.
+        await m.pause().catch(() => {});
+        return null;
+      } catch {
+        return "The house could not be reached";
+      }
+    },
+
+    bringHere: async (fromDeviceId: string): Promise<string | null> => {
+      const secret = getDeviceSecret();
+      if (!secret) return "This Hub is not paired to the house";
+
+      try {
+        const res = await fetch("/api/music/fetch", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-device-secret": secret },
+          body: JSON.stringify({ fromDeviceId }),
+        });
+        const json = (await res.json()) as { error?: string };
+        return res.ok ? null : (json.error ?? "That panel could not hand it over");
+      } catch {
+        return "The house could not be reached";
+      }
+    },
+
+    controlRemote: async (deviceId: string, action: RemoteAction, value?: number) => {
+      const secret = getDeviceSecret();
+      if (!secret) return "This Hub is not paired to the house";
+      try {
+        const res = await fetch("/api/music/control", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-device-secret": secret },
+          body: JSON.stringify({ deviceId, action, value }),
+        });
+        const json = (await res.json()) as { error?: string };
+        return res.ok ? null : (json.error ?? "That panel would not take it");
+      } catch {
+        return "The house could not be reached";
+      }
+    },
+
+    applyRemote: (action: RemoteAction, value?: number) => {
+      const m = kit.current;
+      if (!m) return;
+      switch (action) {
+        case "play":
+          void m.play().catch(() => {});
+          break;
+        case "pause":
+          void m.pause().catch(() => {});
+          break;
+        case "next":
+          void m.skipToNextItem().catch(() => {});
+          break;
+        case "previous":
+          void m.skipToPreviousItem().catch(() => {});
+          break;
+        case "volume": {
+          if (value === undefined) break;
+          const clamped = Math.max(0, Math.min(1, value));
+          baseVolume.current = clamped;
+          // Respect a voice that is currently over the top: the level to come
+          // back to changes, what is audible right now stays ducked.
+          m.volume = ducked ? duckedLevel(clamped) : clamped;
+          setVolumeState(clamped);
+          break;
+        }
+      }
+    },
+
+    acceptHandoff: ({ trackIds, startIndex, startTime }) => {
+      const m = kit.current;
+      if (!m) return;
+      void (async () => {
+        try {
+          setResumed(false);
+          await m.setQueue({ songs: trackIds, startWith: startIndex });
+          await m.play();
+          if (startTime > 0) await m.seekToTime(startTime);
+        } catch (e) {
+          // Library ids belong to the account that owns them, so a queue handed
+          // over from a different Apple ID can simply not resolve here.
+          setError(e instanceof Error ? e.message : "That music would not play here");
+        }
+      })();
+    },
+
+    playQueueIndex: (index: number) => {
+      if (!music) return;
+      void music
+        .changeToMediaAtIndex(index)
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "That track would not start"));
     },
     playPlaylist: (id: string) => {
       if (!music) return;
@@ -412,4 +928,13 @@ function toTrack(r: MusicKitResource): Track {
     artist: r.attributes?.artistName ?? "",
     length: formatLength(r.attributes?.durationInMillis),
   };
+}
+
+/**
+ * A quarter of the level it was at, with a floor so it never disappears.
+ * Proportional rather than absolute, so ducking music that was already quiet
+ * does not make it louder.
+ */
+export function duckedLevel(base: number): number {
+  return Math.max(0.05, base * 0.25);
 }

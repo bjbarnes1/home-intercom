@@ -11,6 +11,11 @@ import type { ReactNode } from "react";
  *
  * Every use ships one of two explicit exits: a visible close, or a stated
  * countdown. Tapping the backdrop is never the only way out.
+ *
+ * Fixed to the viewport rather than filling its parent. An interruption is
+ * mounted beside the screen it interrupts, not inside it, so any height it
+ * inherited would be whatever space was left over — which is how a broadcast
+ * ended up as a strip along the bottom of the Hub.
  */
 export default function OverlayCard({
   width = 480,
@@ -23,7 +28,7 @@ export default function OverlayCard({
   backdrop?: ReactNode;
 }) {
   return (
-    <div className="relative flex h-full w-full flex-col overflow-hidden">
+    <div className="fixed inset-0 z-50 flex flex-col overflow-hidden">
       <div className="absolute inset-0">{backdrop}</div>
       <div className="absolute inset-0" style={{ background: "rgba(15,23,42,0.4)" }} />
       <div

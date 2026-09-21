@@ -34,8 +34,6 @@ export const PEOPLE: Person[] = [
 export const AT_HOME = PEOPLE.filter((p) => p.home);
 export const OUT = PEOPLE.filter((p) => !p.home);
 
-export const CLOCK = { time: "08:42", date: "Monday 24 October", greeting: "Good morning" };
-
 /** A note someone left for the house. Undefined means the block is not rendered. */
 export const HOUSE_NOTE:
   | { text: string; by: string; at: string }
@@ -135,14 +133,6 @@ export const CONVERSATIONS: Conversation[] = [
   { id: "raff", name: "Raff", preview: "Did you find my PE kit?", when: "1h", members: ["Raff"] },
   { id: "gus", name: "Gus", preview: "Homework club moved to 14:00 today", when: "3h", members: ["Gus"] },
   { id: "kids", name: "Kids", speaker: "Raff", preview: "Race you home!", when: "Yesterday", members: ["Gus", "Georgette", "Willoughby", "Raff"] },
-];
-
-export const SPEAKERS: { name: string; where: string; playing?: boolean; key?: Identity }[] = [
-  { name: "Hub", where: "Kitchen · Playing now", playing: true, key: "Kitchen" },
-  { name: "Rumpus", where: "Available", key: "Rumpus" },
-  { name: "Lounge", where: "Available", key: "Lounge" },
-  { name: "Gus's room", where: "Available", key: "Gus" },
-  { name: "Whole house", where: "All rooms synced", key: "Everyone" },
 ];
 
 export const BROADCAST = {

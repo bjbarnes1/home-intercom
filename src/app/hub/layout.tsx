@@ -1,24 +1,25 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import HubRuntime from "./HubRuntime";
 
 export const metadata: Metadata = {
   title: "famOS Hub",
-  description: "The ambient family display, as designed.",
+  description: "The family display.",
 };
 
 /**
- * Hub prototype.
+ * The Hub.
  *
- * A walkthrough of the FamOS Hub screens running in the real app, so they can be
- * opened on the actual panel (and on the fridge) before any of them is wired to
- * live data. Fixture data lives in ./data.ts and nothing here reads or writes.
+ * A real panel: it pairs to the household, heartbeats, holds the LiveKit lobby
+ * open, and takes calls, announcements and reminders — the same engine the
+ * original wall panel runs, wearing the Hub's screens.
  *
- * This sits alongside /endpoint rather than replacing it: /endpoint carries the
- * working intercom, presence and LED behaviour, and swapping it for a prototype
- * would take real features offline.
+ * /endpoint still exists alongside it while this is proven on hardware. It is
+ * the same engine in both, so nothing is duplicated except the presentation,
+ * and retiring /endpoint is a deletion rather than a migration.
  *
- * Fluid rather than pinned to the 1280×800 reference, so it fills whatever panel
- * it lands on.
+ * Fluid rather than pinned to the 1280×800 reference, so it fills whatever
+ * panel it lands on.
  */
 export default function HubLayout({ children }: { children: ReactNode }) {
   return (
@@ -26,7 +27,7 @@ export default function HubLayout({ children }: { children: ReactNode }) {
       className="kiosk relative flex h-screen w-full flex-col overflow-hidden"
       style={{ background: "linear-gradient(168deg, #FFFFFF 0%, #EEF2FA 46%, #E6ECF9 100%)" }}
     >
-      {children}
+      <HubRuntime>{children}</HubRuntime>
     </div>
   );
 }
