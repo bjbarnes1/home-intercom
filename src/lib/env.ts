@@ -11,6 +11,12 @@ function bool(value: string | undefined, fallback = false): boolean {
   return value === "1" || value.toLowerCase() === "true";
 }
 
+/** A finite number, or the fallback — an unparseable coordinate is not a location. */
+function numeric(value: string | undefined, fallback: number): number {
+  const parsed = Number(str(value));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 /** Treat empty/whitespace env vars as unset (Vercel can store empty strings). */
 function str(value: string | undefined): string | undefined {
   if (value == null) return undefined;
@@ -43,6 +49,22 @@ export const env = {
     vapidPublicKey: process.env.VAPID_PUBLIC_KEY ?? "",
     vapidPrivateKey: process.env.VAPID_PRIVATE_KEY ?? "",
     vapidSubject: process.env.VAPID_SUBJECT ?? "mailto:admin@example.com",
+  },
+
+  weather: {
+    /** Home location for the Hub's weather. Sydney until someone says otherwise. */
+    latitude: numeric(process.env.WEATHER_LATITUDE, -33.8688),
+    longitude: numeric(process.env.WEATHER_LONGITUDE, 151.2093),
+    place: str(process.env.WEATHER_PLACE) ?? "Sydney",
+  },
+
+  appleMusic: {
+    /** Apple Developer team ID that owns the MusicKit identifier. */
+    teamId: str(process.env.APPLE_MUSIC_TEAM_ID) ?? "",
+    /** Key ID of the MusicKit private key (.p8). */
+    keyId: str(process.env.APPLE_MUSIC_KEY_ID) ?? "",
+    /** The .p8 contents, PKCS#8 PEM. Newlines may be escaped as \n. */
+    privateKey: process.env.APPLE_MUSIC_PRIVATE_KEY ?? "",
   },
 
   tts: {

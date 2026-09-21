@@ -137,25 +137,6 @@ export const CONVERSATIONS: Conversation[] = [
   { id: "kids", name: "Kids", speaker: "Raff", preview: "Race you home!", when: "Yesterday", members: ["Gus", "Georgette", "Willoughby", "Raff"] },
 ];
 
-export const NOW_PLAYING = {
-  track: "Golden Hour",
-  artist: "JVKE · Weekend Chill",
-  room: "Kitchen Hub",
-  elapsed: "1:42",
-  total: "3:56",
-  progress: 42,
-  volume: 65,
-};
-
-export const BROWSE = ["Focus", "Family Dinner", "Kids' Favourites", "Chill Evening", "Throwback"];
-
-export const RECENT_TRACKS = [
-  { title: "Sunroof", artist: "Nicky Youre", length: "2:49" },
-  { title: "As It Was", artist: "Harry Styles", length: "2:47" },
-  { title: "Sunflower", artist: "Post Malone, Swae Lee", length: "2:38" },
-  { title: "Lovely Day", artist: "Bill Withers", length: "4:15" },
-];
-
 export const SPEAKERS: { name: string; where: string; playing?: boolean; key?: Identity }[] = [
   { name: "Hub", where: "Kitchen · Playing now", playing: true, key: "Kitchen" },
   { name: "Rumpus", where: "Available", key: "Rumpus" },
@@ -163,60 +144,6 @@ export const SPEAKERS: { name: string; where: string; playing?: boolean; key?: I
   { name: "Gus's room", where: "Available", key: "Gus" },
   { name: "Whole house", where: "All rooms synced", key: "Everyone" },
 ];
-
-export const WEATHER = {
-  place: "Sydney",
-  context: "home · updated 08:40",
-  saved: ["Sydney", "Brisbane", "Jindabyne"],
-  temp: 12,
-  feelsLike: 9,
-  condition: "Light rain",
-  feelsNote: "the wind is doing that",
-  high: 14,
-  low: 7,
-  wind: "28 km/h",
-  uv: "2 · Low",
-  sunset: "18:04",
-  driest: "11:00–14:00",
-  warning: {
-    level: "Yellow warning · Wind",
-    detail: "10:00–18:00 · gusts to 60 km/h. Bring the bins in and drop the trampoline net.",
-    source: "Bureau of Meteorology",
-  },
-  /** hour, temperature, chance of rain as a percentage. */
-  hours: [
-    { at: "08", temp: 12, rain: 55 },
-    { at: "09", temp: 12, rain: 40 },
-    { at: "10", temp: 13, rain: 25 },
-    { at: "11", temp: 13, rain: 15 },
-    { at: "12", temp: 14, rain: 10 },
-    { at: "13", temp: 14, rain: 10 },
-    { at: "14", temp: 14, rain: 20 },
-    { at: "15", temp: 13, rain: 45 },
-    { at: "16", temp: 13, rain: 70 },
-    { at: "17", temp: 12, rain: 65 },
-    { at: "18", temp: 11, rain: 40 },
-  ],
-  week: [
-    { day: "Today", icon: "rain" as const, high: 14, low: 7, rain: 60 },
-    { day: "Tue", icon: "cloud" as const, high: 15, low: 8, rain: 20 },
-    { day: "Wed", icon: "sun" as const, high: 16, low: 9, rain: 10 },
-    { day: "Thu", icon: "rain" as const, high: 13, low: 8, rain: 70 },
-    { day: "Fri", icon: "wind" as const, high: 12, low: 6, rain: 30 },
-    { day: "Sat", icon: "sun" as const, high: 11, low: 5, rain: 10 },
-    { day: "Sun", icon: "cloud" as const, high: 13, low: 7, rain: 25 },
-  ],
-  /**
-   * Dressed for it. Derived in the real build from apparent temperature (the 2001
-   * wind-chill revision) plus rain probability and the person's own outings —
-   * never from air temperature, which is the case this feature exists to fix.
-   */
-  dressed: [
-    { who: "Dad" as Identity, advice: "Coat and proper shoes", why: "09:15 run is dry, the 16:00 pickup is not" },
-    { who: "Gus" as Identity, advice: "Waterproof over the jumper", why: "wind makes 12° feel like 9°, no shorts today" },
-    { who: "Raff" as Identity, advice: "Waterproof, and a towel", why: "swimming at 16:00, heaviest rain 15:00–17:00" },
-  ],
-};
 
 export const BROADCAST = {
   from: "Mum" as Identity,
