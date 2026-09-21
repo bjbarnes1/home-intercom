@@ -6,25 +6,19 @@ import {
   getDeviceSecret,
   clearDeviceCredentials,
 } from "@/lib/client/identity";
-import { decodeCommand, type LedCommand } from "@/lib/control/commands";
 import { speak, stopSpeaking } from "@/lib/client/speak";
 import { toWsUrl } from "@/lib/client/livekitUrl";
 import { reportClientError } from "@/lib/client/reportError";
-import {
-  defaultRoomLights,
-  type FrontMode,
-  type LedColorKey,
-  type RoomLights,
-} from "@/lib/color/led-state";
 import { minutesToHm } from "@/lib/etiquette/quietHours";
 import {
   ANNOUNCE_DWELL_DEFAULT,
   clampAnnounceDwellSec,
 } from "@/lib/etiquette/announceDwell";
-import type {
-  MusicControlCommand,
-  MusicFetchCommand,
-  MusicHandoffCommand,
+import {
+  decodeCommand,
+  type MusicControlCommand,
+  type MusicFetchCommand,
+  type MusicHandoffCommand,
 } from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
@@ -36,7 +30,6 @@ export interface EtiquetteSettings {
   quietHoursEnabled: boolean;
   quietHoursStart: string;
   quietHoursEnd: string;
-  hasLeds: boolean;
   announceDwellSec: number;
 }
 
@@ -59,7 +52,7 @@ export interface PresenceHandlers {
  * Presence heartbeat + lobby control channel for a paired wall device.
  * Owns phase, DND from server, and dispatch of control commands into media/TTS.
  */
-export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {}) {
+export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) {
   const { joinMedia, leaveMedia, setRinging } = media;
   // Held in a ref so a new handler identity does not tear down the lobby.
   const handlersRef = useRef(handlers);
@@ -73,10 +66,8 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
     quietHoursEnabled: false,
     quietHoursStart: "22:00",
     quietHoursEnd: "07:00",
-    hasLeds: false,
     announceDwellSec: ANNOUNCE_DWELL_DEFAULT,
   });
-  const [roomLights, setRoomLights] = useState<RoomLights>(() => defaultRoomLights());
   const [receiving, setReceiving] = useState(false);
   const [receiveError, setReceiveError] = useState("");
   const [livekitUrl, setLivekitUrl] = useState("");
@@ -85,40 +76,10 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
   const lobbyRef = useRef<Room | null>(null);
   const etiquetteRef = useRef(etiquette);
   etiquetteRef.current = etiquette;
-  const hasLedsRef = useRef(etiquette.hasLeds);
-  hasLedsRef.current = etiquette.hasLeds;
 
   const dismissSpeaking = useCallback(() => {
     stopSpeaking();
     setSpeaking(null);
-  }, []);
-
-  const applyLed = useCallback((cmd: LedCommand) => {
-    if (!hasLedsRef.current) return;
-    setRoomLights((prev) => {
-      const next = { ...prev };
-      if (cmd.front) {
-        if (cmd.front.mode && cmd.front.mode !== "pulse") {
-          next.front = cmd.front.mode as FrontMode;
-        }
-        if (cmd.front.color && isLedColor(cmd.front.color)) {
-          next.frontColor = cmd.front.color;
-        }
-        if (cmd.front.brightness != null) {
-          next.bright = cmd.front.brightness;
-        }
-      }
-      if (cmd.rear) {
-        if (cmd.rear.on != null) next.rear = cmd.rear.on;
-        if (cmd.rear.color && isLedColor(cmd.rear.color)) {
-          next.rearColor = cmd.rear.color;
-        }
-        if (cmd.rear.brightness != null) {
-          next.bright = cmd.rear.brightness;
-        }
-      }
-      return next;
-    });
   }, []);
 
   const heartbeat = useCallback(async () => {
@@ -151,7 +112,6 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
             : "22:00",
         quietHoursEnd:
           data.quietHoursEnd != null ? minutesToHm(data.quietHoursEnd) : "07:00",
-        hasLeds: !!data.hasLeds,
         announceDwellSec: clampAnnounceDwellSec(
           data.announceDwellSec ?? ANNOUNCE_DWELL_DEFAULT,
         ),
@@ -223,9 +183,6 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
                 setRinging(null);
                 leaveMedia();
                 break;
-              case "led":
-                applyLed(cmd);
-                break;
               case "ping":
                 break;
               default: {
@@ -236,7 +193,7 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
           } catch (e) {
             reportClientError(e, {
               code: "endpoint.control_decode",
-              route: "useEndpointPresence",
+              route: "usePanelPresence",
             });
           }
         });
@@ -256,7 +213,7 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
           setReceiveError(e instanceof Error ? e.message : "Audio connection failed");
           reportClientError(e, {
             code: "endpoint.lobby_connect",
-            route: "useEndpointPresence",
+            route: "usePanelPresence",
           });
         }
       }
@@ -265,10 +222,10 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
       setPhase((p) => (p === "ready" ? p : "error"));
       reportClientError(e, {
         code: "endpoint.heartbeat",
-        route: "useEndpointPresence",
+        route: "usePanelPresence",
       });
     }
-  }, [joinMedia, leaveMedia, setRinging, applyLed]);
+  }, [joinMedia, leaveMedia, setRinging]);
 
   useEffect(() => {
     heartbeat();
@@ -312,7 +269,6 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
           quietHoursEnabled: saved.quietHoursEnabled,
           quietHoursStart: saved.quietHoursStart,
           quietHoursEnd: saved.quietHoursEnd,
-          hasLeds: saved.hasLeds,
           announceDwellSec: clampAnnounceDwellSec(
             saved.announceDwellSec ?? ANNOUNCE_DWELL_DEFAULT,
           ),
@@ -334,7 +290,6 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
     setDoNotDisturb,
     etiquette,
     updateEtiquette,
-    roomLights,
     receiving,
     receiveError,
     livekitUrl,
@@ -344,8 +299,4 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
     dismissSpeaking,
     heartbeat,
   };
-}
-
-function isLedColor(c: string): c is LedColorKey {
-  return ["warm", "amber", "rose", "teal", "indigo", "green"].includes(c);
 }

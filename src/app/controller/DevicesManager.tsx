@@ -165,7 +165,7 @@ function PairingCard({
 
   useEffect(() => {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    const url = `${origin}/endpoint?code=${info.code}`;
+    const url = `${origin}/hub?code=${info.code}`;
     QRCode.toDataURL(url, {
       margin: 1,
       width: 240,
@@ -179,7 +179,7 @@ function PairingCard({
     <div className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-6 p-6 text-center">
       <div className="uplabel text-accent">Pair {info.displayName}</div>
       <p className="max-w-xs text-sm text-neutral-400">
-        On the room device, open <span className="text-neutral-200">/endpoint</span> and
+        On the room device, open <span className="text-neutral-200">/hub</span> and
         enter this code — or scan the QR to fill it in.
       </p>
 

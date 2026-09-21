@@ -53,7 +53,7 @@ The intercom core is working end-to-end, including **real two-way audio**
 
 ### Devices & control channel
 - **Pairing**: admin registers a device → 6-char code **+ QR**; the room phone
-  scans it (`/endpoint?code=…` auto-pairs) or types it. Re-pairing rotates the
+  scans it (`/hub?code=…` auto-pairs) or types it. Re-pairing rotates the
   device secret (revokes the old phone). Endpoints authenticate by device secret.
 - **Presence + control**: endpoints hold a lobby connection with **auto-reconnect**
   and a visible **"Ready to receive"** indicator; the backend delivers only to
@@ -92,7 +92,7 @@ The Xcode project is generated from `ios/project.yml` — `brew install xcodegen
 then `cd ios && ./Scripts/bootstrap.sh`. See [`ios/README.md`](ios/README.md).
 Wall panels stay on the kiosk PWA.
 
-### Wall panel / endpoint (kiosk PWA)
+### Wall panel (kiosk PWA, served at `/hub`)
 - Pair → lobby → auto-answer; live-clock Home with summary cards; **Schedule**
   (calendar day view), **Jobs** (chore board, tap-to-tick + streaks),
   **Reminders**, **Music** (shared player state), **Sound** (persisted DND;
@@ -218,7 +218,7 @@ writes. An existing deployment may have had its emails edited since, so check
 the `User` table rather than assuming, and don't re-run the seed against
 production to "fix" a login: it upserts by email and would add a second
 account rather than change the one you have. Then open `/controller` on your phone and
-`/endpoint` on a room device (in **Fully Kiosk Browser** for the real kiosks).
+`/hub` on a room device (in **Fully Kiosk Browser** for the real kiosks).
 Without Docker, set `MOCK_LOCAL_SERVICES=true` to exercise the control flow
 without live media.
 

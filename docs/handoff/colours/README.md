@@ -1,17 +1,22 @@
 # Colour handoff — identity & LED
 
-Drop-in code for the colour system shown in **Home Intercom v2.dc.html**. Three files,
-no dependencies beyond the Nocturne stylesheet already in the app. Both grounds — dark
-and light — ship in the same sheet.
+The reasoning behind the colour system. The code that came with this handoff has since
+been adopted and has moved on, so the drop-in copies that used to sit beside this file
+were removed rather than left to fork — read the live source instead:
 
-| File | Goes in | Role |
-| --- | --- | --- |
-| `identity.css` | `src/styles/` (import after the theme sheet) | Tokens for both themes + the `.hi-tinted` / `.hi-chip` / `.hi-hold` / `.hi-led-fixture` / `.hi-led-bar` contracts |
-| `identity.ts` | `src/lib/colour/` | The identity map, `ident()`, `tint()`, `mix()`, `fade()`, `reaches()`, `resolveTheme()` |
-| `led-state.ts` | `src/lib/colour/` | LED palette + `frontLed()` / `rearLed()` / `SCENES` |
+| Was | Now lives in |
+| --- | --- |
+| `identity.css` | `src/styles/identity.css` (imported by `src/app/globals.css`) |
+| `identity.ts` | `src/lib/color/identity.ts` — `ident()`, `litIdent()`, `fade()`, `identStyle()`, `reaches()`, `resolveTheme()` |
+| `led-state.ts` | removed — see **LED** below |
 
-`Colour System.dc.html` at the project root renders the whole palette on both grounds — open it to
-check a hue before shipping it.
+## LED
+
+The LED half was built and then taken out again. Nothing sent a cue (`POST /api/led` had
+no callers) and nothing drew a bar once the Hub replaced the old `/endpoint` panel, so
+the sender, the `led` control command and `led-state.ts` went with it rather than sit
+unreachable. Rule 3 and the light-mode notes below are kept because they are the part
+worth having when the hardware panels arrive — the code is recoverable from git history.
 
 ## The four rules
 
@@ -52,24 +57,15 @@ ambient sensor with a 60–120 lux dead band so cloud cover can't flicker it.
 ## Usage
 
 ```tsx
-import { ident, identStyle, resolveTheme } from '@/lib/colour/identity';
-import { frontLed, ledStyle } from '@/lib/colour/led-state';
+import { ident, identStyle, resolveTheme } from '@/lib/color/identity';
 
 <div data-theme={resolveTheme(room.themePref, lux, theme)}>
   <article className="hi-tinted" style={identStyle('Gus')}>
     <h3 style={{ color: 'var(--hi-ident)' }}>Gus</h3>
     <div style={{ background: 'var(--hi-tint-2)' }}>…</div>
   </article>
-
-  <div className="hi-led-fixture">
-    <div className="hi-led-bar" data-live={front.live} style={ledStyle(front)} />
-  </div>
-  <p>{front.why}</p>
 </div>
 ```
-
-`why` is written to be shown, not just logged — the panel prints it under the bar so the
-LED is never an unexplained colour.
 
 ## Accessibility
 

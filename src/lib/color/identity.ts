@@ -30,22 +30,6 @@ const TOKEN: Record<Identity, string> = {
   Everyone: "everyone",
 };
 
-/** Plain-English colour name — theme-stable (light retunes lightness, not hue). */
-export const COLOR_NAME: Record<Identity, string> = {
-  Gus: "teal",
-  Georgette: "rose",
-  Willoughby: "amber",
-  Raff: "green",
-  Mum: "rose",
-  Dad: "teal",
-  Kitchen: "blurple",
-  Rumpus: "indigo",
-  Lounge: "coral",
-  Kids: "pink",
-  Downstairs: "blue",
-  Everyone: "blurple",
-};
-
 export const ZONE_MEMBERS: Record<Zone, Identity[]> = {
   Everyone: ["Gus", "Georgette", "Willoughby", "Raff", "Kitchen", "Rumpus", "Lounge"],
   Kids: ["Gus", "Georgette", "Willoughby", "Raff"],
@@ -90,13 +74,7 @@ export const litIdent = (name?: string | null): string => {
   return t ? `var(--hi-lit-${t})` : ACCENT_FALLBACK;
 };
 
-/** All blends run in oklab — hue-interpolating spaces skew warm tints magenta. */
-export const tint = (name: string | undefined, pct: number, base = GROUND): string =>
-  `color-mix(in oklab, ${ident(name)} ${pct}%, ${base})`;
-
-export const mix = (color: string, pct: number, base = GROUND): string =>
-  `color-mix(in oklab, ${color} ${pct}%, ${base})`;
-
+/** Blends run in oklab — hue-interpolating spaces skew warm tints magenta. */
 export const fade = (color: string, pct: number): string =>
   `color-mix(in oklab, ${color} ${pct}%, transparent)`;
 

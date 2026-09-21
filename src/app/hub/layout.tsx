@@ -12,11 +12,11 @@ export const metadata: Metadata = {
  *
  * A real panel: it pairs to the household, heartbeats, holds the LiveKit lobby
  * open, and takes calls, announcements and reminders — the same engine the
- * original wall panel runs, wearing the Hub's screens.
+ * original wall panel ran, wearing the Hub's screens.
  *
- * /endpoint still exists alongside it while this is proven on hardware. It is
- * the same engine in both, so nothing is duplicated except the presentation,
- * and retiring /endpoint is a deletion rather than a migration.
+ * It is the only panel now — /endpoint was deleted once this was running on
+ * hardware. Four of that panel's sections have no Hub screen yet and their
+ * routes are still there waiting for one: see docs/handoff/hub-gaps.md.
  *
  * Fluid rather than pinned to the 1280×800 reference, so it fills whatever
  * panel it lands on.

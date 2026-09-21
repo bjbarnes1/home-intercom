@@ -5,10 +5,10 @@ import Link from "next/link";
  *  - Controller: a parent's phone that initiates pages/calls/broadcasts.
  *  - Wall panel: a fixed station in a room, which is the Hub.
  *
- * The panel link goes to /hub. The original panel is still served at /endpoint
- * while the Hub is proven on hardware — both run the same engine — but nothing
- * routes to it any more, because sending someone to the old interface from the
- * front door is how you end up testing the wrong thing.
+ * The panel link goes to /hub, which is now the only panel — the original
+ * /endpoint screens were removed once the Hub was running on real hardware.
+ * Their server routes are still there for the sections the Hub has yet to
+ * grow: see docs/handoff/hub-gaps.md.
  */
 export default function Home() {
   return (

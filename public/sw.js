@@ -7,8 +7,10 @@
  * We intentionally do NOT cache API responses or LiveKit traffic.
  */
 
-const SHELL_CACHE = "intercom-shell-v2";
-const SHELL_ASSETS = ["/", "/hub", "/controller", "/endpoint", "/manifest.webmanifest", "/icon.svg"];
+// v3 drops /endpoint, which no longer exists. addAll() is atomic: one 404 and
+// the whole shell cache stays empty, so a stale entry here costs the lot.
+const SHELL_CACHE = "intercom-shell-v3";
+const SHELL_ASSETS = ["/", "/hub", "/controller", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -58,7 +60,7 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Web-push wake (Phase 4): show a notification and focus the endpoint.
+// Web-push wake (Phase 4): show a notification and focus the panel.
 self.addEventListener("push", (event) => {
   let data = { title: "Intercom", body: "Incoming" };
   try {
@@ -82,7 +84,7 @@ self.addEventListener("notificationclick", (event) => {
     self.clients.matchAll({ type: "window" }).then((clients) => {
       const existing = clients.find((c) => "focus" in c);
       if (existing) return existing.focus();
-      return self.clients.openWindow("/endpoint");
+      return self.clients.openWindow("/hub");
     }),
   );
 });

@@ -3,9 +3,9 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { saveDeviceCredentials } from "@/lib/client/identity";
 import { isWellFormedPairingCode } from "@/lib/devices/pairing";
-import PairingScreen from "@/app/endpoint/PairingScreen";
-import { useMediaSession } from "@/app/endpoint/useMediaSession";
-import { useEndpointPresence } from "@/app/endpoint/useEndpointPresence";
+import PairingScreen from "./_components/PairingScreen";
+import { useMediaSession } from "./_runtime/useMediaSession";
+import { usePanelPresence } from "./_runtime/usePanelPresence";
 import { useAppleMusic, type AppleMusic, type RemoteAction } from "./music/useAppleMusic";
 import CallCard from "./_components/CallCard";
 import RingCard from "./_components/RingCard";
@@ -78,7 +78,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     speaking,
     dismissSpeaking,
     heartbeat,
-  } = useEndpointPresence(media, {
+  } = usePanelPresence(media, {
     onMusicHandoff: useCallback(
       (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => acceptHandoff(cmd),
       [acceptHandoff],
@@ -147,6 +147,13 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
       setNote("Pairing failed");
     }
   }, [code, heartbeat, setNote, setPhase, setRoom]);
+
+  // A QR on the admin's screen points here with the code in the URL, so a panel
+  // is paired by scanning rather than by typing six characters on a wall.
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("code");
+    if (fromUrl) setCode(fromUrl.toUpperCase());
+  }, []);
 
   // A code pasted or scanned in full pairs without needing the button.
   useEffect(() => {
