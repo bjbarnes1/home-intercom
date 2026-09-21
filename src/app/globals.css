@@ -2,46 +2,73 @@
 @import "../styles/identity.css";
 
 /* ============================================================================
-   Nocturne + Home Intercom v2 identity colours
-   Ground #161826, identity hues in OKLCH, blends in oklab (see identity.css).
+   FamOS Hub palette — the design system's tokens, applied to the app chrome.
+   Light is the base ground (FamOS ships one theme); dark is retained as a night
+   ground for panels, retuned into the same hue family. `data-theme="dark"` on
+   an ancestor selects it — see useTheme() and the Light mode notes in
+   docs/handoff/colours/README.md.
+
+   Identity hues (people, rooms, zones) are NOT part of this palette: they keep
+   their own hue-per-identity contract in identity.css and drive the LED bars.
    ========================================================================== */
 @theme {
-  --color-bg: #161826;
-  --color-surface: #1e2133;
-  --color-surface-2: #262a40;
+  /* Surfaces — cool blue-grey only, never warm. */
+  --color-bg: #eef2fa; /* surface-page  */
+  --color-surface: #ffffff; /* surface-card  */
+  --color-surface-2: #fbfcfe; /* surface-overlay */
 
-  --color-text: #e9e9ed;
-  --color-neutral-200: #c9c9d4;
-  --color-neutral-300: #a9a9b8;
-  --color-neutral-400: #8b8b9c;
-  --color-neutral-500: #6b6b7e;
-  --color-neutral-600: #52526a;
-  --color-neutral-700: #3a3b4d;
-  --color-neutral-800: #26283a;
-  --color-neutral-900: #12141f;
+  /* Ink. The steps below are darkened from FamOS ink-muted (#64748B) so every
+     text step clears 4.5:1 on surface-page as well as on surface-card; the
+     literal token stays available as --color-ink-muted. */
+  --color-text: #0f172a; /* ink-primary */
+  --color-ink-muted: #64748b; /* ink-muted, for use on surface-card */
+  --color-ink-inverse: #ffffff; /* ink-inverse */
 
-  --color-divider: #2a2d42;
+  --color-neutral-200: #1e293b;
+  --color-neutral-300: #334155;
+  --color-neutral-400: #475569;
+  --color-neutral-500: #5a6b85;
+  --color-neutral-600: #94a3b8; /* non-text: placeholders, offline dots */
+  --color-neutral-700: #cbd5e1;
+  --color-neutral-800: #e2e8f0;
+  --color-neutral-900: #eef2fa;
 
-  /* Accent = Everyone / Kitchen blurple from identity handoff */
-  --color-accent: oklch(0.72 0.125 289);
-  --color-accent-200: oklch(0.88 0.06 289);
-  --color-accent-300: oklch(0.82 0.09 289);
-  --color-accent-400: oklch(0.76 0.11 289);
-  --color-accent-800: oklch(0.42 0.08 289);
-  --color-accent-900: oklch(0.28 0.06 289);
+  --color-divider: #e2e8f0;
+
+  /* The one accent in the system. */
+  --color-accent: #3b5cf6; /* accent-primary */
+  --color-accent-200: #1e3a8a;
+  --color-accent-300: #2c46d6; /* accent-primary-pressed */
+  --color-accent-400: #3b5cf6;
+  --color-accent-800: #bfcafd;
+  --color-accent-900: #e8edfe;
+
+  /* Destructive actions only — today that is the hang-up button alone. */
+  --color-danger: #ef4444;
 
   --font-body: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI",
     Roboto, sans-serif;
-  --font-heading: "Space Grotesk", "Inter", ui-sans-serif, system-ui,
+  --font-heading: "Plus Jakarta Sans", "Inter", ui-sans-serif, system-ui,
     -apple-system, sans-serif;
 
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.28);
-  --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.5);
+  /* Elevation: one token per layer, not one blur at three sizes. */
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-dock: 0 10px 24px rgba(15, 23, 42, 0.16);
+  --shadow-overlay: 0 28px 56px rgba(21, 32, 74, 0.22),
+    0 8px 20px rgba(59, 92, 246, 0.16);
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 10px 24px rgba(15, 23, 42, 0.16);
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --hi-bg: var(--color-bg);
+
+  /* Radius is binary: content tiles, then the pill. */
+  --radius-tile: 12px;
+  --radius-block: 20px;
+  --radius-sheet: 32px;
+  --radius-pill: 999px;
 }
 
 html,
@@ -51,29 +78,41 @@ body {
 
 body {
   margin: 0;
+  /* A subtle gradient toward white from surface-page; the hue never shifts warm. */
   background:
-    radial-gradient(
-      120% 80% at 50% -10%,
-      color-mix(in oklab, var(--color-accent) 14%, transparent),
-      transparent 55%
-    ),
+    radial-gradient(120% 80% at 50% -10%, #ffffff, transparent 55%),
     var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-body);
   -webkit-tap-highlight-color: transparent;
 }
 
-h1,
-h2,
-h3,
-h4 {
-  font-family: var(--font-heading);
-  font-weight: 500;
-  letter-spacing: -0.01em;
+[data-theme="dark"] body {
+  background:
+    radial-gradient(
+      120% 80% at 50% -10%,
+      color-mix(in oklab, var(--color-accent) 16%, transparent),
+      transparent 55%
+    ),
+    var(--color-bg);
 }
 
-a {
-  color: var(--color-accent);
+/* Element defaults belong in the base layer. Unlayered rules beat everything
+   Tailwind emits, so an unlayered `a { color }` silently wins over `text-*` on
+   every link in the app — which is exactly what it used to do. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-heading);
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+
+  a {
+    color: var(--color-accent);
+  }
 }
 
 .no-scrollbar {
@@ -96,14 +135,23 @@ a {
   color: var(--color-neutral-500);
 }
 
+/* Ink for anything drawn on an accent or identity fill. Light ground fills are
+   dark enough for white ink; the night ground lifts them, so ink flips. */
+.on-accent {
+  color: #ffffff;
+}
+[data-theme="dark"] .on-accent {
+  color: #0b1220;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 40px;
-  padding: 0 14px;
-  border-radius: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: var(--radius-pill);
   border: 1px solid transparent;
   font-family: var(--font-heading);
   font-weight: 500;
@@ -126,10 +174,10 @@ a {
 }
 .btn-primary {
   background: var(--color-accent);
-  color: #141221;
+  color: #ffffff;
 }
-[data-theme="light"] .btn-primary {
-  color: #fbfbfd;
+[data-theme="dark"] .btn-primary {
+  color: #0b1220;
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-300);
@@ -144,7 +192,7 @@ a {
 }
 .btn-ghost {
   background: transparent;
-  color: var(--color-neutral-300);
+  color: var(--color-neutral-400);
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--color-surface);
@@ -160,8 +208,8 @@ a {
 
 .card {
   background: var(--color-surface);
-  border-radius: 10px;
-  box-shadow: var(--shadow-sm);
+  border-radius: var(--radius-tile);
+  box-shadow: var(--shadow-card);
 }
 .card-hover {
   cursor: pointer;
@@ -177,7 +225,7 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   padding: 3px 9px;
   font-size: 11px;
   font-weight: 500;
@@ -194,7 +242,7 @@ a {
 }
 .tag-outline {
   border: 1px solid var(--color-divider);
-  color: var(--color-neutral-300);
+  color: var(--color-neutral-400);
 }
 .tag-ident {
   background: var(--hi-tint-2);
@@ -212,7 +260,7 @@ a {
   width: 100%;
   background: var(--color-surface);
   border: 1px solid var(--color-divider);
-  border-radius: 8px;
+  border-radius: var(--radius-tile);
   padding: 11px 12px;
   color: var(--color-text);
   font-family: var(--font-body);
@@ -230,12 +278,15 @@ a {
 .switch {
   width: 44px;
   height: 26px;
-  border-radius: 999px;
-  background: var(--color-neutral-800);
+  border-radius: var(--radius-pill);
+  background: var(--color-neutral-700);
   position: relative;
   cursor: pointer;
   flex: none;
   transition: background 0.18s ease;
+}
+[data-theme="dark"] .switch {
+  background: var(--color-neutral-800);
 }
 .switch[data-on="true"] {
   background: var(--color-accent);
@@ -262,7 +313,7 @@ a {
   display: inline-block;
 }
 .dot-online {
-  background: oklch(0.76 0.12 197);
+  background: var(--color-accent);
 }
 .dot-offline {
   background: var(--color-neutral-600);
@@ -296,9 +347,12 @@ a {
 }
 .ptt[data-live="true"] {
   background: var(--hi-ident, var(--color-accent));
-  color: #141221;
+  color: #ffffff;
   border-color: var(--hi-ident, var(--color-accent));
   animation: halo 1.4s ease-out infinite;
+}
+[data-theme="dark"] .ptt[data-live="true"] {
+  color: #0b1220;
 }
 .ptt:active {
   transform: scale(0.97);

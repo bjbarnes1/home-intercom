@@ -88,7 +88,7 @@ export default function MusicPlayer({ music, room, onAction, onClose }: Props) {
                   onClick={() => onAction({ action: "toggleRoom", deviceId: r.id })}
                   className={`flex items-center gap-2 rounded-lg px-3 py-2 text-[13px] transition ${
                     on
-                      ? "bg-accent text-[#141221]"
+                      ? "bg-accent on-accent"
                       : "border border-divider text-neutral-300 hover:border-accent"
                   }`}
                 >

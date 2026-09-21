@@ -7,8 +7,8 @@
  * We intentionally do NOT cache API responses or LiveKit traffic.
  */
 
-const SHELL_CACHE = "intercom-shell-v1";
-const SHELL_ASSETS = ["/", "/controller", "/endpoint", "/manifest.webmanifest", "/icon.svg"];
+const SHELL_CACHE = "intercom-shell-v2";
+const SHELL_ASSETS = ["/", "/hub", "/controller", "/endpoint", "/manifest.webmanifest", "/icon.svg"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -29,12 +29,32 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
+  if (event.request.method !== "GET") return;
+
   const url = new URL(event.request.url);
+
+  // Never touch anything we do not serve ourselves. Handing our HTML shell to a
+  // third-party <script> makes the browser parse a page as JavaScript, which is
+  // how a flaky network used to break Apple's MusicKit, Google Fonts and the
+  // icon sheets — with "Unexpected token '<'" as the only clue.
+  if (url.origin !== self.location.origin) return;
+
   // Never intercept API or websocket traffic — always go to network.
-  if (url.pathname.startsWith("/api/") || event.request.method !== "GET") return;
+  if (url.pathname.startsWith("/api/")) return;
 
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request).then((r) => r || caches.match("/"))),
+    fetch(event.request).catch(async () => {
+      const cached = await caches.match(event.request);
+      if (cached) return cached;
+
+      // The app shell answers a page navigation. For a script, style or image
+      // it would be the wrong content type, so those fail honestly instead.
+      if (event.request.mode === "navigate") {
+        const shell = await caches.match("/");
+        if (shell) return shell;
+      }
+      return Response.error();
+    }),
   );
 });
 

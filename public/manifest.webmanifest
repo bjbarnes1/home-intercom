@@ -1,12 +1,15 @@
 {
-  "name": "Home Intercom",
-  "short_name": "Intercom",
-  "description": "Page, call, broadcast and remind across the house.",
+  "name": "famOS Hub",
+  "short_name": "famOS",
+  "description": "The family display: page, call, broadcast, plan the day and play music.",
   "start_url": "/",
-  "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#0b1220",
-  "theme_color": "#0b1220",
+  "scope": "/",
+  "id": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#EEF2FA",
+  "theme_color": "#EEF2FA",
   "icons": [
     {
       "src": "/icon.svg",

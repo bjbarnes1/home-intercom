@@ -10,10 +10,10 @@ import {
 const STORAGE_KEY = "hi-theme-pref";
 
 function readPref(): ThemePref {
-  if (typeof window === "undefined") return "dark";
+  if (typeof window === "undefined") return "light";
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (raw === "light" || raw === "dark" || raw === "auto") return raw;
-  return "dark";
+  return "light";
 }
 
 /**
@@ -21,8 +21,8 @@ function readPref(): ThemePref {
  * with the handoff dead band (60–120 lux). Applies `data-theme` on <html>.
  */
 export function useTheme() {
-  const [pref, setPrefState] = useState<ThemePref>("dark");
-  const [theme, setTheme] = useState<Theme>("dark");
+  const [pref, setPrefState] = useState<ThemePref>("light");
+  const [theme, setTheme] = useState<Theme>("light");
   const [lux, setLux] = useState(0);
   const [ready, setReady] = useState(false);
 

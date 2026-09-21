@@ -80,6 +80,18 @@ The intercom core is working end-to-end, including **real two-way audio**
   ("Say something" TTS + "Talk live"), Reminders (AI "ask in plain words" with
   optional speech input + manual form), and a **Devices** manager.
 
+### Native iOS controller (`ios/`)
+
+A SwiftUI app for the same Controller role, talking to this backend unchanged —
+sign-in reuses the `intercom_session` cookie, so no server work was needed. Home
+(zones + rooms with live presence), hold-to-talk page, two-way call, Broadcast
+("Say something" + "Talk live"), Reminders (AI + manual) and Settings. Media
+rides the LiveKit Swift SDK.
+
+The Xcode project is generated from `ios/project.yml` — `brew install xcodegen`
+then `cd ios && ./Scripts/bootstrap.sh`. See [`ios/README.md`](ios/README.md).
+Wall panels stay on the kiosk PWA.
+
 ### Wall panel / endpoint (kiosk PWA)
 - Pair → lobby → auto-answer; live-clock Home with summary cards; **Schedule**
   (calendar day view), **Jobs** (chore board, tap-to-tick + streaks),
@@ -121,7 +133,8 @@ The intercom core is working end-to-end, including **real two-way audio**
 - **Local Piper TTS** — optional offline/home-node alternative to OpenAI.
 - **Latency (optional):** local media node so on-LAN audio skips cloud round-trip.
 - **iOS audio unlock** (`room.startAudio()`) if inbound playback needs a tap.
-- **Web-push wake** for backgrounded/remote devices (Phase 4).
+- **Web-push wake** for backgrounded/remote devices (Phase 4). The native iOS
+  app needs the same thing (APNs + CallKit) before a locked phone can ring.
 - Half duplex; kiosk soak (Phase 5); native **Android** device (Phase 6).
 - Separate **Neon branch per environment** before previews share prod data.
 
@@ -141,9 +154,13 @@ Bigger, exploratory features — not scheduled, captured so we don't lose them.
     flapping) → the media/session state moves to that room's endpoint. Data model
     would add `Person`↔`phone beacon` and a `presence` stream; ties into the
     existing Music state and (later) per-person profiles.
-  - Note: iOS restricts background BLE advertising, so the phone likely needs the
-    PWA/app foregrounded or a small companion app; worth prototyping on Android
-    endpoints first.
+  - **Correction:** this is pointed the wrong way for iOS. A backgrounded iPhone
+    puts its BLE service UUIDs in an undocumented "overflow area" only another
+    Apple device can decode, so an Android panel can't hear it. Invert it — the
+    **room device beacons**, the **phone monitors** the region via Core Location,
+    which survives backgrounding and app termination. See
+    [`docs/LOCATION.md`](docs/LOCATION.md), which also covers live location
+    sharing.
 
 - **Custom device with LED lighting.** The future in-house touchscreen device
   gains a **front-facing LED** for room lighting + notifications (e.g. gentle
@@ -194,9 +211,13 @@ already applied to Neon and its migration is recorded in `_prisma_migrations`,
 so `prisma migrate deploy` against it is a clean no-op; re-run it after adding
 new migrations. Migrations live in `prisma/migrations/` and are committed.
 
-Sign in at `/login` (the seed creates `soph@example.com` / `bj@example.com`
-with password `changeme123` — override with `SEED_ADMIN_PASSWORD`, and change
-it before any real deployment). Then open `/controller` on your phone and
+Sign in at `/login`. The seed creates `soph@example.com` / `bj@example.com`
+with password `changeme123` (override with `SEED_ADMIN_PASSWORD`, and change it
+before any real deployment) — but note these are the addresses a *fresh* seed
+writes. An existing deployment may have had its emails edited since, so check
+the `User` table rather than assuming, and don't re-run the seed against
+production to "fix" a login: it upserts by email and would add a second
+account rather than change the one you have. Then open `/controller` on your phone and
 `/endpoint` on a room device (in **Fully Kiosk Browser** for the real kiosks).
 Without Docker, set `MOCK_LOCAL_SERVICES=true` to exercise the control flow
 without live media.
