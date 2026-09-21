@@ -5,6 +5,7 @@ import type { Identity } from "@/lib/color/identity";
 import { getDeviceSecret } from "@/lib/client/identity";
 import { love, lovedIds, unlove, type LovableKind } from "@/lib/music/appleApi";
 import { clearResume, readResume, saveResume } from "./resume";
+import { indexAfterMove, reorder } from "@/lib/music/reorder";
 import {
   artworkUrl,
   loadMusicKit,
@@ -124,6 +125,13 @@ export interface AppleMusic {
   queueNext: (songId: string) => void;
   /** Put a track at the end of the queue. */
   queueLater: (songId: string) => void;
+  /**
+   * Move a queue entry. MusicKit has no reorder call, so this hands it a whole
+   * new queue and puts the playhead back — see the note on reordering below.
+   */
+  reorderQueue: (from: number, to: number) => void;
+  /** True while a reorder is re-seating the queue. */
+  reordering: boolean;
   /** Ids the listener has loved, for whatever is currently on screen. */
   loved: Set<string>;
   toggleLove: (kind: LovableKind, id: string) => void;
@@ -168,6 +176,7 @@ export function useAppleMusic(): AppleMusic {
   const [repeatOne, setRepeatOne] = useState(false);
   const [loved, setLoved] = useState<Set<string>>(new Set());
   const [resumed, setResumed] = useState(false);
+  const [reordering, setReordering] = useState(false);
   /** Needed for the REST calls MusicKit has no helper for. */
   const developerToken = useRef<string>("");
   /** The level to come back to. Tracks the slider even while ducked. */
@@ -615,6 +624,44 @@ export function useAppleMusic(): AppleMusic {
       void m
         .playNext({ song: songId })
         .catch((e: unknown) => setError(e instanceof Error ? e.message : "That would not queue"));
+    },
+
+    reordering,
+
+    /**
+     * Reordering costs a queue reload, because MusicKit gives us no other way:
+     * `remove` is deprecated and there is no move. So the new order goes in
+     * through setQueue, and the playhead is put back by seeking to where it was.
+     *
+     * The track that was playing is located by working the move out
+     * arithmetically rather than by looking its id up again — a family queue
+     * can hold the same song twice, and an id lookup would eventually resume
+     * the wrong copy.
+     */
+    reorderQueue: (from: number, to: number) => {
+      const m = kit.current;
+      const items = m?.queue?.items ?? [];
+      if (!m || !items.length || from === to) return;
+      if (from < 0 || from >= items.length) return;
+
+      const current = Math.max(0, m.nowPlayingItemIndex ?? 0);
+      const ids = reorder(items.map((i) => i.id), from, to);
+      const startWith = indexAfterMove(current, from, Math.max(0, Math.min(to, items.length - 1)));
+      const at = Math.max(0, m.currentPlaybackTime ?? 0);
+      const wasPlaying = isPlaying;
+
+      setReordering(true);
+      void (async () => {
+        try {
+          await m.setQueue({ songs: ids, startWith });
+          if (at > 0) await m.seekToTime(at);
+          if (wasPlaying) await m.play();
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "The queue would not take that order");
+        } finally {
+          setReordering(false);
+        }
+      })();
     },
 
     queueLater: (songId: string) => {
