@@ -1,12 +1,12 @@
 "use client";
 
-import { ident } from "@/lib/color/identity";
 import BaseLayer, { Eyebrow, Hero } from "../_components/BaseLayer";
 import Icon from "../_components/Icon";
 import Avatar from "../_components/Avatar";
-import { PEOPLE, SPEAKERS } from "../data";
+import { PEOPLE } from "../data";
 import type { Identity } from "@/lib/color/identity";
 import { useState } from "react";
+import PlayingOn from "./PlayingOn";
 import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
 
 /**
@@ -94,46 +94,7 @@ export default function Music() {
           </div>
         </div>
 
-        <div className="flex w-[300px] min-w-0 flex-none flex-col gap-2 max-[1200px]:w-[240px]">
-          <span className="px-1">
-            <Eyebrow tone="ink">Playing on</Eyebrow>
-          </span>
-          <div className="flex min-h-0 flex-grow flex-col gap-1 overflow-y-auto rounded-xl bg-surface p-2 shadow-card">
-            {SPEAKERS.map((s) => (
-              <button
-                key={s.name}
-                type="button"
-                aria-pressed={!!s.playing && music.isPlaying}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border-none px-3.5 py-2.5 text-left transition-colors ${
-                  s.playing && music.isPlaying ? "" : "bg-transparent hover:bg-bg"
-                }`}
-                style={s.playing && music.isPlaying ? { background: "var(--color-accent)" } : undefined}
-              >
-                <span
-                  className="flex h-9 w-9 flex-none items-center justify-center rounded-xl"
-                  style={{
-                    background: s.playing && music.isPlaying ? "rgba(255,255,255,0.22)" : "rgba(59,92,246,0.10)",
-                    color: s.playing && music.isPlaying ? "#FFFFFF" : s.key ? ident(s.key) : "var(--color-accent)",
-                  }}
-                >
-                  <Icon name="speaker" size={17} />
-                </span>
-                <span className="flex min-w-0 flex-grow flex-col">
-                  <span className={`truncate text-[13px] font-semibold leading-[18px] ${s.playing && music.isPlaying ? "text-white" : "text-text"}`}>
-                    {s.name}
-                  </span>
-                  <span className={`truncate text-xs leading-4 ${s.playing && music.isPlaying ? "text-white" : "text-ink-muted"}`}>
-                    {s.playing && !music.isPlaying ? "Available" : s.where}
-                  </span>
-                </span>
-                <span
-                  className="h-2.5 w-2.5 flex-none rounded-full"
-                  style={{ background: s.playing && music.isPlaying ? "#FFFFFF" : "rgba(15,23,42,0.18)" }}
-                />
-              </button>
-            ))}
-          </div>
-        </div>
+        <PlayingOn isPlaying={music.isPlaying} />
       </div>
 
       {adding ? (

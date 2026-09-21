@@ -137,14 +137,6 @@ export const CONVERSATIONS: Conversation[] = [
   { id: "kids", name: "Kids", speaker: "Raff", preview: "Race you home!", when: "Yesterday", members: ["Gus", "Georgette", "Willoughby", "Raff"] },
 ];
 
-export const SPEAKERS: { name: string; where: string; playing?: boolean; key?: Identity }[] = [
-  { name: "Hub", where: "Kitchen · Playing now", playing: true, key: "Kitchen" },
-  { name: "Rumpus", where: "Available", key: "Rumpus" },
-  { name: "Lounge", where: "Available", key: "Lounge" },
-  { name: "Gus's room", where: "Available", key: "Gus" },
-  { name: "Whole house", where: "All rooms synced", key: "Everyone" },
-];
-
 export const BROADCAST = {
   from: "Mum" as Identity,
   text: "Dinner's ready in 10 — start tidying up!",
