@@ -68,10 +68,15 @@ export async function pruneLocationHistory(now: Date): Promise<RetentionResult> 
 
   // Rounding happens in SQL so a day's worth of rows is one statement rather
   // than a read-modify-write per row.
+  //
+  // The `::int` on the decimals is load-bearing. Prisma binds a JavaScript
+  // integer as int8, Postgres has round(numeric, integer) but no
+  // round(numeric, bigint), and it will not pick one by implicit cast — so
+  // without it every sweep failed with 42883 and nothing was ever coarsened.
   const coarsened = await prisma.$executeRaw`
     UPDATE "LocationPing"
-    SET "lat" = ROUND("lat"::numeric, ${COARSE_DECIMALS})::double precision,
-        "lng" = ROUND("lng"::numeric, ${COARSE_DECIMALS})::double precision,
+    SET "lat" = ROUND("lat"::numeric, ${COARSE_DECIMALS}::int)::double precision,
+        "lng" = ROUND("lng"::numeric, ${COARSE_DECIMALS}::int)::double precision,
         "accuracyM" = NULL,
         "coarse" = true
     WHERE "coarse" = false AND "capturedAt" < ${coarsenBefore}
