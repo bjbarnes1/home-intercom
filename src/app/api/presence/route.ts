@@ -10,7 +10,8 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/presence — endpoint heartbeat. Authenticated by device secret.
  * Bumps lastSeenAt and returns a fresh lobby token so the endpoint can (re)join
- * the control channel. Called on boot and periodically.
+ * the control channel, along with the settings and the room name this panel
+ * should be showing. Called on boot and periodically.
  */
 export async function POST(req: Request) {
   const device = await deviceFromRequest(req);
@@ -34,6 +35,8 @@ export async function POST(req: Request) {
   const row = await prisma.device.findUniqueOrThrow({
     where: { id: device.id },
     select: {
+      displayName: true,
+      room: true,
       doNotDisturb: true,
       autoAnswer: true,
       chimeEnabled: true,
@@ -48,6 +51,10 @@ export async function POST(req: Request) {
   return NextResponse.json({
     lobbyToken,
     livekitUrl: env.livekit.publicUrl,
+    // The panel is told which room it is on every beat. It only learned this
+    // at pairing before, so a reload left it calling itself something generic
+    // — or, worse, whatever the last screen it rendered had hardcoded.
+    room: row.room ?? row.displayName,
     doNotDisturb: row.doNotDisturb,
     autoAnswer: row.autoAnswer,
     chimeEnabled: row.chimeEnabled,
