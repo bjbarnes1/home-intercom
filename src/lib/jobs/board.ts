@@ -2,6 +2,17 @@
  * Pure helpers for the jobs / chore board.
  */
 
+import { DateTime } from "luxon";
+
+/** Local calendar day `offset` days from `now`, as yyyy-mm-dd. */
+function shiftedDay(now: Date, timeZone: string, offset: number): string {
+  const base = DateTime.fromJSDate(now, { zone: timeZone });
+  const dt = (base.isValid ? base : DateTime.fromJSDate(now, { zone: "UTC" })).plus({
+    days: offset,
+  });
+  return dt.toISODate() as string;
+}
+
 /** yyyy-mm-dd for `date` in the given IANA timezone. */
 export function localDay(date: Date, timeZone: string): string {
   // en-CA formats as yyyy-mm-dd.
@@ -13,13 +24,21 @@ export function localDay(date: Date, timeZone: string): string {
   }).format(date);
 }
 
+/*
+ * Both walks step the local CALENDAR, not 86,400,000 ms. A DST day is 23 or 25
+ * hours long, so fixed-millisecond steps skip a date every spring and repeat
+ * one every autumn: at the 5 Oct Sydney transition 4 October vanished from the
+ * board and broke any running streak across it.
+ */
+
 /** The last `n` local-day strings, most recent (today) first. */
 export function recentDays(now: Date, timeZone: string, n: number): string[] {
-  const days: string[] = [];
-  for (let k = 0; k < n; k++) {
-    days.push(localDay(new Date(now.getTime() - k * 86_400_000), timeZone));
-  }
-  return days;
+  return Array.from({ length: n }, (_, k) => shiftedDay(now, timeZone, -k));
+}
+
+/** The next `n` local-day strings, starting with today. */
+export function upcomingDays(now: Date, timeZone: string, n: number): string[] {
+  return Array.from({ length: n }, (_, k) => shiftedDay(now, timeZone, k));
 }
 
 /**

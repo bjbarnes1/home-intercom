@@ -57,6 +57,14 @@ export async function POST(req: Request) {
 
     const now = new Date();
     const runAt = data.runAt ? new Date(data.runAt) : null;
+    // A reminder for a time that has passed is a mistake, not an instruction
+    // to speak immediately.
+    if (data.kind === "ONE_OFF" && runAt && runAt.getTime() <= now.getTime()) {
+      return NextResponse.json(
+        { error: "That time has already passed" },
+        { status: 400 },
+      );
+    }
     const nextRunAt = computeNextRun(
       {
         kind: data.kind,

@@ -8,6 +8,12 @@ import { coarsenCoordinate } from "@/lib/location/retention";
 import { firePlaceRules } from "@/lib/location/rules";
 import type { PlaceTrigger } from "@prisma/client";
 
+/**
+ * How close to an existing arrival a second `enter` has to be to count as iOS
+ * re-reporting the same crossing rather than a new one after a missed exit.
+ */
+const RE_REPORT_WINDOW_MS = 5 * 60 * 1000;
+
 export const dynamic = "force-dynamic";
 
 const PlaceEvent = z.object({
@@ -98,13 +104,43 @@ export async function POST(req: Request) {
       const at = new Date(event.at);
 
       if (event.type === "enter") {
-        // A duplicate enter (iOS re-reports on relaunch) must not open a second
-        // visit, so only open one when none is currently open.
+        /*
+         * An enter used to be dropped whenever ANY visit for this (user, place)
+         * was still open, with no age bound and nothing else ever closing one.
+         * Force-quit the app at school — iOS stops delivering region events to
+         * a user-terminated app, so the exit never arrives — and that visit
+         * stays open forever, silently swallowing every subsequent morning's
+         * arrival while the route still answered {stored:true, arrivals:0}.
+         *
+         * An enter is iOS saying a boundary was crossed inward, so the person
+         * was outside: an open visit means the exit was missed, not that they
+         * never left. The one real exception is a re-report of the same
+         * arrival, which lands within a few minutes of it.
+         */
+        await prisma.placeVisit.updateMany({
+          where: { userId: user.id, placeId: { not: event.placeId }, leftAt: null },
+          data: { leftAt: at },
+        });
+
         const open = await prisma.placeVisit.findFirst({
           where: { userId: user.id, placeId: event.placeId, leftAt: null },
-          select: { id: true },
+          select: { id: true, arrivedAt: true },
+          orderBy: { arrivedAt: "desc" },
         });
-        if (!open) {
+
+        const isReReport =
+          open != null &&
+          Math.abs(at.getTime() - open.arrivedAt.getTime()) <= RE_REPORT_WINDOW_MS;
+
+        if (!isReReport) {
+          if (open) {
+            // The exit we never saw. `at` is the only defensible timestamp for
+            // it — bounded, because we now know they were outside just before.
+            await prisma.placeVisit.update({
+              where: { id: open.id },
+              data: { leftAt: at },
+            });
+          }
           await prisma.placeVisit.create({
             data: { userId: user.id, placeId: event.placeId, arrivedAt: at },
           });

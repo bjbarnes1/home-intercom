@@ -19,22 +19,44 @@ export async function hashPassword(password: string): Promise<string> {
   return `scrypt$${salt.toString("hex")}$${derived.toString("hex")}`;
 }
 
+/*
+ * Work done on a path that is going to return false anyway, so that path costs
+ * what a real verification costs. Returning early when there is no stored hash
+ * answered in ~2ms where a real check takes ~70ms, which told an unauthenticated
+ * caller whether an email had an account — the opposite of what the login
+ * route's own comment promises.
+ */
+const DUMMY_SALT = randomBytes(SALT_BYTES);
+async function burnEquivalentWork(password: string): Promise<void> {
+  await scryptAsync(password, DUMMY_SALT, KEYLEN);
+}
+
 export async function verifyPassword(
   password: string,
   stored: string | null | undefined,
 ): Promise<boolean> {
-  if (!stored) return false;
+  if (!stored) {
+    await burnEquivalentWork(password);
+    return false;
+  }
   const parts = stored.split("$");
-  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  if (parts.length !== 3 || parts[0] !== "scrypt") {
+    await burnEquivalentWork(password);
+    return false;
+  }
   const [, saltHex, hashHex] = parts;
 
   let expected: Buffer;
   try {
     expected = Buffer.from(hashHex, "hex");
   } catch {
+    await burnEquivalentWork(password);
     return false;
   }
-  if (expected.length !== KEYLEN) return false;
+  if (expected.length !== KEYLEN) {
+    await burnEquivalentWork(password);
+    return false;
+  }
 
   const derived = (await scryptAsync(
     password,

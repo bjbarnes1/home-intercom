@@ -16,18 +16,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const executeRaw = vi.fn().mockResolvedValue(3);
 const deleteMany = vi.fn().mockResolvedValue({ count: 7 });
+const deleteVisits = vi.fn().mockResolvedValue({ count: 2 });
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     $executeRaw: (strings: TemplateStringsArray, ...values: unknown[]) =>
       executeRaw(strings, ...values),
     locationPing: { deleteMany: (args: unknown) => deleteMany(args) },
+    placeVisit: { deleteMany: (args: unknown) => deleteVisits(args) },
   },
 }));
 
 afterEach(() => {
   executeRaw.mockClear();
   deleteMany.mockClear();
+  deleteVisits.mockClear();
 });
 
 async function sweep() {
@@ -77,6 +80,26 @@ describe("the coarsening statement", () => {
   });
 
   it("reports what it did", async () => {
-    expect(await sweep()).toEqual({ coarsened: 3, deleted: 7 });
+    expect(await sweep()).toEqual({ coarsened: 3, deleted: 7, visitsDeleted: 2 });
+  });
+});
+
+describe("the derived record", () => {
+  /*
+   * A PlaceVisit — "arrived School 08:31, left 15:08" — is a sharper picture of
+   * a child's routine than the raw fixes it came from. It was kept forever
+   * while the consent screen promised seven days.
+   */
+  it("prunes visits on the same seven-day cutoff as the pings", async () => {
+    await sweep();
+    const [pings] = deleteMany.mock.calls[0] as [{ where: { capturedAt: { lt: Date } } }];
+    const [visits] = deleteVisits.mock.calls[0] as [{ where: { arrivedAt: { lt: Date } } }];
+    expect(visits.where.arrivedAt.lt.getTime()).toBe(pings.where.capturedAt.lt.getTime());
+  });
+
+  it("judges a visit by when it started, not when it ended", async () => {
+    await sweep();
+    const [visits] = deleteVisits.mock.calls[0] as [{ where: Record<string, unknown> }];
+    expect(Object.keys(visits.where)).toEqual(["arrivedAt"]);
   });
 });

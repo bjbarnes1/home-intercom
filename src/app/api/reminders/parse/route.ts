@@ -163,9 +163,25 @@ export async function POST(req: Request) {
       }
       kind = "RECURRING";
     } else {
-      const dt = DateTime.fromISO(out.time, { zone: tz });
+      let dt = DateTime.fromISO(out.time, { zone: tz });
       if (!dt.isValid) {
         return NextResponse.json({ error: "Couldn't read the date/time." }, { status: 422 });
+      }
+      /*
+       * "Remind Raff at 4pm to bring the bins in", asked at six in the evening,
+       * comes back as 16:00 TODAY. Taken literally that is a reminder that
+       * announces itself on the next cron tick. A bare clock time that has
+       * already passed means the next one — tomorrow.
+       */
+      if (dt <= nowLocal) {
+        const rolled = dt.plus({ days: 1 });
+        if (rolled <= nowLocal) {
+          return NextResponse.json(
+            { error: "That time has already passed." },
+            { status: 422 },
+          );
+        }
+        dt = rolled;
       }
       runAt = dt.toJSDate();
       kind = "ONE_OFF";

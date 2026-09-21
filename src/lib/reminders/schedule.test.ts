@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeNextRun,
+  MISSED_TICK_GRACE_MS,
   isDue,
   validateCron,
   snoozeUntil,
@@ -117,5 +118,24 @@ describe("snoozeUntil", () => {
   });
   it("rejects non-positive minutes", () => {
     expect(() => snoozeUntil(new Date(), 0)).toThrow();
+  });
+});
+
+describe("computeNextRun — one-off staleness", () => {
+  const oneOff: ScheduleInput = { kind: "ONE_OFF", enabled: true };
+
+  it("still fires a runAt inside the missed-tick grace", () => {
+    const from = new Date("2026-05-01T09:30:00Z");
+    const runAt = new Date(from.getTime() - MISSED_TICK_GRACE_MS + 60_000);
+    expect(computeNextRun({ ...oneOff, runAt }, from)?.toISOString()).toBe(
+      runAt.toISOString(),
+    );
+  });
+
+  it("does not fire a runAt older than the grace", () => {
+    // "at 4pm" resolved to 4pm today, asked at six in the evening.
+    const from = new Date("2026-05-01T18:00:00Z");
+    const runAt = new Date("2026-05-01T16:00:00Z");
+    expect(computeNextRun({ ...oneOff, runAt }, from)).toBeNull();
   });
 });

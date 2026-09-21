@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
-import { localDay } from "@/lib/jobs/board";
+import { localDay, upcomingDays } from "@/lib/jobs/board";
 
 export const dynamic = "force-dynamic";
 
@@ -34,10 +34,7 @@ export async function GET(req: Request) {
   const now = new Date();
 
   // Build the forward day list (today first) and the fetch window.
-  const dayList: string[] = [];
-  for (let k = 0; k < DAYS; k++) {
-    dayList.push(localDay(new Date(now.getTime() + k * 86_400_000), tz));
-  }
+  const dayList = upcomingDays(now, tz, DAYS);
   const windowEnd = new Date(now.getTime() + DAYS * 86_400_000);
 
   const events = await prisma.calendarEvent.findMany({

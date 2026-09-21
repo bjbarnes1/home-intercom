@@ -22,6 +22,9 @@ export interface ScheduleInput {
   lastRunAt?: Date | null;
 }
 
+/** How late a one-off may be and still fire — one missed cron outage, not a day. */
+export const MISSED_TICK_GRACE_MS = 60 * 60 * 1000;
+
 /**
  * Compute the next instant a reminder should fire strictly after `from`,
  * or null if it will never fire again (disabled, or a spent one-off).
@@ -38,6 +41,17 @@ export function computeNextRun(input: ScheduleInput, from: Date): Date | null {
     if (!input.runAt) return null;
     // Already fired → spent.
     if (input.lastRunAt && input.lastRunAt.getTime() >= input.runAt.getTime()) {
+      return null;
+    }
+    /*
+     * A runAt slightly in the past still fires: the cron ticks every minute and
+     * a missed tick should catch up rather than swallow the reminder. But only
+     * slightly — an unbounded catch-up is how a reminder set for 4pm, resolved
+     * to 4pm TODAY at six in the evening, announced itself within the minute.
+     * Past the grace it is stale, and the write paths reject one that far back
+     * anyway.
+     */
+    if (input.runAt.getTime() < from.getTime() - MISSED_TICK_GRACE_MS) {
       return null;
     }
     return input.runAt;

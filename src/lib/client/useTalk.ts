@@ -2,7 +2,6 @@
 
 import { useCallback, useRef, useState } from "react";
 import { Room, RoomEvent, RemoteTrack } from "livekit-client";
-import { controllerIdentity } from "@/lib/client/identity";
 import { toWsUrl } from "@/lib/client/livekitUrl";
 import { attachRemoteAudio } from "@/lib/client/attachAudioTrack";
 import { reportClientError } from "@/lib/client/reportError";
@@ -50,10 +49,7 @@ export function useTalk() {
       await fetch("/api/page/hangup", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          eventId: meta.eventId,
-          deviceIds: meta.reached,
-        }),
+        body: JSON.stringify({ eventId: meta.eventId }),
       }).catch((e) =>
         reportClientError(e, { code: "talk.hangup_request", route: "useTalk" }),
       );
@@ -63,6 +59,27 @@ export function useTalk() {
         reportClientError(e, { code: "talk.disconnect", route: "useTalk" }),
       );
     }
+  }, []);
+
+  /*
+   * Hang up an event by id, without reading metaRef.
+   *
+   * A tap-and-release inside ~200ms has stop() run while start() is still
+   * awaiting the server. stop() reads metaRef before start() has written it, so
+   * it sends no hangup — but start()'s round trip has already created the event
+   * and pushed `join {autoAnswer:true}` to the panel. The kitchen sat in the
+   * incoming overlay until somebody tapped again, and that tap hung up the
+   * stale event rather than the new one. So the cancelled branches have to end
+   * the session they opened, themselves.
+   */
+  const hangUpEvent = useCallback(async (eventId: string) => {
+    await fetch("/api/page/hangup", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ eventId }),
+    }).catch((e) =>
+      reportClientError(e, { code: "talk.hangup_cancelled", route: "useTalk" }),
+    );
   }, []);
 
   const start = useCallback(
@@ -78,14 +95,16 @@ export function useTalk() {
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             kind: target.kind,
-            initiatorIdentity: controllerIdentity(),
             targetDeviceId: target.deviceId,
             targetZoneId: target.zoneId,
           }),
         });
         if (!res.ok) throw new Error(`Couldn't start (${res.status})`);
         const data = await res.json();
-        if (cancelled()) return { reached: 0 };
+        if (cancelled()) {
+          if (data.eventId) await hangUpEvent(data.eventId as string);
+          return { reached: 0 };
+        }
 
         const reached = (data.reached ?? []) as string[];
         if (reached.length === 0) {
@@ -129,6 +148,7 @@ export function useTalk() {
         await room.connect(toWsUrl(data.livekitUrl), data.initiatorToken);
         if (cancelled()) {
           await room.disconnect().catch(() => {});
+          await hangUpEvent(data.eventId as string);
           return { reached: 0 };
         }
         roomRef.current = room;
@@ -136,6 +156,7 @@ export function useTalk() {
         if (cancelled()) {
           roomRef.current = null;
           await room.disconnect().catch(() => {});
+          await hangUpEvent(data.eventId as string);
           return { reached: 0 };
         }
         setStatus("live");
@@ -148,7 +169,7 @@ export function useTalk() {
         return { reached: 0 };
       }
     },
-    [],
+    [hangUpEvent],
   );
 
   return { status, message, start, stop };

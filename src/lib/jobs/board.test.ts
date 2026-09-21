@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { localDay, recentDays, streakFrom } from "./board";
+import { localDay, recentDays, streakFrom, upcomingDays } from "./board";
 
 describe("localDay", () => {
   it("formats yyyy-mm-dd in the given timezone", () => {
@@ -43,5 +43,57 @@ describe("streakFrom", () => {
 
   it("counts a lone completed today", () => {
     expect(streakFrom([true, false])).toBe(1);
+  });
+});
+
+describe("day walks across a DST transition", () => {
+  /*
+   * Sydney's 2026 transitions, sampled at local midnight — which is when the
+   * board rolls over, and the only time of day the old fixed-86,400,000ms walk
+   * got it wrong. Verified against that old implementation: both cases below
+   * reproduce on it and pass here.
+   */
+  const tz = "Australia/Sydney";
+
+  it("does not skip the day DST starts over", () => {
+    // 2026-10-04T13:00Z is local midnight on Sunday 5 October. Stepping back a
+    // fixed 24h from there lands on 3 October: 4 October vanished from the
+    // board, and streakFrom saw a gap where a completed day had been.
+    const days = recentDays(new Date("2026-10-04T13:00:00Z"), tz, 5);
+    expect(days).toEqual([
+      "2026-10-05",
+      "2026-10-04",
+      "2026-10-03",
+      "2026-10-02",
+      "2026-10-01",
+    ]);
+  });
+
+  it("does not repeat a day when DST ends", () => {
+    // 2026-04-05T13:00Z is local midnight on 5 April; the fixed step landed on
+    // 5 April again, so the board showed the same day twice.
+    const days = recentDays(new Date("2026-04-05T13:00:00Z"), tz, 5);
+    expect(days).toEqual([
+      "2026-04-05",
+      "2026-04-04",
+      "2026-04-03",
+      "2026-04-02",
+      "2026-04-01",
+    ]);
+    expect(new Set(days).size).toBe(days.length);
+  });
+
+  it("walks forward across the same transition without skipping", () => {
+    // 23:00 local on 1 October — Sydney is still UTC+10 here, so this instant
+    // is late on the 1st, not midnight on the 2nd. The window still spans the
+    // transition, which is the point.
+    const days = upcomingDays(new Date("2026-10-01T13:00:00Z"), tz, 5);
+    expect(days).toEqual([
+      "2026-10-01",
+      "2026-10-02",
+      "2026-10-03",
+      "2026-10-04",
+      "2026-10-05",
+    ]);
   });
 });

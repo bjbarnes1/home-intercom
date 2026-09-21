@@ -76,3 +76,33 @@ export const env = {
 } as const;
 
 export type Env = typeof env;
+
+/**
+ * Refuse to use the public `devkey`/`devsecret` pair in production.
+ *
+ * Those defaults are the ones every LiveKit quickstart ships with. In
+ * development that is the point. In production it is a silent failure mode: a
+ * bad env rotation keeps the app booting, every token is signed with a key the
+ * world knows, every panel fails to join with an opaque error, and nothing in
+ * the logs says why.
+ *
+ * Called from the two places that actually need the credentials — minting a
+ * token and constructing the control sender — rather than at module load.
+ * `next build` runs with NODE_ENV=production, so a module-load throw makes the
+ * BUILD depend on runtime secrets and fails it on any machine without them.
+ * A misconfigured server should fail its requests loudly, not fail to compile.
+ */
+export function assertLiveKitConfigured(): void {
+  if (process.env.NODE_ENV !== "production" || env.mockLocalServices) return;
+  const missing = [
+    !str(process.env.LIVEKIT_API_KEY) && "LIVEKIT_API_KEY",
+    !str(process.env.LIVEKIT_API_SECRET) && "LIVEKIT_API_SECRET",
+    !str(process.env.LIVEKIT_URL) && "LIVEKIT_URL",
+  ].filter(Boolean);
+  if (missing.length > 0) {
+    throw new Error(
+      `${missing.join(", ")} unset in production — LiveKit would fall back to ` +
+        "the public dev credentials, so no token minted here would be trustworthy.",
+    );
+  }
+}

@@ -1,5 +1,5 @@
 import { RoomServiceClient, DataPacket_Kind } from "livekit-server-sdk";
-import { env } from "@/lib/env";
+import { assertLiveKitConfigured, env } from "@/lib/env";
 import { lobbyRoom } from "@/lib/livekit/rooms";
 import { encodeCommand, type ControlCommand } from "@/lib/control/commands";
 
@@ -40,6 +40,7 @@ class MockControlSender implements ControlSender {
 class LiveKitControlSender implements ControlSender {
   private client: RoomServiceClient;
   constructor() {
+    assertLiveKitConfigured();
     // RoomServiceClient wants an http(s) URL, not ws(s).
     const httpUrl = env.livekit.url.replace(/^ws/, "http");
     this.client = new RoomServiceClient(

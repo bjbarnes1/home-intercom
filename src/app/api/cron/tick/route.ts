@@ -16,17 +16,25 @@ export const maxDuration = 60;
  * tiny — there is never a day's backlog to grind through, and "deleted after a
  * week" is true to the minute rather than to the night.
  *
- * When CRON_SECRET is set, Vercel sends it as `Authorization: Bearer <secret>`
- * and we require it; without it (local/dev) the route is open.
+ * Vercel sends CRON_SECRET as `Authorization: Bearer <secret>`. In production
+ * it is required: an unset secret used to mean "open", and Vercel stores an
+ * empty string, so a blank var left this on a minute-by-minute schedule that
+ * anyone could drive in a loop — firing every due reminder repeatedly and
+ * spending real money on TTS. Outside production an unset secret still means
+ * open, so `npm run dev` needs no ceremony.
  */
 export async function GET(req: Request) {
   return withRoute(async () => {
     const secret = process.env.CRON_SECRET;
-    if (secret) {
-      const auth = req.headers.get("authorization");
-      if (auth !== `Bearer ${secret}`) {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (!secret) {
+      if (process.env.NODE_ENV === "production") {
+        return NextResponse.json(
+          { error: "CRON_SECRET is not configured" },
+          { status: 503 },
+        );
       }
+    } else if (req.headers.get("authorization") !== `Bearer ${secret}`) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const now = new Date();

@@ -1,5 +1,5 @@
 import { AccessToken, type VideoGrant } from "livekit-server-sdk";
-import { env } from "@/lib/env";
+import { assertLiveKitConfigured, env } from "@/lib/env";
 
 /**
  * What a participant is allowed to do in a room. Least privilege by intent:
@@ -57,6 +57,7 @@ export function grantForRole(room: string, role: Role): VideoGrant {
  * fake/absent server.
  */
 export async function mintToken(req: TokenRequest): Promise<string> {
+  assertLiveKitConfigured();
   const at = new AccessToken(env.livekit.apiKey, env.livekit.apiSecret, {
     identity: req.identity,
     name: req.name,

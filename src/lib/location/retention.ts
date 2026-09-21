@@ -10,6 +10,12 @@
  *   aged  (> 24h)  rounded to ~100m — enough for "left home around 8:15"
  *   old   (> 7d)   deleted
  *
+ * That last line covers the derived record too. A PlaceVisit — "arrived School
+ * 08:31, left 15:08" — is a higher-fidelity picture of a child's routine than
+ * the raw fixes it came from, and it used to be kept forever while the consent
+ * screen said seven days. The screen reads the constants below, so the promise
+ * and the sweep cannot drift apart.
+ *
  * These are the numbers the household agreed to; changing them is a decision,
  * not a tuning knob.
  */
@@ -50,6 +56,8 @@ export function retentionCutoffs(now: Date): RetentionCutoffs {
 export interface RetentionResult {
   coarsened: number;
   deleted: number;
+  /** PlaceVisit rows deleted on the same seven-day promise. */
+  visitsDeleted: number;
 }
 
 /**
@@ -64,6 +72,12 @@ export async function pruneLocationHistory(now: Date): Promise<RetentionResult> 
 
   const { count: deleted } = await prisma.locationPing.deleteMany({
     where: { capturedAt: { lt: deleteBefore } },
+  });
+
+  // Keyed on arrivedAt, so a visit is judged by when it started: a stay that
+  // began eight days ago goes even if its exit was recorded yesterday.
+  const { count: visitsDeleted } = await prisma.placeVisit.deleteMany({
+    where: { arrivedAt: { lt: deleteBefore } },
   });
 
   // Rounding happens in SQL so a day's worth of rows is one statement rather
@@ -82,5 +96,5 @@ export async function pruneLocationHistory(now: Date): Promise<RetentionResult> 
     WHERE "coarse" = false AND "capturedAt" < ${coarsenBefore}
   `;
 
-  return { coarsened, deleted };
+  return { coarsened, deleted, visitsDeleted };
 }

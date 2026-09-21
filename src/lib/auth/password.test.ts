@@ -36,3 +36,38 @@ describe("password hashing", () => {
     expect(await verifyPassword("whatever12", "scrypt$only$two")).toBe(false);
   });
 });
+
+describe("verifyPassword — timing", () => {
+  /*
+   * Not a precise benchmark — a CI box is noisy. The channel being closed is
+   * the difference between ~2ms (early return, no KDF) and a real scrypt, so
+   * a generous floor is enough to catch a regression that reintroduces it.
+   */
+  it("spends comparable work when there is no stored hash", async () => {
+    const stored = await hashPassword("correct horse battery");
+
+    const t0 = performance.now();
+    await verifyPassword("wrong guess entirely", stored);
+    const real = performance.now() - t0;
+
+    const t1 = performance.now();
+    await verifyPassword("wrong guess entirely", null);
+    const missing = performance.now() - t1;
+
+    expect(missing).toBeGreaterThan(real / 4);
+  });
+
+  it("spends comparable work on a malformed stored hash", async () => {
+    const stored = await hashPassword("correct horse battery");
+
+    const t0 = performance.now();
+    await verifyPassword("wrong guess entirely", stored);
+    const real = performance.now() - t0;
+
+    const t1 = performance.now();
+    await verifyPassword("wrong guess entirely", "not-a-scrypt-hash");
+    const malformed = performance.now() - t1;
+
+    expect(malformed).toBeGreaterThan(real / 4);
+  });
+});
