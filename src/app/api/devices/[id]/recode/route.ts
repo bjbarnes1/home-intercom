@@ -3,6 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { requireAdmin } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
 import { generatePairingCode, generateDeviceSecret } from "@/lib/devices/pairing";
+import { forgetSecret } from "@/lib/devices/cache";
+import { forget } from "@/lib/presence/store";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,15 @@ export async function POST(
     if (!device || device.householdId !== admin.householdId) {
       return NextResponse.json({ error: "Unknown device" }, { status: 404 });
     }
+
+    /*
+     * Revocation, so the cache has to be cleared explicitly rather than left
+     * to expire: the point of recoding is that the old phone stops working
+     * immediately. Cleared before the write, so a request racing this cannot
+     * repopulate the entry from the pre-update row.
+     */
+    await forgetSecret(device.deviceSecret);
+    await forget(device.id);
 
     const updated = await prisma.device.update({
       where: { id },

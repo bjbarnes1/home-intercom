@@ -5,14 +5,28 @@ import { mintToken } from "@/lib/livekit/token";
 import { lobbyRoom } from "@/lib/livekit/rooms";
 import { env } from "@/lib/env";
 import { reportError } from "@/lib/errors/report";
+import { shouldPersistLastSeen, touch } from "@/lib/presence/store";
 
 export const dynamic = "force-dynamic";
 
 /**
  * POST /api/presence — endpoint heartbeat. Authenticated by device secret.
- * Bumps lastSeenAt and returns a fresh lobby token so the endpoint can (re)join
- * the control channel, along with the settings and the room name this panel
- * should be showing. Called on boot and periodically.
+ *
+ * Records liveness, returns a fresh lobby token so the panel can (re)join the
+ * control channel, and tells it the settings and room name it should be
+ * showing. Called on boot and every ten seconds after.
+ *
+ * This is the hottest path in the product and it now costs, in the common
+ * case, ZERO Postgres queries. It used to cost three: the auth lookup by
+ * device secret, the lastSeenAt write, and a re-read for the settings. Two
+ * panels at six beats a minute were enough that the gap between queries never
+ * reached the database's minimum idle window, so a billed compute instance
+ * could never suspend — 96% duty cycle, for a household of two screens.
+ *
+ * Now: the auth lookup reads through a cache that carries the settings with
+ * it, liveness is a Redis key whose TTL is the presence window, and the
+ * durable lastSeenAt column is refreshed every few minutes rather than every
+ * ten seconds. Postgres is touched on a cache miss and on the writeback.
  */
 export async function POST(req: Request) {
   const device = await deviceFromRequest(req);
@@ -20,10 +34,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized device" }, { status: 401 });
   }
 
-  await prisma.device.update({
-    where: { id: device.id },
-    data: { lastSeenAt: new Date() },
-  });
+  await touch(device.id);
+
+  /*
+   * The durable column answers a different question from the Redis key: not
+   * "is this alive now" but "when did we last hear from it at all", which is
+   * how you find the panel that has been dark for a fortnight. Worth keeping,
+   * not worth writing six times a minute.
+   */
+  if (await shouldPersistLastSeen(device.id)) {
+    await prisma.device
+      .update({ where: { id: device.id }, data: { lastSeenAt: new Date() } })
+      .catch((e) =>
+        reportError(e, { code: "presence.writeback", route: "/api/presence" }),
+      );
+  }
 
   /*
    * mintToken now refuses to sign with the public dev credentials in
@@ -50,21 +75,9 @@ export async function POST(req: Request) {
     reportError(e, { code: "presence.mint_lobby_token", route: "/api/presence" });
   }
 
-  const row = await prisma.device.findUniqueOrThrow({
-    where: { id: device.id },
-    select: {
-      displayName: true,
-      room: true,
-      doNotDisturb: true,
-      autoAnswer: true,
-      chimeEnabled: true,
-      quietHoursEnabled: true,
-      quietHoursStart: true,
-      quietHoursEnd: true,
-      hasLeds: true,
-      announceDwellSec: true,
-    },
-  });
+  // The authenticated row already carries the settings — it is the same
+  // Device row the re-read used to fetch a second time.
+  const row = device;
 
   return NextResponse.json({
     lobbyToken,

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { isOnline } from "@/lib/presence/snapshot";
+import { onlineAmong } from "@/lib/presence/store";
 
 /**
  * Where audio can actually come out in this house.
@@ -44,7 +44,6 @@ export interface TargetRow {
   displayName: string;
   room: string | null;
   hasSpeaker: boolean;
-  lastSeenAt: Date | null;
   musicLinkedAt: Date | null;
   nowPlayingTitle: string | null;
   nowPlayingArtist: string | null;
@@ -53,7 +52,7 @@ export interface TargetRow {
 
 /**
  * Pure so the filtering rules can be tested without a database: only devices
- * with a speaker, only ones seen inside the presence window, nearest thing to a
+ * with a speaker, only ones the caller says are live, nearest thing to a
  * stable order (room, then name) so the list does not reshuffle under a finger.
  */
 /**
@@ -66,6 +65,8 @@ export const NOW_PLAYING_WINDOW_MS = 90_000;
 export function toTargets(
   rows: TargetRow[],
   selfId: string | null,
+  /** Which ids are live. Passed in so this stays pure and testable. */
+  online: ReadonlySet<string>,
   now: Date | number = Date.now(),
 ): PlaybackTarget[] {
   return rows
@@ -74,7 +75,7 @@ export function toTargets(
       id: d.id,
       name: d.displayName,
       where: d.room ?? d.displayName,
-      online: isOnline(d.lastSeenAt, now),
+      online: online.has(d.id),
       isSelf: d.id === selfId,
       canPlay: d.musicLinkedAt != null,
       playing: freshlyPlaying(d, now),
@@ -119,7 +120,6 @@ export async function loadPlaybackTargets(
         displayName: true,
         room: true,
         hasSpeaker: true,
-        lastSeenAt: true,
         musicLinkedAt: true,
         nowPlayingTitle: true,
         nowPlayingArtist: true,
@@ -132,7 +132,13 @@ export async function loadPlaybackTargets(
     }),
   ]);
 
-  const devices = toTargets(rows, selfId, now);
+  const liveIds = await onlineAmong(
+    rows.map((d) => d.id),
+    typeof now === "number" ? now : now.getTime(),
+  );
+  const devices = toTargets(rows, selfId, liveIds, now);
+  // Not the same set: `devices` has also dropped anything without a speaker,
+  // and a zone's count should reflect what can actually play.
   const online = new Set(devices.map((d) => d.id));
 
   return {

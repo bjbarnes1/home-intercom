@@ -1,5 +1,5 @@
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { redis } from "@/lib/redis";
 import { reportWarning } from "@/lib/errors/report";
 
 /**
@@ -17,18 +17,6 @@ import { reportWarning } from "@/lib/errors/report";
  * A failure is reported so it is visible rather than silent.
  */
 
-/**
- * Vercel's Upstash integration sets KV_REST_API_*; a direct Upstash account
- * gives you UPSTASH_REDIS_REST_*. Accept either so whichever was set up works
- * without anyone having to rename a variable.
- */
-function credentials(): { url: string; token: string } | null {
-  const url = process.env.UPSTASH_REDIS_REST_URL ?? process.env.KV_REST_API_URL;
-  const token =
-    process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
-  return url && token ? { url, token } : null;
-}
-
 let limiters: {
   loginByIp: Ratelimit;
   loginByAccount: Ratelimit;
@@ -38,8 +26,8 @@ let warnedUnconfigured = false;
 
 function build() {
   if (limiters) return limiters;
-  const creds = credentials();
-  if (!creds) {
+  const r = redis();
+  if (!r) {
     if (!warnedUnconfigured && process.env.NODE_ENV === "production") {
       warnedUnconfigured = true;
       reportWarning(new Error("Upstash is not configured; throttles are off"), {
@@ -49,7 +37,6 @@ function build() {
     }
     return null;
   }
-  const redis = new Redis(creds);
   limiters = {
     /*
      * Per IP: a burst is normal (someone fat-fingers a password twice), a
@@ -57,7 +44,7 @@ function build() {
      * cannot get two full buckets by straddling a boundary.
      */
     loginByIp: new Ratelimit({
-      redis,
+      redis: r,
       limiter: Ratelimit.slidingWindow(20, "10 m"),
       prefix: "rl:login:ip",
       analytics: false,
@@ -68,7 +55,7 @@ function build() {
      * email. Tighter, because a real person does not need ten tries.
      */
     loginByAccount: new Ratelimit({
-      redis,
+      redis: r,
       limiter: Ratelimit.slidingWindow(10, "10 m"),
       prefix: "rl:login:acct",
       analytics: false,
@@ -80,7 +67,7 @@ function build() {
      * lives, by a lot.
      */
     claimByIp: new Ratelimit({
-      redis,
+      redis: r,
       limiter: Ratelimit.slidingWindow(10, "1 m"),
       prefix: "rl:claim:ip",
       analytics: false,

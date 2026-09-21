@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
+import { invalidateSecret } from "@/lib/devices/cache";
 import { withRoute } from "@/lib/http";
 
 export const dynamic = "force-dynamic";
@@ -53,6 +54,11 @@ export async function POST(req: Request) {
           nowPlayingAt: nowPlaying ? new Date() : null,
         },
       });
+
+      // musicLinkedAt is read off the authenticated device in /api/music/fetch,
+      // so linking or unlinking has to reach the cache immediately rather than
+      // waiting out its TTL.
+      await invalidateSecret(device.deviceSecret);
 
       return NextResponse.json({ ok: true });
     },

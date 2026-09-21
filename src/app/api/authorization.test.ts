@@ -23,8 +23,8 @@ const userA = {
   role: "ADMIN" as const,
 };
 
-const deviceA = { id: "dev_a", householdId: HOUSEHOLD_A, pairing: "ACTIVE", lastSeenAt: new Date(), doNotDisturb: false };
-const deviceB = { id: "dev_b", householdId: HOUSEHOLD_B, pairing: "ACTIVE", lastSeenAt: new Date(), doNotDisturb: false };
+const deviceA = { id: "dev_a", householdId: HOUSEHOLD_A, pairing: "ACTIVE", doNotDisturb: false };
+const deviceB = { id: "dev_b", householdId: HOUSEHOLD_B, pairing: "ACTIVE", doNotDisturb: false };
 
 /** A live call in household B. Its id is the thing an attacker would post. */
 const eventB = {
@@ -114,8 +114,14 @@ function post(body: unknown): Request {
   });
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.stubEnv("MOCK_LOCAL_SERVICES", "true");
+  // Liveness comes from the presence store now, not a column. With no Redis
+  // configured the store falls back to an in-process map, so this exercises
+  // the real code path rather than mocking it away.
+  const { touch, resetLocalPresenceForTests } = await import("@/lib/presence/store");
+  resetLocalPresenceForTests();
+  await touch(deviceA.id);
 });
 
 afterEach(() => {

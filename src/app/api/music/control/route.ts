@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
 import { withRoute } from "@/lib/http";
 import { controlSender } from "@/lib/livekit/control";
-import { isOnline } from "@/lib/presence/snapshot";
+import { isDeviceOnline } from "@/lib/presence/store";
 
 export const dynamic = "force-dynamic";
 
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       if (!target || target.pairing !== "ACTIVE") {
         return NextResponse.json({ error: "No such panel" }, { status: 404 });
       }
-      if (!isOnline(target.lastSeenAt)) {
+      if (!(await isDeviceOnline(target.id))) {
         return NextResponse.json({ error: "That panel is asleep" }, { status: 409 });
       }
 

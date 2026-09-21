@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
+import { invalidateSecret } from "@/lib/devices/cache";
 import { withRoute } from "@/lib/http";
 import {
   minutesToHm,
@@ -139,6 +140,10 @@ export async function PATCH(req: Request) {
       data,
       select: settingsSelect,
     });
+
+    // The heartbeat serves settings out of the auth cache, so a DND toggle
+    // would otherwise take up to the cache TTL to reach the panel.
+    await invalidateSecret(device.deviceSecret);
 
     return NextResponse.json(serializeSettings(updated));
   }, { route: "/api/endpoint/settings" });

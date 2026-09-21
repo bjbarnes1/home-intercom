@@ -7,7 +7,7 @@ import {
   generatePairingCode,
   generateDeviceSecret,
 } from "@/lib/devices/pairing";
-import { isOnline } from "@/lib/presence/snapshot";
+import { onlineAmong } from "@/lib/presence/store";
 
 export const dynamic = "force-dynamic";
 
@@ -28,11 +28,14 @@ export async function GET() {
         lastSeenAt: true,
       },
     });
-    const now = Date.now();
+    // lastSeenAt is kept in the response: it is the durable "last heard from
+    // at all", which is how an admin spots a panel that has been dark for a
+    // fortnight. `online` is the live signal and comes from the presence store.
+    const online = await onlineAmong(devices.map((d) => d.id));
     return NextResponse.json({
       devices: devices.map((d) => ({
         ...d,
-        online: isOnline(d.lastSeenAt, now),
+        online: online.has(d.id),
       })),
     });
   });

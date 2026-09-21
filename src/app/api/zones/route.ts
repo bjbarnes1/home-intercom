@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { currentHouseholdId } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
-import { isOnline } from "@/lib/presence/snapshot";
+import { onlineAmong } from "@/lib/presence/store";
 
 export const dynamic = "force-dynamic";
 
@@ -17,21 +17,25 @@ export async function GET() {
         memberships: {
           include: {
             device: {
-              select: { id: true, displayName: true, room: true, lastSeenAt: true },
+              select: { id: true, displayName: true, room: true },
             },
           },
         },
       },
     });
 
-    const now = Date.now();
+    // One liveness round trip for every device across every zone, rather than
+    // one per device — the ids are already in hand.
+    const online = await onlineAmong(
+      zones.flatMap((z) => z.memberships.map((m) => m.device.id)),
+    );
     return NextResponse.json({
       zones: zones.map((z) => {
         const devices = z.memberships.map((m) => ({
           id: m.device.id,
           displayName: m.device.displayName,
           room: m.device.room,
-          online: isOnline(m.device.lastSeenAt, now),
+          online: online.has(m.device.id),
         }));
         return {
           id: z.id,

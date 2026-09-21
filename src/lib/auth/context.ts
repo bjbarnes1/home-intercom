@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import type { Device, User } from "@prisma/client";
 import { SESSION_COOKIE, validateSessionToken } from "@/lib/auth/session";
+import { cachedBySecret, rememberSecret } from "@/lib/devices/cache";
 
 /**
  * Auth surface.
@@ -47,9 +48,29 @@ export async function currentHouseholdId(): Promise<string> {
   return user.householdId;
 }
 
-/** Resolve and authenticate an endpoint from its device secret header. */
+/**
+ * Resolve and authenticate an endpoint from its device secret header.
+ *
+ * Reads through a short-lived cache, because this ran on every device request
+ * — a heartbeat every ten seconds per panel paid a Postgres round trip before
+ * it did anything else. A miss falls through to Postgres, so the worst case is
+ * what it always was.
+ *
+ * The cached row is a faithful Device, timestamps included — /api/music/fetch
+ * reads musicLinkedAt straight off it. Only liveness is deliberately NOT read
+ * from here: lastSeenAt is the durable "last heard from at all" column now,
+ * and the live answer comes from the presence store.
+ */
 export async function deviceFromRequest(req: Request): Promise<Device | null> {
   const secret = req.headers.get("x-device-secret");
   if (!secret) return null;
-  return prisma.device.findUnique({ where: { deviceSecret: secret } });
+
+  const cached = await cachedBySecret(secret);
+  if (cached) return cached;
+
+  const device = await prisma.device.findUnique({
+    where: { deviceSecret: secret },
+  });
+  if (device) await rememberSecret(secret, device);
+  return device;
 }
