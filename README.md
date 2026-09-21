@@ -1,5 +1,10 @@
 # home-intercom
 
+> **Architecture rules live in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).**
+> Read Rule 1 (data placement) and Rule 2 (hot paths carry their cost) before
+> adding anything that runs per-request-from-every-device. They exist because
+> presence sat in Postgres and held a billed database at a 96% duty cycle.
+
 A household intercom + announcement system for the Barnes / Wilkes home:
 **page the kids**, **broadcast to everyone**, **start two-way calls**, and set
 **spoken reminders** that play on one device or a zone — from inside the house or
