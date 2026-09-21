@@ -132,6 +132,9 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
         return;
       }
       const data = await res.json();
+      // Which room this panel is. Sent every beat, so renaming it in the
+      // controller reaches the panel without anybody touching it.
+      if (typeof data.room === "string" && data.room) setRoom(data.room);
       setDnd(!!data.doNotDisturb);
       setEtiquette({
         chimeEnabled: data.chimeEnabled !== false,

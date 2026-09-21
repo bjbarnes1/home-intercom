@@ -9,7 +9,7 @@ import { useState } from "react";
 import PlayingOn from "./PlayingOn";
 import QueueLists from "./QueueLists";
 import SearchOverlay from "./SearchOverlay";
-import { useHubMusic } from "../HubRuntime";
+import { useHub, useHubMusic } from "../HubRuntime";
 import { formatTime, type AppleMusic } from "./useAppleMusic";
 
 /**
@@ -164,6 +164,7 @@ function Gate({ music, onAdd }: { music: AppleMusic; onAdd: () => void }) {
 }
 
 function Player({ music }: { music: AppleMusic }) {
+  const { room } = useHub();
   const np = music.nowPlaying;
   const progress = np && np.duration > 0 ? (np.elapsed / np.duration) * 100 : 0;
 
@@ -187,7 +188,9 @@ function Player({ music }: { music: AppleMusic }) {
             style={{ background: "rgba(59,92,246,0.10)" }}
           >
             <Icon name="home" size={15} className="text-accent" />
-            <span className="text-xs font-semibold leading-4 text-text">Kitchen Hub</span>
+            {/* The room this panel actually is, as the household named it —
+                every panel used to call itself the kitchen. */}
+            <span className="text-xs font-semibold leading-4 text-text">{room}</span>
           </span>
         </span>
 

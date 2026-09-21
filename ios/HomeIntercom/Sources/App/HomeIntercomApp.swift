@@ -13,6 +13,7 @@ struct HomeIntercomApp: App {
                 // Its own ObservableObject: views that show sharing state must
                 // observe it directly, or they'd never see it change.
                 .environmentObject(store.location)
+                .environmentObject(store.beacons)
                 .tint(.accentColor)
         }
         .onChange(of: scenePhase) { _, phase in
@@ -24,8 +25,12 @@ struct HomeIntercomApp: App {
                     guard store.auth.user != nil else { return }
                     await store.refresh()
                     store.startPolling()
+                    // Ranging is foreground-only anyway, so it runs while
+                    // somebody is looking and stops when they are not.
+                    store.beacons.startRanging()
                 case .background, .inactive:
                     store.stopPolling()
+                    store.beacons.stopRanging()
                 @unknown default:
                     break
                 }

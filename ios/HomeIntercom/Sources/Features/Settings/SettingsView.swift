@@ -7,6 +7,7 @@ struct SettingsView: View {
     @EnvironmentObject private var store: HouseholdStore
     @EnvironmentObject private var location: LocationService
     @State private var showingServerSheet = false
+    @State private var showingPairSheet = false
     @State private var confirmingSignOut = false
 
     var body: some View {
@@ -28,10 +29,20 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                 } footer: {
+                    Text("Where this phone finds the house.")
+                }
+
+                Section {
+                    // Only a parent account can register a panel, so the button
+                    // is not offered to anyone who would only be refused.
+                    if user.isAdmin {
+                        Button("Add a wall panel") { showingPairSheet = true }
+                    }
+                } footer: {
                     Text(
-                        "Devices are registered and paired from the web controller — "
-                        + "open \(store.baseURL.absoluteString)/controller in a "
-                        + "browser to add a room device or rotate its pairing code."
+                        user.isAdmin
+                        ? "Registers a panel and gives you a code to type into it."
+                        : "Wall panels are added by a parent account."
                     )
                 }
 
@@ -64,6 +75,9 @@ struct SettingsView: View {
                 }
             }
             .navigationTitle("Settings")
+        }
+        .sheet(isPresented: $showingPairSheet) {
+            PairPanelView(api: store.api)
         }
         .sheet(isPresented: $showingServerSheet) {
             NavigationStack { ServerURLEditor() }
