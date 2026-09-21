@@ -10,6 +10,9 @@ const row = (over: Partial<TargetRow> & { id: string }): TargetRow => ({
   hasSpeaker: true,
   lastSeenAt: seen(1),
   musicLinkedAt: new Date(NOW),
+  nowPlayingTitle: null,
+  nowPlayingArtist: null,
+  nowPlayingAt: null,
   ...over,
 });
 
@@ -60,6 +63,31 @@ describe("toTargets", () => {
     // handoff has nowhere to go — it is still listed, because it takes calls.
     expect(bare.canPlay).toBe(false);
     expect(bare.online).toBe(true);
+  });
+
+  it("says what a panel is playing", () => {
+    const t = toTargets(
+      [row({ id: "a", nowPlayingTitle: "Golden Hour", nowPlayingArtist: "JVKE", nowPlayingAt: seen(5) })],
+      null,
+      NOW,
+    )[0];
+    expect(t.playing).toEqual({ title: "Golden Hour", artist: "JVKE" });
+  });
+
+  it("forgets a song nobody has confirmed lately", () => {
+    // The panel is still awake — presence and playback go stale on different
+    // clocks, and last night's song on screen is worse than saying nothing.
+    const t = toTargets(
+      [row({ id: "a", nowPlayingTitle: "Golden Hour", nowPlayingAt: seen(600) })],
+      null,
+      NOW,
+    )[0];
+    expect(t.online).toBe(true);
+    expect(t.playing).toBeNull();
+  });
+
+  it("says nothing when a panel has never reported", () => {
+    expect(toTargets([row({ id: "a" })], null, NOW)[0].playing).toBeNull();
   });
 
   it("falls back to the panel's own name when it has no room", () => {

@@ -200,6 +200,14 @@ model Device {
   /// another panel knows whether a handoff has anywhere to go.
   musicLinkedAt DateTime?
 
+  /// What this panel is playing right now, so other panels can say so. Title
+  /// and artist only — enough for a line on a screen, not a listening history.
+  nowPlayingTitle  String?
+  nowPlayingArtist String?
+  /// When that was last reported. Stale means the panel stopped talking, not
+  /// that it is still playing.
+  nowPlayingAt     DateTime?
+
   /// The BLE beacon marking this panel's room, if one has been placed.
   roomBeacon RoomBeacon?
   /// Seconds to keep announce/reminder overlay visible before auto-return (default 30).

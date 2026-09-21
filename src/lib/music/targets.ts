@@ -22,6 +22,8 @@ export interface PlaybackTarget {
   isSelf: boolean;
   /** Somebody has linked an Apple Music account here, so music can land on it. */
   canPlay: boolean;
+  /** What it is playing, when the reading is fresh enough to believe. */
+  playing: { title: string; artist: string } | null;
 }
 
 export interface TargetGroup {
@@ -44,6 +46,9 @@ export interface TargetRow {
   hasSpeaker: boolean;
   lastSeenAt: Date | null;
   musicLinkedAt: Date | null;
+  nowPlayingTitle: string | null;
+  nowPlayingArtist: string | null;
+  nowPlayingAt: Date | null;
 }
 
 /**
@@ -51,6 +56,13 @@ export interface TargetRow {
  * with a speaker, only ones seen inside the presence window, nearest thing to a
  * stable order (room, then name) so the list does not reshuffle under a finger.
  */
+/**
+ * A now-playing reading goes stale faster than presence does. A panel that
+ * stopped reporting has almost certainly stopped playing, and leaving last
+ * night's song on screen is worse than saying nothing.
+ */
+export const NOW_PLAYING_WINDOW_MS = 90_000;
+
 export function toTargets(
   rows: TargetRow[],
   selfId: string | null,
@@ -65,9 +77,20 @@ export function toTargets(
       online: isOnline(d.lastSeenAt, now),
       isSelf: d.id === selfId,
       canPlay: d.musicLinkedAt != null,
+      playing: freshlyPlaying(d, now),
     }))
     .filter((d) => d.online)
     .sort((a, b) => (a.isSelf ? -1 : b.isSelf ? 1 : a.where.localeCompare(b.where)));
+}
+
+function freshlyPlaying(
+  d: TargetRow,
+  now: Date | number,
+): { title: string; artist: string } | null {
+  if (!d.nowPlayingTitle || !d.nowPlayingAt) return null;
+  const nowMs = typeof now === "number" ? now : now.getTime();
+  if (nowMs - d.nowPlayingAt.getTime() > NOW_PLAYING_WINDOW_MS) return null;
+  return { title: d.nowPlayingTitle, artist: d.nowPlayingArtist ?? "" };
 }
 
 /** Drop groups with nothing online left in them, and narrow the rest to what is. */
@@ -98,6 +121,9 @@ export async function loadPlaybackTargets(
         hasSpeaker: true,
         lastSeenAt: true,
         musicLinkedAt: true,
+        nowPlayingTitle: true,
+        nowPlayingArtist: true,
+        nowPlayingAt: true,
       },
     }),
     prisma.zone.findMany({

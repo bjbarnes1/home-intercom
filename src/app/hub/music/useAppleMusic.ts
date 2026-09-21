@@ -516,14 +516,29 @@ export function useAppleMusic(): AppleMusic {
     const secret = getDeviceSecret();
     if (!secret) return;
 
-    void fetch("/api/music/linked", {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-device-secret": secret },
-      body: JSON.stringify({ linked: accounts.length > 0 }),
-    }).catch(() => {
-      /* the next change reports again */
-    });
-  }, [accounts.length, status]);
+    const report = () =>
+      fetch("/api/music/linked", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-device-secret": secret },
+        body: JSON.stringify({
+          linked: accounts.length > 0,
+          // Only while actually playing: a paused panel is not playing
+          // anything, and should not claim a song on everyone else's screen.
+          nowPlaying:
+            isPlaying && nowPlaying
+              ? { title: nowPlaying.title.slice(0, 200), artist: nowPlaying.artist.slice(0, 200) }
+              : null,
+        }),
+      }).catch(() => {
+        /* the next tick reports again */
+      });
+
+    void report();
+    // Refreshed inside the staleness window, so the other panels' view of this
+    // one expires on its own if this panel stops talking.
+    const id = window.setInterval(report, 30_000);
+    return () => window.clearInterval(id);
+  }, [accounts.length, status, isPlaying, nowPlaying]);
 
   const refreshLoved = useCallback(
     async (ids: string[], kind: LovableKind) => {

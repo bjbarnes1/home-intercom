@@ -15,14 +15,15 @@ import type { AppleMusic } from "./useAppleMusic";
  * panel that has not checked in inside the presence window, because a tap on a
  * sleeping panel does nothing and the list should not invite one.
  *
- * Tapping a room hands the music to it rather than adding it. Apple Music
- * streams to one device per subscription and its audio is DRM-protected, so
- * nothing can be relayed or doubled — what can be done is to move it, which is
- * what a tap does: that panel picks up the same queue at the same second, and
- * this one falls quiet.
+ * Tapping a room hands the music to it rather than adding it: that panel picks
+ * up the same queue at the same second, and this one falls quiet. Apple Music's
+ * audio is DRM-protected, so nothing can capture one panel's output and relay
+ * it to another — moving it is what is available.
  *
- * A panel with nobody signed in to Apple Music still appears, because it takes
- * calls and announcements, but it is not offered as somewhere to send music.
+ * Each row says what that panel is playing, when it has said so recently
+ * enough to be believed. A panel with nobody signed in to Apple Music still
+ * appears, because it takes calls and announcements, but it is not offered as
+ * somewhere to send music.
  */
 
 const REFRESH_MS = 15_000;
@@ -139,17 +140,25 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
                     : "This Hub"
                   : moving === d.id
                     ? "Moving the music…"
-                    : sendable
-                      ? "Tap to move the music here"
-                      : d.canPlay
-                        ? "Awake"
-                        : "Awake · no Apple Music account"}
+                    : d.playing
+                      ? `${d.playing.title}${d.playing.artist ? ` · ${d.playing.artist}` : ""}`
+                      : sendable
+                        ? "Tap to move the music here"
+                        : d.canPlay
+                          ? "Awake"
+                          : "Awake · not signed in"}
               </span>
             </span>
 
             <span
               className="h-2.5 w-2.5 flex-none rounded-full"
-              style={{ background: here ? "#FFFFFF" : "rgba(15,23,42,0.18)" }}
+              style={{
+                background: here
+                  ? "#FFFFFF"
+                  : d.playing
+                    ? "var(--color-accent)"
+                    : "rgba(15,23,42,0.18)",
+              }}
             />
           </button>
           );
@@ -159,8 +168,7 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
 
         {devices.length > 1 ? (
           <Note>
-            Music moves between rooms rather than filling them — one Apple Music account plays in
-            one place at a time.
+            Tapping a room moves the music there rather than adding it.
           </Note>
         ) : null}
       </div>
