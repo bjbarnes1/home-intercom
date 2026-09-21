@@ -21,7 +21,11 @@ import {
   ANNOUNCE_DWELL_DEFAULT,
   clampAnnounceDwellSec,
 } from "@/lib/etiquette/announceDwell";
-import type { MusicFetchCommand, MusicHandoffCommand } from "@/lib/control/commands";
+import type {
+  MusicControlCommand,
+  MusicFetchCommand,
+  MusicHandoffCommand,
+} from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
 
@@ -47,6 +51,8 @@ export interface PresenceHandlers {
    * same reason: a surface with no player has nothing to hand over.
    */
   onMusicFetch?: (cmd: MusicFetchCommand) => void;
+  /** Somebody at another panel is working this one's player. */
+  onMusicControl?: (cmd: MusicControlCommand) => void;
 }
 
 /**
@@ -209,6 +215,9 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
                 break;
               case "musicFetch":
                 handlersRef.current.onMusicFetch?.(cmd);
+                break;
+              case "musicControl":
+                handlersRef.current.onMusicControl?.(cmd);
                 break;
               case "hangup":
                 setRinging(null);

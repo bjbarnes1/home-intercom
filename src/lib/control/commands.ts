@@ -86,6 +86,21 @@ const MusicFetchCommandSchema = z.object({
   from: z.string().max(80).optional(),
 });
 
+/**
+ * Work the player on another panel from this one.
+ *
+ * Only the panel holding the queue can act on it, so this is the same shape as
+ * the handoff: a request to the panel that has the music, not a reach into its
+ * player. Volume is absolute rather than a nudge, because two taps racing each
+ * other should land somewhere definite rather than compounding.
+ */
+const MusicControlCommandSchema = z.object({
+  type: z.literal("musicControl"),
+  action: z.enum(["play", "pause", "next", "previous", "volume"]),
+  /** 0–1, required for "volume" and ignored otherwise. */
+  value: z.number().min(0).max(1).optional(),
+});
+
 const HangupCommandSchema = z.object({
   type: z.literal("hangup"),
   eventId: z.string(),
@@ -122,6 +137,7 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   AnnounceCommandSchema,
   MusicHandoffCommandSchema,
   MusicFetchCommandSchema,
+  MusicControlCommandSchema,
   HangupCommandSchema,
   PingCommandSchema,
   LedCommandSchema,
@@ -134,6 +150,7 @@ export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
 export type MusicHandoffCommand = z.infer<typeof MusicHandoffCommandSchema>;
 export type MusicFetchCommand = z.infer<typeof MusicFetchCommandSchema>;
+export type MusicControlCommand = z.infer<typeof MusicControlCommandSchema>;
 export type HangupCommand = z.infer<typeof HangupCommandSchema>;
 export type PingCommand = z.infer<typeof PingCommandSchema>;
 export type LedCommand = z.infer<typeof LedCommandSchema>;

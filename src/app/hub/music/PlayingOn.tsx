@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { RemoteAction } from "./useAppleMusic";
 import { getDeviceSecret } from "@/lib/client/identity";
 import { Eyebrow } from "../_components/BaseLayer";
 import Icon from "../_components/Icon";
@@ -44,6 +45,8 @@ interface TargetsResponse {
 export default function PlayingOn({ music }: { music: AppleMusic }) {
   const [state, setState] = useState<TargetsResponse | null>(null);
   const [moving, setMoving] = useState<string | null>(null);
+  /** Which room's controls are open. One at a time; this is a narrow column. */
+  const [open, setOpen] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const isPlaying = music.isPlaying;
 
@@ -114,8 +117,8 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
           };
 
           return (
+          <div key={d.id} className="flex flex-col">
           <button
-            key={d.id}
             type="button"
             disabled={!actionable}
             onClick={move}
@@ -187,6 +190,22 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
               }}
             />
           </button>
+
+          {/* Turning the music down in a room you are not in is the thing a
+              shared house actually needs. Only offered where there is
+              something playing to turn down. */}
+          {!d.isSelf && d.playing ? (
+            <Remote
+              open={open === d.id}
+              onToggle={() => setOpen(open === d.id ? null : d.id)}
+              where={d.where}
+              onAct={async (action, value) => {
+                const failure = await music.controlRemote(d.id, action, value);
+                setProblem(failure);
+              }}
+            />
+          ) : null}
+          </div>
           );
         })}
 
@@ -200,6 +219,96 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
         ) : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * Transport and volume for a room you are not in.
+ *
+ * Folded away until asked for: this column is 300px on a panel, and four more
+ * controls on every row would bury the thing the list is actually for, which is
+ * seeing where the music is.
+ *
+ * Volume is sent as a level rather than a nudge, and only when the finger comes
+ * off — a slider dragged across its width would otherwise send forty
+ * instructions to another room.
+ */
+function Remote({
+  open,
+  onToggle,
+  where,
+  onAct,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  where: string;
+  onAct: (action: RemoteAction, value?: number) => void;
+}) {
+  const [level, setLevel] = useState(0.5);
+
+  return (
+    <div className="flex flex-col gap-2 px-3.5 pb-1">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="cursor-pointer self-start border-none bg-transparent p-0 text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-accent"
+      >
+        {open ? "Hide controls" : "Controls"}
+      </button>
+
+      {open ? (
+        <div className="flex flex-col gap-2 pb-2">
+          <div className="flex items-center gap-1">
+            <Tap label={`Previous track in ${where}`} icon="prev" onClick={() => onAct("previous")} />
+            <Tap label={`Play in ${where}`} icon="play" onClick={() => onAct("play")} />
+            <Tap label={`Pause in ${where}`} icon="pause" onClick={() => onAct("pause")} />
+            <Tap label={`Next track in ${where}`} icon="next" onClick={() => onAct("next")} />
+          </div>
+
+          <span className="flex items-center gap-2">
+            <Icon name="speaker" size={15} className="flex-none text-ink-muted" />
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(level * 100)}
+              aria-label={`Volume in ${where}`}
+              onChange={(e) => setLevel(Number(e.target.value) / 100)}
+              // Only on release: a drag across the slider would otherwise send
+              // an instruction to another room for every pixel.
+              onPointerUp={() => onAct("volume", level)}
+              onKeyUp={() => onAct("volume", level)}
+              className="h-1.5 flex-grow cursor-pointer appearance-none rounded-full"
+              style={{
+                background: `linear-gradient(to right, var(--color-accent) ${level * 100}%, rgba(15,23,42,0.08) ${level * 100}%)`,
+              }}
+            />
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Tap({
+  label,
+  icon,
+  onClick,
+}: {
+  label: string;
+  icon: "prev" | "play" | "pause" | "next";
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      onClick={onClick}
+      className="flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full border-none bg-bg text-text transition-transform active:scale-[0.97]"
+    >
+      <Icon name={icon} size={15} />
+    </button>
   );
 }
 

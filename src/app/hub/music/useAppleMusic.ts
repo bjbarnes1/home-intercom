@@ -77,6 +77,8 @@ export interface SearchResults {
   playlists: Playlist[];
 }
 
+export type RemoteAction = "play" | "pause" | "next" | "previous" | "volume";
+
 export interface QueueItem extends Track {
   /** Position in MusicKit's queue, so tapping can jump straight to it. */
   index: number;
@@ -160,6 +162,10 @@ export interface AppleMusic {
    * once the request is away, or the reason it could not be made.
    */
   bringHere: (fromDeviceId: string) => Promise<string | null>;
+  /** Work another panel's player — transport and volume, from this one. */
+  controlRemote: (deviceId: string, action: RemoteAction, value?: number) => Promise<string | null>;
+  /** Apply an instruction that arrived from another panel. */
+  applyRemote: (action: RemoteAction, value?: number) => void;
 }
 
 /** Milliseconds to "3:56". */
@@ -826,6 +832,51 @@ export function useAppleMusic(): AppleMusic {
         return res.ok ? null : (json.error ?? "That panel could not hand it over");
       } catch {
         return "The house could not be reached";
+      }
+    },
+
+    controlRemote: async (deviceId: string, action: RemoteAction, value?: number) => {
+      const secret = getDeviceSecret();
+      if (!secret) return "This Hub is not paired to the house";
+      try {
+        const res = await fetch("/api/music/control", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-device-secret": secret },
+          body: JSON.stringify({ deviceId, action, value }),
+        });
+        const json = (await res.json()) as { error?: string };
+        return res.ok ? null : (json.error ?? "That panel would not take it");
+      } catch {
+        return "The house could not be reached";
+      }
+    },
+
+    applyRemote: (action: RemoteAction, value?: number) => {
+      const m = kit.current;
+      if (!m) return;
+      switch (action) {
+        case "play":
+          void m.play().catch(() => {});
+          break;
+        case "pause":
+          void m.pause().catch(() => {});
+          break;
+        case "next":
+          void m.skipToNextItem().catch(() => {});
+          break;
+        case "previous":
+          void m.skipToPreviousItem().catch(() => {});
+          break;
+        case "volume": {
+          if (value === undefined) break;
+          const clamped = Math.max(0, Math.min(1, value));
+          baseVolume.current = clamped;
+          // Respect a voice that is currently over the top: the level to come
+          // back to changes, what is audible right now stays ducked.
+          m.volume = ducked ? duckedLevel(clamped) : clamped;
+          setVolumeState(clamped);
+          break;
+        }
       }
     },
 

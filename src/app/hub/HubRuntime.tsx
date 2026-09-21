@@ -6,7 +6,7 @@ import { isWellFormedPairingCode } from "@/lib/devices/pairing";
 import PairingScreen from "@/app/endpoint/PairingScreen";
 import { useMediaSession } from "@/app/endpoint/useMediaSession";
 import { useEndpointPresence } from "@/app/endpoint/useEndpointPresence";
-import { useAppleMusic, type AppleMusic } from "./music/useAppleMusic";
+import { useAppleMusic, type AppleMusic, type RemoteAction } from "./music/useAppleMusic";
 import CallCard from "./_components/CallCard";
 import RingCard from "./_components/RingCard";
 import SpeakingCard from "./_components/SpeakingCard";
@@ -63,6 +63,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
   const music = useAppleMusic();
   const acceptHandoff = music.acceptHandoff;
   const handOffTo = music.handOffTo;
+  const applyRemote = music.applyRemote;
   const {
     phase,
     setPhase,
@@ -87,6 +88,11 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     onMusicFetch: useCallback(
       (cmd: { toDeviceId: string }) => void handOffTo(cmd.toDeviceId),
       [handOffTo],
+    ),
+    // Somebody is working this panel's player from another room.
+    onMusicControl: useCallback(
+      (cmd: { action: RemoteAction; value?: number }) => applyRemote(cmd.action, cmd.value),
+      [applyRemote],
     ),
   });
 

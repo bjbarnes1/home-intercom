@@ -3,6 +3,7 @@ import {
   ControlCommandSchema,
   decodeCommand,
   encodeCommand,
+  type MusicControlCommand,
   type MusicFetchCommand,
   type MusicHandoffCommand,
 } from "@/lib/control/commands";
@@ -88,5 +89,32 @@ describe("musicFetch — bringing the music to you", () => {
 
   it("is told apart from a handoff going the other way", () => {
     expect(decodeCommand(encodeCommand(fetchCmd)).type).toBe("musicFetch");
+  });
+});
+
+describe("musicControl — working another room's player", () => {
+  const control: MusicControlCommand = { type: "musicControl", action: "volume", value: 0.4 };
+
+  it("survives the round trip", () => {
+    expect(decodeCommand(encodeCommand(control))).toEqual(control);
+  });
+
+  it("carries transport without a value", () => {
+    for (const action of ["play", "pause", "next", "previous"] as const) {
+      expect(ControlCommandSchema.safeParse({ type: "musicControl", action }).success).toBe(true);
+    }
+  });
+
+  it("keeps volume inside what a volume control means", () => {
+    expect(ControlCommandSchema.safeParse({ ...control, value: 1.5 }).success).toBe(false);
+    expect(ControlCommandSchema.safeParse({ ...control, value: -0.1 }).success).toBe(false);
+    expect(ControlCommandSchema.safeParse({ ...control, value: 0 }).success).toBe(true);
+    expect(ControlCommandSchema.safeParse({ ...control, value: 1 }).success).toBe(true);
+  });
+
+  it("refuses an action it has no way to perform", () => {
+    expect(ControlCommandSchema.safeParse({ type: "musicControl", action: "eject" }).success).toBe(
+      false,
+    );
   });
 });
