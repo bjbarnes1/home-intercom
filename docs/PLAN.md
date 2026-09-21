@@ -145,3 +145,21 @@ Two planes, kept deliberately separate:
 3. Prisma schema for `User`/`Device`/`Zone`/`Reminder`; migrate; seed a household.
 4. LiveKit token endpoint + PWA shell (manifest + service worker) with two roles.
 5. Implement the **lobby presence** join and the **page one device** flow.
+
+## Deployment regions
+
+`vercel.json` pins functions to `syd1`.
+
+Every customer is in AU today and the database is in `ap-southeast-2`, so the
+default `iad1` put the Pacific in the middle of every Prisma round trip — two
+sequential queries in `/api/presence` meant roughly 400–500ms of pure RTT on a
+heartbeat that runs every ten seconds, per panel.
+
+It is pinned in the repo rather than set in the dashboard so the choice is
+reviewable and travels with a fork or a new project.
+
+Going global does not mean moving this region. It means a region per customer
+cluster with data resident near them, which is a tenancy decision (how
+`householdId` maps to a home region) before it is a config one — see the
+multi-household spec. Until that exists, one region near the data is correct
+and one region far from it is not.

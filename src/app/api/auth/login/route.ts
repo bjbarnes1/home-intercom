@@ -3,6 +3,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession, SESSION_COOKIE, SESSION_TTL_MS } from "@/lib/auth/session";
+import { clientIp, throttleLogin, tooManyRequests } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,12 @@ export async function POST(req: Request) {
   const parsed = Login.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 400 });
+  }
+
+  // Before touching the database, and before spending a scrypt on it.
+  const verdict = await throttleLogin(clientIp(req), parsed.data.email);
+  if (!verdict.ok) {
+    return tooManyRequests(verdict, "Too many attempts — try again shortly");
   }
 
   const user = await prisma.user.findUnique({

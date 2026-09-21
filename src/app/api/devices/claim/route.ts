@@ -5,6 +5,7 @@ import {
   isWellFormedPairingCode,
   isPairingCodeExpired,
 } from "@/lib/devices/pairing";
+import { clientIp, throttleClaim, tooManyRequests } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +20,13 @@ export async function POST(req: Request) {
   const parsed = Claim.safeParse(body);
   if (!parsed.success || !isWellFormedPairingCode(parsed.data.code)) {
     return NextResponse.json({ error: "Invalid pairing code" }, { status: 400 });
+  }
+
+  // Only well-formed codes reach here, so the throttle is spent on plausible
+  // guesses rather than on typos.
+  const verdict = await throttleClaim(clientIp(req));
+  if (!verdict.ok) {
+    return tooManyRequests(verdict, "Too many attempts — try again shortly");
   }
 
   const code = parsed.data.code.toUpperCase().replace(/\s+/g, "");

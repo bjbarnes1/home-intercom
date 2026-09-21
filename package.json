@@ -23,6 +23,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.124.0",
     "@prisma/client": "^6.2.1",
+    "@upstash/ratelimit": "^2.1.0",
+    "@upstash/redis": "^1.39.0",
     "@vercel/blob": "^2.8.0",
     "cron-parser": "^4.9.0",
     "livekit-client": "^2.7.5",
