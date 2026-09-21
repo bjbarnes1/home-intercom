@@ -1,7 +1,10 @@
-import { AT_HOME, CLOCK, HOME_CARDS, HOUSE_NOTE, OUT, PEOPLE, TODAY } from "./data";
+"use client";
+
+import { AT_HOME, HOME_CARDS, HOUSE_NOTE, OUT, PEOPLE, TODAY } from "./data";
 import Avatar from "./_components/Avatar";
 import BaseLayer, { Eyebrow } from "./_components/BaseLayer";
 import Icon from "./_components/Icon";
+import { useNow } from "./_components/Clock";
 
 /**
  * Home — the ambient screen.
@@ -15,15 +18,19 @@ import Icon from "./_components/Icon";
  * list — lists live one tap away in the section that owns them.
  */
 export default function HubHome() {
+  const now = useNow();
+
   return (
     <BaseLayer people={PEOPLE.map((p) => p.key)}>
       <div className="flex min-h-0 flex-grow items-stretch gap-8">
         <div className="flex min-w-0 flex-grow flex-col justify-center gap-1.5">
-          <span className="text-base font-medium text-neutral-400">{CLOCK.greeting}</span>
+          {/* Until the first tick the slots are held open, so nothing below
+              jumps when the real time arrives a frame later. */}
+          <span className="text-base font-medium text-neutral-400">{now?.greeting ?? "\u00A0"}</span>
           <span className="font-heading text-[clamp(72px,11vw,132px)] font-extrabold leading-[0.92] tracking-[-0.045em] text-text tabular-nums">
-            {CLOCK.time}
+            {now?.time ?? "\u00A0"}
           </span>
-          <span className="font-heading text-2xl font-bold leading-8 text-text">{CLOCK.date}</span>
+          <span className="font-heading text-2xl font-bold leading-8 text-text">{now?.date ?? "\u00A0"}</span>
 
           {/* Who's in, grouped so state is read from position rather than a sentence. */}
           <div className="mt-6 flex min-w-0 items-end gap-6">

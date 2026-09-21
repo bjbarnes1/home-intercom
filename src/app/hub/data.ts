@@ -34,8 +34,6 @@ export const PEOPLE: Person[] = [
 export const AT_HOME = PEOPLE.filter((p) => p.home);
 export const OUT = PEOPLE.filter((p) => !p.home);
 
-export const CLOCK = { time: "08:42", date: "Monday 24 October", greeting: "Good morning" };
-
 /** A note someone left for the house. Undefined means the block is not rendered. */
 export const HOUSE_NOTE:
   | { text: string; by: string; at: string }

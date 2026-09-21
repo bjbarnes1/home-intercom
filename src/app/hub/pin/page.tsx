@@ -1,13 +1,18 @@
+"use client";
+
 import Link from "next/link";
-import { CLOCK, ME } from "../data";
+import { ME } from "../data";
 import Avatar from "../_components/Avatar";
 import Icon from "../_components/Icon";
+import { useNow } from "../_components/Clock";
 import OverlayCard, { BackdropSketch } from "../_components/OverlayCard";
 
 /** PIN entry — the identity check, in the same shell as every other interruption. */
 export default function PinEntry() {
+  const now = useNow();
+
   return (
-    <OverlayCard backdrop={<BackdropSketch hero={CLOCK.time} rows={3} />}>
+    <OverlayCard backdrop={<BackdropSketch hero={now?.time ?? ""} rows={3} />}>
       <Avatar who={ME.key} size={72} />
       <span className="mt-3 font-heading text-xl font-bold leading-7 text-text">Hi, {ME.name}</span>
       <span className="mt-1 text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-ink-muted">

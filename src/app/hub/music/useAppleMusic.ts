@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@/lib/color/identity";
 import { getDeviceSecret } from "@/lib/client/identity";
+import { love, lovedIds, unlove, type LovableKind } from "@/lib/music/appleApi";
+import { clearResume, readResume, saveResume } from "./resume";
 import {
   artworkUrl,
   loadMusicKit,
@@ -62,6 +64,11 @@ export interface Track {
   length: string;
 }
 
+export interface SearchResults {
+  songs: Track[];
+  playlists: Playlist[];
+}
+
 export interface QueueItem extends Track {
   /** Position in MusicKit's queue, so tapping can jump straight to it. */
   index: number;
@@ -111,6 +118,21 @@ export interface AppleMusic {
   /** Loop the song that is playing. */
   repeatOne: boolean;
   toggleRepeatOne: () => void;
+  /** Catalog search. Empty term gives empty results rather than everything. */
+  search: (term: string) => Promise<SearchResults>;
+  /** Put a track straight after the one playing. */
+  queueNext: (songId: string) => void;
+  /** Put a track at the end of the queue. */
+  queueLater: (songId: string) => void;
+  /** Ids the listener has loved, for whatever is currently on screen. */
+  loved: Set<string>;
+  toggleLove: (kind: LovableKind, id: string) => void;
+  /**
+   * True when the queue was restored after a reload and is sitting where it
+   * left off. Browsers will not start audio without a tap, so the panel waits
+   * for one rather than pretending it is playing.
+   */
+  resumed: boolean;
   /**
    * Send what is playing to another panel and fall silent. Resolves to null on
    * success, or the reason it could not go.
@@ -144,6 +166,10 @@ export function useAppleMusic(): AppleMusic {
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [ducked, setDucked] = useState(false);
   const [repeatOne, setRepeatOne] = useState(false);
+  const [loved, setLoved] = useState<Set<string>>(new Set());
+  const [resumed, setResumed] = useState(false);
+  /** Needed for the REST calls MusicKit has no helper for. */
+  const developerToken = useRef<string>("");
   /** The level to come back to. Tracks the slider even while ducked. */
   const baseVolume = useRef(0.65);
   const [volume, setVolumeState] = useState(0.65);
@@ -172,6 +198,7 @@ export function useAppleMusic(): AppleMusic {
           setStatus("unconfigured");
           return;
         }
+        developerToken.current = json.token ?? "";
         if (!json.token) {
           // Credentials are set but unusable — the server knows why, so say it.
           setError(json.reason ?? "The Apple Music credentials on this server are not usable");
@@ -287,6 +314,64 @@ export function useAppleMusic(): AppleMusic {
       music.removeEventListener("playbackTimeDidChange", readTime);
     };
   }, [music]);
+
+  /**
+   * Put the queue back where it was.
+   *
+   * A wall panel gets reloaded — a deploy, a crash, the power — and coming back
+   * to silence with an empty queue is the moment it stops feeling like an
+   * appliance. The position is restored but playback is not started: no browser
+   * will begin audio without a gesture, so the panel sits ready and the first
+   * tap on play picks up mid-song.
+   */
+  useEffect(() => {
+    if (!music || status !== "ready" || !active) return;
+    const point = readResume();
+    if (!point) return;
+
+    let alive = true;
+    void (async () => {
+      try {
+        await music.setQueue({ songs: point.trackIds, startWith: point.index });
+        if (point.time > 0) await music.seekToTime(point.time);
+        if (alive) setResumed(true);
+      } catch {
+        // The queue was somebody else's library, or the tracks have gone.
+        clearResume();
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+    // Deliberately once per account: re-running on every queue change would
+    // undo what the listener has just done.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [music, status, active]);
+
+  // Remember where we are, so a reload can come back to it.
+  useEffect(() => {
+    if (!music || status !== "ready") return;
+
+    const remember = () => {
+      const items = music.queue?.items ?? [];
+      if (!items.length) return;
+      saveResume({
+        trackIds: items.map((i) => i.id).slice(0, 100),
+        index: Math.max(0, music.nowPlayingItemIndex ?? 0),
+        time: Math.max(0, Math.floor(music.currentPlaybackTime ?? 0)),
+      });
+    };
+
+    // Often enough to lose only seconds, rarely enough not to thrash storage.
+    const id = window.setInterval(remember, 10_000);
+    window.addEventListener("pagehide", remember);
+    return () => {
+      window.clearInterval(id);
+      window.removeEventListener("pagehide", remember);
+      remember();
+    };
+  }, [music, status]);
 
   // The active listener's own library. Re-reads whenever the account changes,
   // so switching person actually switches whose playlists are on screen.
@@ -431,6 +516,20 @@ export function useAppleMusic(): AppleMusic {
     });
   }, [accounts.length, status]);
 
+  const refreshLoved = useCallback(
+    async (ids: string[], kind: LovableKind) => {
+      const m = kit.current;
+      if (!m || !developerToken.current || !m.musicUserToken || !ids.length) return;
+      const found = await lovedIds(
+        { developerToken: developerToken.current, musicUserToken: m.musicUserToken },
+        kind,
+        ids,
+      ).catch(() => new Set<string>());
+      if (found.size) setLoved((prev) => new Set([...prev, ...found]));
+    },
+    [],
+  );
+
   const guard = useCallback(
     (fn: (m: MusicKitInstance) => Promise<unknown> | void) => () => {
       if (!music) return;
@@ -474,6 +573,85 @@ export function useAppleMusic(): AppleMusic {
       baseVolume.current = clamped;
       music.volume = ducked ? duckedLevel(clamped) : clamped;
       setVolumeState(clamped);
+    },
+
+    loved,
+    resumed,
+
+    search: async (term: string): Promise<SearchResults> => {
+      const m = kit.current;
+      const query = term.trim();
+      if (!m || query.length < 2) return { songs: [], playlists: [] };
+
+      try {
+        const res = (await m.api.music(`/v1/catalog/${m.storefrontId}/search`, {
+          term: query,
+          types: "songs,playlists",
+          limit: 12,
+        })) as unknown as {
+          data: {
+            results?: {
+              songs?: { data: MusicKitResource[] };
+              playlists?: { data: MusicKitResource[] };
+            };
+          };
+        };
+        const results = res.data?.results ?? {};
+        const songs = (results.songs?.data ?? []).map(toTrack);
+        const playlists = (results.playlists?.data ?? []).map(toPlaylist);
+
+        // Mark what is already loved, so the heart is right the moment it appears.
+        void refreshLoved(songs.map((t) => t.id), "songs");
+        return { songs, playlists };
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Search is unavailable");
+        return { songs: [], playlists: [] };
+      }
+    },
+
+    queueNext: (songId: string) => {
+      const m = kit.current;
+      if (!m) return;
+      void m
+        .playNext({ song: songId })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "That would not queue"));
+    },
+
+    queueLater: (songId: string) => {
+      const m = kit.current;
+      if (!m) return;
+      void m
+        .playLater({ song: songId })
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "That would not queue"));
+    },
+
+    toggleLove: (kind: LovableKind, id: string) => {
+      const m = kit.current;
+      const auth = m && {
+        developerToken: developerToken.current,
+        musicUserToken: m.musicUserToken,
+      };
+      if (!auth?.developerToken || !auth.musicUserToken) return;
+
+      const on = loved.has(id);
+      // Move the heart now and put it back if Apple disagrees: a tap that waits
+      // on a round trip feels broken on a wall panel.
+      setLoved((prev) => {
+        const next = new Set(prev);
+        if (on) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+
+      void (on ? unlove(auth, kind, id) : love(auth, kind, id)).catch((e: unknown) => {
+        setLoved((prev) => {
+          const next = new Set(prev);
+          if (on) next.add(id);
+          else next.delete(id);
+          return next;
+        });
+        setError(e instanceof Error ? e.message : "Apple Music would not save that");
+      });
     },
 
     repeatOne,
@@ -529,6 +707,7 @@ export function useAppleMusic(): AppleMusic {
       if (!m) return;
       void (async () => {
         try {
+          setResumed(false);
           await m.setQueue({ songs: trackIds, startWith: startIndex });
           await m.play();
           if (startTime > 0) await m.seekToTime(startTime);

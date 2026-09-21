@@ -66,10 +66,16 @@ export interface MusicKitInstance {
   /** The queue as MusicKit holds it — what is playing and what follows. */
   queue: MusicKitQueue | null;
   nowPlayingItemIndex: number;
+  /** Apple Music storefront, e.g. "au". Search is per-storefront. */
+  storefrontId: string;
   /** PlayerRepeatMode: 0 none, 1 this song, 2 the queue. */
   repeatMode: number;
   /** Jump straight to a queue entry. */
   changeToMediaAtIndex(index: number): Promise<void>;
+  /** Insert right after the track playing. The only supported way in. */
+  playNext(options: Record<string, unknown>): Promise<void>;
+  /** Add to the end of the queue. */
+  playLater(options: Record<string, unknown>): Promise<void>;
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
   play(): Promise<void>;
