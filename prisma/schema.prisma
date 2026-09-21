@@ -35,6 +35,7 @@ model Household {
   music     MusicState?
   places    Place[]
   placeRules PlaceRule[]
+  roomBeacons RoomBeacon[]
 }
 
 /// Shared, household-wide music player state. Demo-backed today (a fixed
@@ -141,6 +142,10 @@ model User {
   locationShare    LocationShare?
   placeRuleSubjects PlaceRule[]    @relation("PlaceRuleSubject")
   placeRuleFires    PlaceRuleFire[] @relation("PlaceRuleFireUser")
+  roomFix           RoomFix?
+
+  /// Move the music to whichever room this person walks into.
+  followMeMusic Boolean @default(false)
 
   @@index([householdId])
 }
@@ -194,6 +199,9 @@ model Device {
   /// token stays on the device; this only records that music can land here, so
   /// another panel knows whether a handoff has anywhere to go.
   musicLinkedAt DateTime?
+
+  /// The BLE beacon marking this panel's room, if one has been placed.
+  roomBeacon RoomBeacon?
   /// Seconds to keep announce/reminder overlay visible before auto-return (default 30).
   announceDwellSec Int @default(30)
   /// When enabled, reminders whisper (no chime, lower volume); pages still ring.
@@ -495,4 +503,51 @@ model PlaceRuleFire {
   firedAt DateTime
 
   @@unique([ruleId, userId])
+}
+
+/// A BLE beacon marking one room, so a phone that hears it knows where it is.
+///
+/// Identified the iBeacon way — one UUID for the household, major/minor per
+/// room — because that is what iOS can monitor in the background, which is the
+/// only way "follow me" works with a phone in a pocket.
+model RoomBeacon {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  /// Human name for the room, e.g. "Kitchen".
+  label String
+  uuid  String
+  major Int
+  minor Int
+
+  /// The panel in this room. Null while a beacon is placed but no panel is.
+  deviceId String? @unique
+  device   Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  fixes     RoomFix[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([householdId, uuid, major, minor])
+  @@index([householdId])
+}
+
+/// Where we currently believe someone is, and since when.
+///
+/// One row per person rather than a history: this answers "where are they now",
+/// and keeping every sighting would be a movement log of a family's home, which
+/// is not something worth storing to move some music.
+model RoomFix {
+  userId String @id
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  beaconId String?
+  beacon   RoomBeacon? @relation(fields: [beaconId], references: [id], onDelete: SetNull)
+
+  /// When they arrived in this room.
+  since     DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([beaconId])
 }
