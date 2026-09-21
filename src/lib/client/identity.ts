@@ -33,11 +33,6 @@ export function saveDeviceCredentials(deviceId: string, secret: string): void {
   localStorage.setItem(DEVICE_SECRET_KEY, secret);
 }
 
-export function getDeviceId(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(DEVICE_ID_KEY);
-}
-
 export function clearDeviceCredentials(): void {
   localStorage.removeItem(DEVICE_ID_KEY);
   localStorage.removeItem(DEVICE_SECRET_KEY);

@@ -71,12 +71,3 @@ export function controlSender(): ControlSender {
     : new LiveKitControlSender();
   return singleton;
 }
-
-/** Test/helper accessor for the mock's recorded sends. */
-export function mockControlSender(): MockControlSender {
-  const s = controlSender();
-  if (!(s instanceof MockControlSender)) {
-    throw new Error("controlSender is not the mock; set MOCK_LOCAL_SERVICES");
-  }
-  return s;
-}

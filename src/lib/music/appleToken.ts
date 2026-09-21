@@ -147,8 +147,3 @@ export function getDeveloperToken(now = Date.now()): { token: string; expiresAt:
   cached = { token: `${signingInput}.${base64url(signature)}`, expiresAt: expires * 1000 };
   return cached;
 }
-
-/** Test seam: forget the cached token so a fresh one is minted. */
-export function resetDeveloperTokenCache(): void {
-  cached = null;
-}

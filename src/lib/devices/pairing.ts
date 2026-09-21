@@ -22,15 +22,6 @@ export function generateDeviceSecret(): string {
   return `dev_${secretGen()}`;
 }
 
-/** Normalise user-entered codes: uppercase, strip spaces and easy confusions. */
-export function normalizePairingCode(input: string): string {
-  return input
-    .toUpperCase()
-    .replace(/\s+/g, "")
-    .replace(/O/g, "0")
-    .replace(/[IL]/g, "1");
-}
-
 /**
  * A pairing code is valid to *submit* if, after normalisation to the code
  * alphabet's own confusables, it is the right length and only uses allowed
