@@ -148,6 +148,11 @@ export interface AppleMusic {
   handOffTo: (deviceId: string) => Promise<string | null>;
   /** Pick up what another panel was playing. */
   acceptHandoff: (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => void;
+  /**
+   * Ask the panel that is playing to hand over to this one. Resolves to null
+   * once the request is away, or the reason it could not be made.
+   */
+  bringHere: (fromDeviceId: string) => Promise<string | null>;
 }
 
 /** Milliseconds to "3:56". */
@@ -608,7 +613,11 @@ export function useAppleMusic(): AppleMusic {
       if (!m || query.length < 2) return { songs: [], playlists: [] };
 
       try {
-        const res = (await m.api.music(`/v1/catalog/${m.storefrontId}/search`, {
+        // `{{storefrontId}}` is MusicKit's own templating, filled from the
+        // storefront it resolved at configure time. Reading `storefrontId` off
+        // the instance instead gives whatever the lazy getter has so far, which
+        // early on is nothing — and `/v1/catalog/undefined/search` is a 404.
+        const res = (await m.api.music("/v1/catalog/{{storefrontId}}/search", {
           term: query,
           types: "songs,playlists",
           limit: 12,
@@ -628,7 +637,11 @@ export function useAppleMusic(): AppleMusic {
         void refreshLoved(songs.map((t) => t.id), "songs");
         return { songs, playlists };
       } catch (e) {
-        setError(e instanceof Error ? e.message : "Search is unavailable");
+        // A failed search and a search with no matches look identical on screen
+        // otherwise, and they want very different things done about them.
+        setError(
+          e instanceof Error ? `Search failed: ${e.message}` : "Search is unavailable",
+        );
         return { songs: [], playlists: [] };
       }
     },
@@ -759,6 +772,23 @@ export function useAppleMusic(): AppleMusic {
         // quiet before the other end is told would lose the music entirely.
         await m.pause().catch(() => {});
         return null;
+      } catch {
+        return "The house could not be reached";
+      }
+    },
+
+    bringHere: async (fromDeviceId: string): Promise<string | null> => {
+      const secret = getDeviceSecret();
+      if (!secret) return "This Hub is not paired to the house";
+
+      try {
+        const res = await fetch("/api/music/fetch", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-device-secret": secret },
+          body: JSON.stringify({ fromDeviceId }),
+        });
+        const json = (await res.json()) as { error?: string };
+        return res.ok ? null : (json.error ?? "That panel could not hand it over");
       } catch {
         return "The house could not be reached";
       }

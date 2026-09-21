@@ -3,6 +3,7 @@ import {
   ControlCommandSchema,
   decodeCommand,
   encodeCommand,
+  type MusicFetchCommand,
   type MusicHandoffCommand,
 } from "@/lib/control/commands";
 
@@ -58,5 +59,34 @@ describe("musicHandoff over the control channel", () => {
 
   it("refuses a command that is not in the union at all", () => {
     expect(() => decodeCommand(new TextEncoder().encode('{"type":"eject"}'))).toThrow();
+  });
+});
+
+describe("musicFetch — bringing the music to you", () => {
+  const fetchCmd: MusicFetchCommand = {
+    type: "musicFetch",
+    toDeviceId: "dev_bedroom",
+    from: "Bedroom",
+  };
+
+  it("survives the round trip", () => {
+    expect(decodeCommand(encodeCommand(fetchCmd))).toEqual(fetchCmd);
+  });
+
+  it("names where the music should end up", () => {
+    // The panel receiving this is the one holding the queue; without a
+    // destination it has no idea who asked.
+    expect(ControlCommandSchema.safeParse({ type: "musicFetch", from: "Bedroom" }).success).toBe(
+      false,
+    );
+  });
+
+  it("works without a room name, which is only for saying where it went", () => {
+    const { from: _from, ...anonymous } = fetchCmd;
+    expect(ControlCommandSchema.safeParse(anonymous).success).toBe(true);
+  });
+
+  it("is told apart from a handoff going the other way", () => {
+    expect(decodeCommand(encodeCommand(fetchCmd)).type).toBe("musicFetch");
   });
 });

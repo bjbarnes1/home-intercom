@@ -62,6 +62,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
    */
   const music = useAppleMusic();
   const acceptHandoff = music.acceptHandoff;
+  const handOffTo = music.handOffTo;
   const {
     phase,
     setPhase,
@@ -80,6 +81,12 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     onMusicHandoff: useCallback(
       (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => acceptHandoff(cmd),
       [acceptHandoff],
+    ),
+    // Somebody at another panel asked for what is playing here. Handing it over
+    // is the same path as tapping their room from this end.
+    onMusicFetch: useCallback(
+      (cmd: { toDeviceId: string }) => void handOffTo(cmd.toDeviceId),
+      [handOffTo],
     ),
   });
 

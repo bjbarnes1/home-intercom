@@ -21,7 +21,7 @@ import {
   ANNOUNCE_DWELL_DEFAULT,
   clampAnnounceDwellSec,
 } from "@/lib/etiquette/announceDwell";
-import type { MusicHandoffCommand } from "@/lib/control/commands";
+import type { MusicFetchCommand, MusicHandoffCommand } from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
 
@@ -42,6 +42,11 @@ export interface PresenceHandlers {
    * player of its own ignores the command rather than pretending to take it.
    */
   onMusicHandoff?: (cmd: MusicHandoffCommand) => void;
+  /**
+   * Another panel is asking for what this one is playing. Optional for the
+   * same reason: a surface with no player has nothing to hand over.
+   */
+  onMusicFetch?: (cmd: MusicFetchCommand) => void;
 }
 
 /**
@@ -198,6 +203,9 @@ export function useEndpointPresence(media: Media, handlers: PresenceHandlers = {
               }
               case "musicHandoff":
                 handlersRef.current.onMusicHandoff?.(cmd);
+                break;
+              case "musicFetch":
+                handlersRef.current.onMusicFetch?.(cmd);
                 break;
               case "hangup":
                 setRinging(null);

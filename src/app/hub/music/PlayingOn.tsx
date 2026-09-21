@@ -15,8 +15,15 @@ import type { AppleMusic } from "./useAppleMusic";
  * panel that has not checked in inside the presence window, because a tap on a
  * sleeping panel does nothing and the list should not invite one.
  *
- * Tapping a room hands the music to it rather than adding it: that panel picks
- * up the same queue at the same second, and this one falls quiet. Apple Music's
+ * Tapping a room moves the music, in whichever direction makes sense from
+ * where you are standing. A room that is playing gives it up and it arrives
+ * here; a room that is idle receives what is playing here. Either way one
+ * panel ends up with it, because that is what Apple Music allows.
+ *
+ * The pull matters more than it looks: you are at the panel in the room you
+ * walked into, and the music is somewhere else. Having to go back to the
+ * kitchen to send it to the bedroom is the kind of thing that makes people
+ * stop using a feature. Apple Music's
  * audio is DRM-protected, so nothing can capture one panel's output and relay
  * it to another — moving it is what is available.
  *
@@ -91,12 +98,17 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
           const here = d.isSelf && isPlaying;
           // Somewhere to send it: not this panel, signed in, and we have a queue.
           const sendable = !d.isSelf && d.canPlay && music.queue.length > 0;
+          // Something to take: it is playing there and not here.
+          const takeable = !d.isSelf && !!d.playing && !isPlaying;
+          const actionable = takeable || sendable;
 
           const move = async () => {
-            if (!sendable || moving) return;
+            if (!actionable || moving) return;
             setMoving(d.id);
             setProblem(null);
-            const failure = await music.handOffTo(d.id);
+            // Taking wins when both are possible: you are standing here, and
+            // what is playing over there is the thing you came for.
+            const failure = takeable ? await music.bringHere(d.id) : await music.handOffTo(d.id);
             setMoving(null);
             if (failure) setProblem(failure);
           };
@@ -105,12 +117,18 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
           <button
             key={d.id}
             type="button"
-            disabled={!sendable}
+            disabled={!actionable}
             onClick={move}
-            aria-label={sendable ? `Move the music to ${d.where}` : undefined}
+            aria-label={
+              takeable
+                ? `Bring the music here from ${d.where}`
+                : sendable
+                  ? `Move the music to ${d.where}`
+                  : undefined
+            }
             className={`flex items-center gap-3 rounded-xl border-none px-3.5 py-2.5 text-left transition-colors ${
               here ? "" : "bg-transparent"
-            } ${sendable ? "cursor-pointer hover:bg-bg active:scale-[0.99]" : "cursor-default"}`}
+            } ${actionable ? "cursor-pointer hover:bg-bg active:scale-[0.99]" : "cursor-default"}`}
             style={here ? { background: "var(--color-accent)" } : undefined}
           >
             <span
@@ -139,16 +157,24 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
                     ? "Playing now"
                     : "This Hub"
                   : moving === d.id
-                    ? "Moving the music…"
+                    ? takeable
+                      ? "Bringing it here…"
+                      : "Moving the music…"
                     : d.playing
                       ? `${d.playing.title}${d.playing.artist ? ` · ${d.playing.artist}` : ""}`
                       : sendable
-                        ? "Tap to move the music here"
+                        ? "Tap to send it here"
                         : d.canPlay
                           ? "Awake"
                           : "Awake · not signed in"}
               </span>
             </span>
+
+            {takeable ? (
+              <span className="flex-none rounded-full bg-accent px-2.5 py-1 text-[11px] font-bold uppercase leading-4 tracking-[0.06em] text-white">
+                Bring
+              </span>
+            ) : null}
 
             <span
               className="h-2.5 w-2.5 flex-none rounded-full"
@@ -168,7 +194,8 @@ export default function PlayingOn({ music }: { music: AppleMusic }) {
 
         {devices.length > 1 ? (
           <Note>
-            Tapping a room moves the music there rather than adding it.
+            Tapping a room moves the music — here if it is playing there, there if it is playing
+            here.
           </Note>
         ) : null}
       </div>

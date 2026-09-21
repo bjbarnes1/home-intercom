@@ -22,6 +22,8 @@ export default function SearchOverlay({
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<SearchResults>({ songs: [], playlists: [] });
   const [busy, setBusy] = useState(false);
+  /** A search that errored, so it does not masquerade as "nothing found". */
+  const [failed, setFailed] = useState<string | null>(null);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => input.current?.focus(), []);
@@ -35,7 +37,12 @@ export default function SearchOverlay({
     // searching Apple's catalogue on every letter.
     const id = window.setTimeout(async () => {
       setBusy(true);
-      setResults(await music.search(term));
+      setFailed(null);
+      const found = await music.search(term);
+      setResults(found);
+      if (!found.songs.length && !found.playlists.length && music.error) {
+        setFailed(music.error);
+      }
       setBusy(false);
     }, 350);
     return () => window.clearTimeout(id);
@@ -136,7 +143,9 @@ export default function SearchOverlay({
                 ? "Looking…"
                 : term.trim().length < 2
                   ? "Type at least two letters."
-                  : "Nothing found."}
+                  : failed
+                    ? failed
+                    : "Nothing found."}
             </span>
           ) : null}
         </div>

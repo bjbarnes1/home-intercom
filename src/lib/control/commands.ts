@@ -71,6 +71,21 @@ const MusicHandoffCommandSchema = z.object({
   from: z.string().max(80).optional(),
 });
 
+/**
+ * Somebody at another panel wants what this one is playing.
+ *
+ * Only the panel that holds the queue can hand it over — it is the one with
+ * the tracks, the position and the account — so a pull is a request to push,
+ * not a reach into someone else's player.
+ */
+const MusicFetchCommandSchema = z.object({
+  type: z.literal("musicFetch"),
+  /** The panel asking. Where the music should end up. */
+  toDeviceId: z.string().min(1).max(64),
+  /** The room that asked, so the handing-over panel can say where it went. */
+  from: z.string().max(80).optional(),
+});
+
 const HangupCommandSchema = z.object({
   type: z.literal("hangup"),
   eventId: z.string(),
@@ -106,6 +121,7 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   ReminderCommandSchema,
   AnnounceCommandSchema,
   MusicHandoffCommandSchema,
+  MusicFetchCommandSchema,
   HangupCommandSchema,
   PingCommandSchema,
   LedCommandSchema,
@@ -117,6 +133,7 @@ export type RingCommand = z.infer<typeof RingCommandSchema>;
 export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
 export type MusicHandoffCommand = z.infer<typeof MusicHandoffCommandSchema>;
+export type MusicFetchCommand = z.infer<typeof MusicFetchCommandSchema>;
 export type HangupCommand = z.infer<typeof HangupCommandSchema>;
 export type PingCommand = z.infer<typeof PingCommandSchema>;
 export type LedCommand = z.infer<typeof LedCommandSchema>;
