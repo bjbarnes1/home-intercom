@@ -1,8 +1,8 @@
 import Link from "next/link";
 import type { Identity } from "@/lib/color/identity";
-import { WEATHER } from "../data";
 import Avatar from "./Avatar";
 import Icon from "./Icon";
+import WeatherChip from "./WeatherChip";
 
 /**
  * Hub prototype — Utility Strip.
@@ -29,19 +29,7 @@ export default function UtilityStrip({
 }) {
   return (
     <div className="flex h-[72px] flex-none items-center justify-end gap-3 px-8">
-      <Link
-        href="/hub/weather"
-        aria-label={`Weather: ${WEATHER.temp} degrees in ${WEATHER.place}`}
-        aria-current={weatherActive ? "page" : undefined}
-        className={`flex items-center gap-2 rounded-full px-4 py-2.5 transition-transform active:scale-[0.97] ${
-          weatherActive ? "bg-accent" : "bg-surface shadow-card"
-        }`}
-      >
-        <Icon name="weather" size={18} style={{ color: weatherActive ? "#FFFFFF" : "var(--color-accent)" }} />
-        <span className={`text-[13px] font-semibold ${weatherActive ? "text-white" : "text-text"}`}>
-          {WEATHER.temp}° {WEATHER.place}
-        </span>
-      </Link>
+      <WeatherChip active={weatherActive} />
 
       {active ? (
         <Link
