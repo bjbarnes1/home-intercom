@@ -64,33 +64,84 @@ export default function Music() {
             ) : null}
           </div>
 
-          <span className="px-1 pt-2">
-            <Eyebrow tone="ink">Recently played</Eyebrow>
-          </span>
-          <div className="flex min-h-0 flex-grow flex-col gap-0.5 overflow-y-auto rounded-xl bg-surface p-2 shadow-card">
-            {music.recent.map((t) => (
-              <span
-                key={t.id}
-                className="flex items-center gap-3.5 rounded-xl px-3 py-2 text-left"
-              >
-                <span
-                  className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
-                  style={{ background: "rgba(59,92,246,0.10)" }}
-                >
-                  <Icon name="music" size={17} className="text-accent" />
-                </span>
-                <span className="flex min-w-0 flex-grow flex-col">
-                  <span className="truncate text-[13px] font-semibold leading-[18px] text-text">{t.title}</span>
-                  <span className="truncate text-xs leading-4 text-ink-muted">{t.artist}</span>
-                </span>
-                <span className="flex-none text-xs font-medium leading-4 text-ink-muted tabular-nums">{t.length}</span>
+          <div className="flex min-h-0 flex-grow gap-4 pt-2">
+            <div className="flex min-w-0 flex-grow basis-0 flex-col gap-2">
+              <span className="px-1">
+                <Eyebrow tone="ink">Up next</Eyebrow>
               </span>
-            ))}
-            {!music.recent.length ? (
-              <span className="px-3 py-3 text-[13px] leading-[18px] text-ink-muted">
-                Nothing played on this Hub yet.
+              <div className="flex min-h-0 flex-grow flex-col gap-0.5 overflow-y-auto rounded-xl bg-surface p-2 shadow-card">
+                {music.queue.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => music.playQueueIndex(t.index)}
+                    aria-current={t.playing ? "true" : undefined}
+                    className={`flex cursor-pointer items-center gap-3.5 rounded-xl border-none px-3 py-2 text-left transition-colors ${
+                      t.playing ? "bg-bg" : "bg-transparent hover:bg-bg"
+                    }`}
+                  >
+                    <span
+                      className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
+                      style={{ background: "rgba(59,92,246,0.10)" }}
+                    >
+                      <Icon
+                        name={t.playing && music.isPlaying ? "pause" : "music"}
+                        size={17}
+                        className="text-accent"
+                      />
+                    </span>
+                    <span className="flex min-w-0 flex-grow flex-col">
+                      <span
+                        className={`truncate text-[13px] leading-[18px] ${
+                          t.playing ? "font-bold text-accent" : "font-semibold text-text"
+                        }`}
+                      >
+                        {t.title}
+                      </span>
+                      <span className="truncate text-xs leading-4 text-ink-muted">{t.artist}</span>
+                    </span>
+                    <span className="flex-none text-xs font-medium leading-4 text-ink-muted tabular-nums">
+                      {t.length}
+                    </span>
+                  </button>
+                ))}
+                {!music.queue.length ? (
+                  <span className="px-3 py-3 text-[13px] leading-[18px] text-ink-muted">
+                    Nothing queued. Start a playlist and it lines up here.
+                  </span>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex min-w-0 flex-grow basis-0 flex-col gap-2">
+              <span className="px-1">
+                <Eyebrow tone="ink">Recently played</Eyebrow>
               </span>
-            ) : null}
+              <div className="flex min-h-0 flex-grow flex-col gap-0.5 overflow-y-auto rounded-xl bg-surface p-2 shadow-card">
+                {music.recent.map((t) => (
+                  <span key={t.id} className="flex items-center gap-3.5 rounded-xl px-3 py-2 text-left">
+                    <span
+                      className="flex h-10 w-10 flex-none items-center justify-center rounded-xl"
+                      style={{ background: "rgba(59,92,246,0.10)" }}
+                    >
+                      <Icon name="music" size={17} className="text-accent" />
+                    </span>
+                    <span className="flex min-w-0 flex-grow flex-col">
+                      <span className="truncate text-[13px] font-semibold leading-[18px] text-text">{t.title}</span>
+                      <span className="truncate text-xs leading-4 text-ink-muted">{t.artist}</span>
+                    </span>
+                    <span className="flex-none text-xs font-medium leading-4 text-ink-muted tabular-nums">
+                      {t.length}
+                    </span>
+                  </span>
+                ))}
+                {!music.recent.length ? (
+                  <span className="px-3 py-3 text-[13px] leading-[18px] text-ink-muted">
+                    Nothing played on this Hub yet.
+                  </span>
+                ) : null}
+              </div>
+            </div>
           </div>
         </div>
 

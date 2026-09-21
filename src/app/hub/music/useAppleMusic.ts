@@ -61,6 +61,12 @@ export interface Track {
   length: string;
 }
 
+export interface QueueItem extends Track {
+  /** Position in MusicKit's queue, so tapping can jump straight to it. */
+  index: number;
+  playing: boolean;
+}
+
 export interface AppleMusic {
   status: MusicStatus;
   error: string | null;
@@ -76,6 +82,8 @@ export interface AppleMusic {
   nowPlaying: NowPlaying | null;
   playlists: Playlist[];
   recent: Track[];
+  /** What is playing and what follows it. Empty until something is queued. */
+  queue: QueueItem[];
   volume: number;
   /** Sign a household member in with their own Apple ID. */
   link: (who: Identity) => void;
@@ -89,6 +97,8 @@ export interface AppleMusic {
   seek: (fraction: number) => void;
   setVolume: (value: number) => void;
   playPlaylist: (id: string) => void;
+  /** Jump to a queue entry. */
+  playQueueIndex: (index: number) => void;
 }
 
 /** Milliseconds to "3:56". */
@@ -112,6 +122,7 @@ export function useAppleMusic(): AppleMusic {
   const [nowPlaying, setNowPlaying] = useState<NowPlaying | null>(null);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [recent, setRecent] = useState<Track[]>([]);
+  const [queue, setQueue] = useState<QueueItem[]>([]);
   const [volume, setVolumeState] = useState(0.65);
   const [accounts, setAccounts] = useState<LinkedAccount[]>([]);
   const [active, setActive] = useState<Identity | null>(null);
@@ -197,10 +208,30 @@ export function useAppleMusic(): AppleMusic {
       );
     };
 
+    const readQueue = () => {
+      const q = music.queue;
+      if (!q?.items?.length) {
+        setQueue([]);
+        return;
+      }
+      const at = music.nowPlayingItemIndex ?? q.position ?? 0;
+      setQueue(
+        q.items.map((item, i) => ({
+          id: `${item.id}-${i}`,
+          title: item.title ?? "Unknown track",
+          artist: item.artistName ?? "",
+          length: formatLength(item.playbackDuration),
+          index: i,
+          playing: i === at,
+        })),
+      );
+    };
+
     const readState = () => {
       const playingState = window.MusicKit?.PlaybackStates?.playing;
       setPlaying(music.playbackState === playingState);
       readNowPlaying();
+      readQueue();
     };
 
     const readTime = () => {
@@ -211,12 +242,16 @@ export function useAppleMusic(): AppleMusic {
 
     music.addEventListener("playbackStateDidChange", readState);
     music.addEventListener("nowPlayingItemDidChange", readNowPlaying);
+    music.addEventListener("nowPlayingItemDidChange", readQueue);
+    music.addEventListener("queueItemsDidChange", readQueue);
     music.addEventListener("playbackTimeDidChange", readTime);
     readState();
 
     return () => {
       music.removeEventListener("playbackStateDidChange", readState);
       music.removeEventListener("nowPlayingItemDidChange", readNowPlaying);
+      music.removeEventListener("nowPlayingItemDidChange", readQueue);
+      music.removeEventListener("queueItemsDidChange", readQueue);
       music.removeEventListener("playbackTimeDidChange", readTime);
     };
   }, [music]);
@@ -298,6 +333,7 @@ export function useAppleMusic(): AppleMusic {
       setActive(who);
       setNowPlaying(null);
       setPlaying(false);
+      setQueue([]);
       setStatus("ready");
     },
     [accounts, active],
@@ -368,6 +404,7 @@ export function useAppleMusic(): AppleMusic {
     nowPlaying,
     playlists,
     recent,
+    queue,
     volume,
     link,
     forget,
@@ -386,6 +423,12 @@ export function useAppleMusic(): AppleMusic {
       const clamped = Math.max(0, Math.min(1, value));
       music.volume = clamped;
       setVolumeState(clamped);
+    },
+    playQueueIndex: (index: number) => {
+      if (!music) return;
+      void music
+        .changeToMediaAtIndex(index)
+        .catch((e: unknown) => setError(e instanceof Error ? e.message : "That track would not start"));
     },
     playPlaylist: (id: string) => {
       if (!music) return;

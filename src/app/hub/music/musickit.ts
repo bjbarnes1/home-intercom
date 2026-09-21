@@ -37,7 +37,14 @@ export type MusicKitEvent =
   | "playbackStateDidChange"
   | "nowPlayingItemDidChange"
   | "playbackTimeDidChange"
-  | "authorizationStatusDidChange";
+  | "authorizationStatusDidChange"
+  | "queueItemsDidChange";
+
+export interface MusicKitQueue {
+  items: MusicKitItem[];
+  /** Index of the item playing now. */
+  position: number;
+}
 
 export interface MusicKitInstance {
   isAuthorized: boolean;
@@ -55,6 +62,11 @@ export interface MusicKitInstance {
   currentPlaybackDuration: number;
   playbackState: number;
   nowPlayingItem: MusicKitItem | null;
+  /** The queue as MusicKit holds it — what is playing and what follows. */
+  queue: MusicKitQueue | null;
+  nowPlayingItemIndex: number;
+  /** Jump straight to a queue entry. */
+  changeToMediaAtIndex(index: number): Promise<void>;
   authorize(): Promise<string>;
   unauthorize(): Promise<void>;
   play(): Promise<void>;
