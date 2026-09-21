@@ -114,9 +114,11 @@ function eyebrowFor(music: AppleMusic): string {
     case "error":
       return music.error ?? "Apple Music is unavailable";
     default:
-      return music.linking
-        ? "Waiting for Apple…"
-        : `Apple Music · ${music.active ?? "nobody"}'s library`;
+      if (music.linking) return "Waiting for Apple…";
+      // Browsers will not start audio without a tap, so a restored queue sits
+      // ready and says so rather than looking like nothing happened.
+      if (music.resumed && !music.isPlaying) return "Where you left off · press play";
+      return `Apple Music · ${music.active ?? "nobody"}'s library`;
   }
 }
 
@@ -176,7 +178,8 @@ function Player({ music }: { music: AppleMusic }) {
               {np?.title ?? "Nothing playing"}
             </span>
             <span className="truncate text-[13px] leading-[18px] text-ink-muted">
-              {np?.artist || "Choose a playlist to start"}
+              {np?.artist ||
+                (music.resumed ? "Picked up where you left off — press play" : "Choose a playlist to start")}
             </span>
           </span>
           <span

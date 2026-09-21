@@ -14,6 +14,14 @@ export interface MusicKitArtwork {
 
 export interface MusicKitItem {
   id: string;
+  /** "songs", "library-songs"… which decides the descriptor to ask for it with. */
+  type?: string;
+  /**
+   * A library item usually carries the catalog id of the same recording.
+   * Preferred when present: catalog ids resolve on any account, library ids
+   * only on the one that owns them.
+   */
+  playParams?: { id?: string; catalogId?: string; isLibrary?: boolean };
   title?: string;
   artistName?: string;
   albumName?: string;

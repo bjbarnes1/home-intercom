@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@/lib/color/identity";
 import { getDeviceSecret } from "@/lib/client/identity";
 import { love, lovedIds, unlove, type LovableKind } from "@/lib/music/appleApi";
-import { clearResume, readResume, saveResume } from "./resume";
+import { clearResume, queueDescriptor, readResume, saveResume } from "./resume";
 import { indexAfterMove, reorder } from "@/lib/music/reorder";
 import {
   artworkUrl,
@@ -346,12 +346,21 @@ export function useAppleMusic(): AppleMusic {
     let alive = true;
     void (async () => {
       try {
-        await music.setQueue({ songs: point.trackIds, startWith: point.index });
+        await music.setQueue({ ...queueDescriptor(point.tracks), startWith: point.index });
         if (point.time > 0) await music.seekToTime(point.time);
         if (alive) setResumed(true);
-      } catch {
-        // The queue was somebody else's library, or the tracks have gone.
+      } catch (e) {
+        // Say why rather than clearing in silence. A queue that quietly fails
+        // to come back looks exactly like one that was never saved, which is
+        // the hardest possible thing to be told about.
         clearResume();
+        if (alive) {
+          setError(
+            e instanceof Error
+              ? `Could not pick up where you left off: ${e.message}`
+              : "Could not pick up where you left off",
+          );
+        }
       }
     })();
 
@@ -371,7 +380,12 @@ export function useAppleMusic(): AppleMusic {
       const items = music.queue?.items ?? [];
       if (!items.length) return;
       saveResume({
-        trackIds: items.map((i) => i.id).slice(0, 100),
+        tracks: items.slice(0, 100).map((i) => ({
+          // A library track's catalog id resolves anywhere; its library id
+          // only resolves on the account that owns it.
+          id: i.playParams?.catalogId ?? i.id,
+          type: i.playParams?.catalogId ? "songs" : (i.type ?? "songs"),
+        })),
         index: Math.max(0, music.nowPlayingItemIndex ?? 0),
         time: Math.max(0, Math.floor(music.currentPlaybackTime ?? 0)),
       });
@@ -760,7 +774,9 @@ export function useAppleMusic(): AppleMusic {
           headers: { "content-type": "application/json", "x-device-secret": secret },
           body: JSON.stringify({
             toDeviceId: deviceId,
-            trackIds: items.map((i) => i.id).slice(0, 100),
+            // Catalog ids where they exist: the panel receiving this may be
+            // signed in as somebody else, and a library id means nothing there.
+            trackIds: items.slice(0, 100).map((i) => i.playParams?.catalogId ?? i.id),
             startIndex: Math.max(0, m.nowPlayingItemIndex ?? 0),
             startTime: Math.max(0, Math.floor(m.currentPlaybackTime ?? 0)),
           }),

@@ -38,7 +38,9 @@ export async function speak(
 
   const volume = Math.min(1, Math.max(0, opts?.volume ?? 1));
   if (opts?.chime) {
-    await playChime();
+    // The chime follows the voice's own level, so a quiet-hours announcement
+    // is not preceded by a full-volume one.
+    await playChime(volume);
   }
 
   if (audioUrl) {
