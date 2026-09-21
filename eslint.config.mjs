@@ -39,8 +39,8 @@ const config = [
   },
   {
     // Last, so it wins: flat config resolves later entries over earlier ones.
-    // prisma/seed.ts is a CLI — telling you what it seeded is its output.
-    files: ["prisma/**/*.ts"],
+    // prisma/seed.ts and the benchmarks are CLIs — their output IS the point.
+    files: ["prisma/**/*.ts", "services/**/bench/**/*.ts"],
     rules: { "no-console": "off" },
   },
 ];

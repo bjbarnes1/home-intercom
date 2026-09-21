@@ -184,3 +184,13 @@ See `docs/architecture/platform.md`. Summary: Vercel is right for the web
 surfaces and increasingly wrong for the control plane, and the control plane is
 where this product's hard parts are. Recommendation is to split rather than
 migrate. Open until decided.
+
+**Spike built and measured** — `services/control-plane/`. 3,000 panels across
+1,000 households in one process: 59.9 MB for both sides of every socket,
+fan-out p99 1ms, presence 0.38µs per lookup, and one database query per panel
+for the life of the connection against 900/s for the polling it replaces.
+
+The transport question is answered: it is not the obstacle. What remains open
+is multi-instance routing in the cloud, local durable state on a Hub (the
+actual hard part of LAN-first, and a data problem rather than a transport one),
+and operational appetite.

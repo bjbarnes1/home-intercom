@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 export default defineConfig({
   test: {
     // Domain logic lives in src/lib/**; tests are co-located as *.test.ts.
-    include: ["src/**/*.test.ts"],
+    include: ["src/**/*.test.ts", "services/**/*.test.ts"],
     environment: "node",
     globals: true,
   },
