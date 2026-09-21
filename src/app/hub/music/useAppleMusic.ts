@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@/lib/color/identity";
+import { getDeviceSecret } from "@/lib/client/identity";
 import {
   artworkUrl,
   loadMusicKit,
@@ -99,6 +100,13 @@ export interface AppleMusic {
   playPlaylist: (id: string) => void;
   /** Jump to a queue entry. */
   playQueueIndex: (index: number) => void;
+  /**
+   * Send what is playing to another panel and fall silent. Resolves to null on
+   * success, or the reason it could not go.
+   */
+  handOffTo: (deviceId: string) => Promise<string | null>;
+  /** Pick up what another panel was playing. */
+  acceptHandoff: (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => void;
 }
 
 /** Milliseconds to "3:56". */
@@ -383,6 +391,22 @@ export function useAppleMusic(): AppleMusic {
     setDefaultWho(who);
   }, []);
 
+  // Other panels need to know whether a handoff has anywhere to land here. The
+  // token itself stays on this device; only its existence is reported.
+  useEffect(() => {
+    if (status === "loading" || status === "unconfigured") return;
+    const secret = getDeviceSecret();
+    if (!secret) return;
+
+    void fetch("/api/music/linked", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-device-secret": secret },
+      body: JSON.stringify({ linked: accounts.length > 0 }),
+    }).catch(() => {
+      /* the next change reports again */
+    });
+  }, [accounts.length, status]);
+
   const guard = useCallback(
     (fn: (m: MusicKitInstance) => Promise<unknown> | void) => () => {
       if (!music) return;
@@ -424,6 +448,53 @@ export function useAppleMusic(): AppleMusic {
       music.volume = clamped;
       setVolumeState(clamped);
     },
+    handOffTo: async (deviceId: string): Promise<string | null> => {
+      const m = kit.current;
+      const items = m?.queue?.items ?? [];
+      if (!m || !items.length) return "There is nothing playing to hand over";
+
+      const secret = getDeviceSecret();
+      if (!secret) return "This Hub is not paired to the house";
+
+      try {
+        const res = await fetch("/api/music/handoff", {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-device-secret": secret },
+          body: JSON.stringify({
+            toDeviceId: deviceId,
+            trackIds: items.map((i) => i.id).slice(0, 100),
+            startIndex: Math.max(0, m.nowPlayingItemIndex ?? 0),
+            startTime: Math.max(0, Math.floor(m.currentPlaybackTime ?? 0)),
+          }),
+        });
+        const json = (await res.json()) as { error?: string };
+        if (!res.ok) return json.error ?? "That panel could not take it";
+
+        // Only now stop: one subscription streams to one device, and going
+        // quiet before the other end is told would lose the music entirely.
+        await m.pause().catch(() => {});
+        return null;
+      } catch {
+        return "The house could not be reached";
+      }
+    },
+
+    acceptHandoff: ({ trackIds, startIndex, startTime }) => {
+      const m = kit.current;
+      if (!m) return;
+      void (async () => {
+        try {
+          await m.setQueue({ songs: trackIds, startWith: startIndex });
+          await m.play();
+          if (startTime > 0) await m.seekToTime(startTime);
+        } catch (e) {
+          // Library ids belong to the account that owns them, so a queue handed
+          // over from a different Apple ID can simply not resolve here.
+          setError(e instanceof Error ? e.message : "That music would not play here");
+        }
+      })();
+    },
+
     playQueueIndex: (index: number) => {
       if (!music) return;
       void music

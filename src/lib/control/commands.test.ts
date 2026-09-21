@@ -1,0 +1,62 @@
+import { describe, expect, it } from "vitest";
+import {
+  ControlCommandSchema,
+  decodeCommand,
+  encodeCommand,
+  type MusicHandoffCommand,
+} from "@/lib/control/commands";
+
+const handoff: MusicHandoffCommand = {
+  type: "musicHandoff",
+  trackIds: ["1440857781", "1440857782"],
+  startIndex: 1,
+  startTime: 42.5,
+  from: "Kitchen",
+};
+
+describe("musicHandoff over the control channel", () => {
+  it("survives the round trip the lobby puts it through", () => {
+    expect(decodeCommand(encodeCommand(handoff))).toEqual(handoff);
+  });
+
+  it("keeps the position, which is the whole point of a handoff", () => {
+    const back = decodeCommand(encodeCommand(handoff)) as MusicHandoffCommand;
+    expect(back.startIndex).toBe(1);
+    expect(back.startTime).toBe(42.5);
+  });
+
+  it("needs at least one track — an empty handoff is not a handoff", () => {
+    expect(ControlCommandSchema.safeParse({ ...handoff, trackIds: [] }).success).toBe(false);
+  });
+
+  it("refuses to carry a whole library in one message", () => {
+    const tooMany = { ...handoff, trackIds: Array.from({ length: 101 }, (_, i) => `t${i}`) };
+    expect(ControlCommandSchema.safeParse(tooMany).success).toBe(false);
+    const atTheLimit = { ...handoff, trackIds: Array.from({ length: 100 }, (_, i) => `t${i}`) };
+    expect(ControlCommandSchema.safeParse(atTheLimit).success).toBe(true);
+  });
+
+  it("rejects a position that is not a whole track", () => {
+    expect(ControlCommandSchema.safeParse({ ...handoff, startIndex: 1.5 }).success).toBe(false);
+    expect(ControlCommandSchema.safeParse({ ...handoff, startIndex: -1 }).success).toBe(false);
+  });
+
+  it("rejects a negative seek", () => {
+    expect(ControlCommandSchema.safeParse({ ...handoff, startTime: -1 }).success).toBe(false);
+  });
+
+  it("works without a room name, which is only decoration", () => {
+    const { from: _from, ...anonymous } = handoff;
+    expect(ControlCommandSchema.safeParse(anonymous).success).toBe(true);
+  });
+
+  it("is told apart from every other command on the channel", () => {
+    const parsed = decodeCommand(encodeCommand(handoff));
+    expect(parsed.type).toBe("musicHandoff");
+    expect(decodeCommand(encodeCommand({ type: "ping", at: 1 })).type).toBe("ping");
+  });
+
+  it("refuses a command that is not in the union at all", () => {
+    expect(() => decodeCommand(new TextEncoder().encode('{"type":"eject"}'))).toThrow();
+  });
+});

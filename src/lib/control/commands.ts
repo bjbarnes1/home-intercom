@@ -49,6 +49,28 @@ const AnnounceCommandSchema = z.object({
   chime: z.boolean().optional(),
 });
 
+/**
+ * Take over what another panel is playing.
+ *
+ * Carries catalog track ids rather than a playlist: a library playlist id is
+ * scoped to the account that owns it and will not resolve on a panel signed in
+ * as somebody else, whereas a catalog song id is the same everywhere.
+ *
+ * Apple Music streams to one device per subscription, so this is a handoff and
+ * not a second speaker: the panel that sends it stops.
+ */
+const MusicHandoffCommandSchema = z.object({
+  type: z.literal("musicHandoff"),
+  /** Queue as catalog ids, in order. Capped so one message cannot carry a library. */
+  trackIds: z.array(z.string().max(64)).min(1).max(100),
+  /** Which of them to start on. */
+  startIndex: z.number().int().min(0),
+  /** Seconds into that track, so the handoff picks up mid-song. */
+  startTime: z.number().min(0),
+  /** The room it came from, for the arriving panel to say so. */
+  from: z.string().max(80).optional(),
+});
+
 const HangupCommandSchema = z.object({
   type: z.literal("hangup"),
   eventId: z.string(),
@@ -83,6 +105,7 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   RingCommandSchema,
   ReminderCommandSchema,
   AnnounceCommandSchema,
+  MusicHandoffCommandSchema,
   HangupCommandSchema,
   PingCommandSchema,
   LedCommandSchema,
@@ -93,6 +116,7 @@ export type JoinRoomCommand = z.infer<typeof JoinRoomCommandSchema>;
 export type RingCommand = z.infer<typeof RingCommandSchema>;
 export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
+export type MusicHandoffCommand = z.infer<typeof MusicHandoffCommandSchema>;
 export type HangupCommand = z.infer<typeof HangupCommandSchema>;
 export type PingCommand = z.infer<typeof PingCommandSchema>;
 export type LedCommand = z.infer<typeof LedCommandSchema>;

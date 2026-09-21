@@ -75,6 +75,7 @@ export interface MusicKitInstance {
   skipToNextItem(): Promise<void>;
   skipToPreviousItem(): Promise<void>;
   seekToTime(seconds: number): Promise<void>;
+  /** `{ songs: string[], startWith?: number }` or `{ playlist: string }`. */
   setQueue(options: Record<string, unknown>): Promise<void>;
   addEventListener(event: MusicKitEvent, handler: () => void): void;
   removeEventListener(event: MusicKitEvent, handler: () => void): void;

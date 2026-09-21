@@ -189,6 +189,11 @@ model Device {
   autoAnswer   Boolean @default(true) // pages auto-open on endpoints
   /// Soft chime before announce/reminder speech on this panel.
   chimeEnabled Boolean @default(true)
+
+  /// When an Apple Music account was last linked on this panel. The listener's
+  /// token stays on the device; this only records that music can land here, so
+  /// another panel knows whether a handoff has anywhere to go.
+  musicLinkedAt DateTime?
   /// Seconds to keep announce/reminder overlay visible before auto-return (default 30).
   announceDwellSec Int @default(30)
   /// When enabled, reminders whisper (no chime, lower volume); pages still ring.

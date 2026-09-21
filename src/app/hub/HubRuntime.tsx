@@ -6,6 +6,7 @@ import { isWellFormedPairingCode } from "@/lib/devices/pairing";
 import PairingScreen from "@/app/endpoint/PairingScreen";
 import { useMediaSession } from "@/app/endpoint/useMediaSession";
 import { useEndpointPresence } from "@/app/endpoint/useEndpointPresence";
+import { useAppleMusic, type AppleMusic } from "./music/useAppleMusic";
 import CallCard from "./_components/CallCard";
 import RingCard from "./_components/RingCard";
 import SpeakingCard from "./_components/SpeakingCard";
@@ -26,6 +27,8 @@ import SpeakingCard from "./_components/SpeakingCard";
  */
 
 interface HubState {
+  /** The music session, owned here so a handoff lands whatever screen is up. */
+  music: AppleMusic;
   /** The room this panel speaks for, as the household named it. */
   room: string;
   /** Live lobby connection — the panel can be reached right now. */
@@ -43,8 +46,22 @@ export function useHub(): HubState {
   return value;
 }
 
+/** The panel's one music session. */
+export function useHubMusic(): AppleMusic {
+  return useHub().music;
+}
+
 export default function HubRuntime({ children }: { children: ReactNode }) {
   const media = useMediaSession();
+
+  /**
+   * One music session for the whole panel, mounted here rather than on the
+   * Music screen. A handoff can arrive while the Hub is showing the clock, and
+   * it has to start playing anyway — a player that only exists on the screen
+   * that shows it would drop every one of them.
+   */
+  const music = useAppleMusic();
+  const acceptHandoff = music.acceptHandoff;
   const {
     phase,
     setPhase,
@@ -59,7 +76,12 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     speaking,
     dismissSpeaking,
     heartbeat,
-  } = useEndpointPresence(media);
+  } = useEndpointPresence(media, {
+    onMusicHandoff: useCallback(
+      (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => acceptHandoff(cmd),
+      [acceptHandoff],
+    ),
+  });
 
   const { sinkRef, incoming, ringing, answerRing, declineRing, leaveMedia } = media;
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
@@ -108,7 +130,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
   }, [phase, code, claim]);
 
   return (
-    <Ctx.Provider value={{ room, receiving, doNotDisturb: dnd, setDoNotDisturb }}>
+    <Ctx.Provider value={{ music, room, receiving, doNotDisturb: dnd, setDoNotDisturb }}>
       {/* Remote audio lands here; it must outlive every screen change. */}
       <div ref={sinkRef} aria-hidden className="pointer-events-none absolute h-0 w-0 overflow-hidden" />
 

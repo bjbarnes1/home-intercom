@@ -20,6 +20,8 @@ export interface PlaybackTarget {
   online: boolean;
   /** True for the device asking — the one whose browser is playing. */
   isSelf: boolean;
+  /** Somebody has linked an Apple Music account here, so music can land on it. */
+  canPlay: boolean;
 }
 
 export interface TargetGroup {
@@ -41,6 +43,7 @@ export interface TargetRow {
   room: string | null;
   hasSpeaker: boolean;
   lastSeenAt: Date | null;
+  musicLinkedAt: Date | null;
 }
 
 /**
@@ -61,6 +64,7 @@ export function toTargets(
       where: d.room ?? d.displayName,
       online: isOnline(d.lastSeenAt, now),
       isSelf: d.id === selfId,
+      canPlay: d.musicLinkedAt != null,
     }))
     .filter((d) => d.online)
     .sort((a, b) => (a.isSelf ? -1 : b.isSelf ? 1 : a.where.localeCompare(b.where)));
@@ -87,7 +91,14 @@ export async function loadPlaybackTargets(
     prisma.device.findMany({
       // ENDPOINT only: a CONTROLLER is somebody's phone, not a speaker in a room.
       where: { householdId, pairing: "ACTIVE", type: "ENDPOINT" },
-      select: { id: true, displayName: true, room: true, hasSpeaker: true, lastSeenAt: true },
+      select: {
+        id: true,
+        displayName: true,
+        room: true,
+        hasSpeaker: true,
+        lastSeenAt: true,
+        musicLinkedAt: true,
+      },
     }),
     prisma.zone.findMany({
       where: { householdId },

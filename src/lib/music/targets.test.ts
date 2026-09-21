@@ -9,6 +9,7 @@ const row = (over: Partial<TargetRow> & { id: string }): TargetRow => ({
   room: null,
   hasSpeaker: true,
   lastSeenAt: seen(1),
+  musicLinkedAt: new Date(NOW),
   ...over,
 });
 
@@ -47,6 +48,18 @@ describe("toTargets", () => {
       NOW,
     );
     expect(targets.map((t) => t.where)).toEqual(["Kitchen", "Lounge", "Rumpus"]);
+  });
+
+  it("says whether music can land on a panel", () => {
+    const [linked, bare] = [
+      toTargets([row({ id: "a" })], null, NOW)[0],
+      toTargets([row({ id: "b", musicLinkedAt: null })], null, NOW)[0],
+    ];
+    expect(linked.canPlay).toBe(true);
+    // Awake and audible, but nobody has signed in to Apple Music on it, so a
+    // handoff has nowhere to go — it is still listed, because it takes calls.
+    expect(bare.canPlay).toBe(false);
+    expect(bare.online).toBe(true);
   });
 
   it("falls back to the panel's own name when it has no room", () => {

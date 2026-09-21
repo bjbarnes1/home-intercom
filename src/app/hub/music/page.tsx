@@ -7,7 +7,8 @@ import { PEOPLE } from "../data";
 import type { Identity } from "@/lib/color/identity";
 import { useState } from "react";
 import PlayingOn from "./PlayingOn";
-import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
+import { useHubMusic } from "../HubRuntime";
+import { formatTime, type AppleMusic } from "./useAppleMusic";
 
 /**
  * Music — what is playing, and where.
@@ -21,7 +22,7 @@ import { formatTime, useAppleMusic, type AppleMusic } from "./useAppleMusic";
  * not Apple's.
  */
 export default function Music() {
-  const music = useAppleMusic();
+  const music = useHubMusic();
   const [adding, setAdding] = useState(false);
 
   return (
@@ -145,7 +146,7 @@ export default function Music() {
           </div>
         </div>
 
-        <PlayingOn isPlaying={music.isPlaying} />
+        <PlayingOn music={music} />
       </div>
 
       {adding ? (

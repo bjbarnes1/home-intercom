@@ -5,6 +5,7 @@ import { getDeviceSecret } from "@/lib/client/identity";
 import { Eyebrow } from "../_components/BaseLayer";
 import Icon from "../_components/Icon";
 import type { PlaybackTarget, TargetGroup } from "@/lib/music/targets";
+import type { AppleMusic } from "./useAppleMusic";
 
 /**
  * Playing on — the household's own speakers, and only the ones awake.
@@ -14,10 +15,14 @@ import type { PlaybackTarget, TargetGroup } from "@/lib/music/targets";
  * panel that has not checked in inside the presence window, because a tap on a
  * sleeping panel does nothing and the list should not invite one.
  *
- * Apple Music plays in this browser and cannot be sent elsewhere — its audio is
- * DRM-protected, so nothing can capture it to relay. Other rooms are therefore
- * shown for what they can genuinely do today, which is carry announcements and
- * calls over the house's own audio path.
+ * Tapping a room hands the music to it rather than adding it. Apple Music
+ * streams to one device per subscription and its audio is DRM-protected, so
+ * nothing can be relayed or doubled — what can be done is to move it, which is
+ * what a tap does: that panel picks up the same queue at the same second, and
+ * this one falls quiet.
+ *
+ * A panel with nobody signed in to Apple Music still appears, because it takes
+ * calls and announcements, but it is not offered as somewhere to send music.
  */
 
 const REFRESH_MS = 15_000;
@@ -28,8 +33,11 @@ interface TargetsResponse {
   groups?: TargetGroup[];
 }
 
-export default function PlayingOn({ isPlaying }: { isPlaying: boolean }) {
+export default function PlayingOn({ music }: { music: AppleMusic }) {
   const [state, setState] = useState<TargetsResponse | null>(null);
+  const [moving, setMoving] = useState<string | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+  const isPlaying = music.isPlaying;
 
   useEffect(() => {
     let alive = true;
@@ -78,19 +86,37 @@ export default function PlayingOn({ isPlaying }: { isPlaying: boolean }) {
           <Note>No panels are awake right now.</Note>
         ) : null}
 
-        {devices.map((d) => (
-          <div
+        {devices.map((d) => {
+          const here = d.isSelf && isPlaying;
+          // Somewhere to send it: not this panel, signed in, and we have a queue.
+          const sendable = !d.isSelf && d.canPlay && music.queue.length > 0;
+
+          const move = async () => {
+            if (!sendable || moving) return;
+            setMoving(d.id);
+            setProblem(null);
+            const failure = await music.handOffTo(d.id);
+            setMoving(null);
+            if (failure) setProblem(failure);
+          };
+
+          return (
+          <button
             key={d.id}
-            className={`flex items-center gap-3 rounded-xl px-3.5 py-2.5 ${
-              d.isSelf && isPlaying ? "" : "bg-transparent"
-            }`}
-            style={d.isSelf && isPlaying ? { background: "var(--color-accent)" } : undefined}
+            type="button"
+            disabled={!sendable}
+            onClick={move}
+            aria-label={sendable ? `Move the music to ${d.where}` : undefined}
+            className={`flex items-center gap-3 rounded-xl border-none px-3.5 py-2.5 text-left transition-colors ${
+              here ? "" : "bg-transparent"
+            } ${sendable ? "cursor-pointer hover:bg-bg active:scale-[0.99]" : "cursor-default"}`}
+            style={here ? { background: "var(--color-accent)" } : undefined}
           >
             <span
               className="flex h-9 w-9 flex-none items-center justify-center rounded-xl"
               style={{
-                background: d.isSelf && isPlaying ? "rgba(255,255,255,0.22)" : "rgba(59,92,246,0.10)",
-                color: d.isSelf && isPlaying ? "#FFFFFF" : "var(--color-accent)",
+                background: here ? "rgba(255,255,255,0.22)" : "rgba(59,92,246,0.10)",
+                color: here ? "#FFFFFF" : "var(--color-accent)",
               }}
             >
               <Icon name="speaker" size={17} />
@@ -99,33 +125,42 @@ export default function PlayingOn({ isPlaying }: { isPlaying: boolean }) {
             <span className="flex min-w-0 flex-grow flex-col">
               <span
                 className={`truncate text-[13px] font-semibold leading-[18px] ${
-                  d.isSelf && isPlaying ? "text-white" : "text-text"
+                  here ? "text-white" : "text-text"
                 }`}
               >
                 {d.where}
               </span>
               <span
-                className={`truncate text-xs leading-4 ${
-                  d.isSelf && isPlaying ? "text-white" : "text-ink-muted"
-                }`}
+                className={`truncate text-xs leading-4 ${here ? "text-white" : "text-ink-muted"}`}
               >
-                {d.isSelf ? (isPlaying ? "Playing now" : "This Hub") : "Awake · announcements"}
+                {d.isSelf
+                  ? isPlaying
+                    ? "Playing now"
+                    : "This Hub"
+                  : moving === d.id
+                    ? "Moving the music…"
+                    : sendable
+                      ? "Tap to move the music here"
+                      : d.canPlay
+                        ? "Awake"
+                        : "Awake · no Apple Music account"}
               </span>
             </span>
 
             <span
               className="h-2.5 w-2.5 flex-none rounded-full"
-              style={{
-                background: d.isSelf && isPlaying ? "#FFFFFF" : "rgba(15,23,42,0.18)",
-              }}
+              style={{ background: here ? "#FFFFFF" : "rgba(15,23,42,0.18)" }}
             />
-          </div>
-        ))}
+          </button>
+          );
+        })}
+
+        {problem ? <Note>{problem}</Note> : null}
 
         {devices.length > 1 ? (
           <Note>
-            Music plays on this Hub only — Apple Music&rsquo;s audio is protected and cannot be sent
-            to another room.
+            Music moves between rooms rather than filling them — one Apple Music account plays in
+            one place at a time.
           </Note>
         ) : null}
       </div>
