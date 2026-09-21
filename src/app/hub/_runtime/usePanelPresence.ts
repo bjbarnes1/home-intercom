@@ -121,7 +121,15 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
       setLivekitUrl(wsUrl);
       setPhase("ready");
 
-      if (!data.mock && !lobbyRef.current) {
+      // The server says so explicitly when it could not mint a lobby token.
+      // Surface that instead of attempting a connect with nothing and showing
+      // whatever LiveKit's client says about an empty token.
+      if (data.livekitError) {
+        setReceiving(false);
+        setReceiveError(String(data.livekitError));
+      }
+
+      if (!data.mock && !data.livekitError && data.lobbyToken && !lobbyRef.current) {
         const r = new Room();
         lobbyRef.current = r;
         r.on(RoomEvent.DataReceived, (payload: Uint8Array) => {

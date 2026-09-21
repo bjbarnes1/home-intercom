@@ -4,6 +4,7 @@ import { deviceFromRequest } from "@/lib/auth/context";
 import { mintToken } from "@/lib/livekit/token";
 import { lobbyRoom } from "@/lib/livekit/rooms";
 import { env } from "@/lib/env";
+import { reportError } from "@/lib/errors/report";
 
 export const dynamic = "force-dynamic";
 
@@ -24,13 +25,30 @@ export async function POST(req: Request) {
     data: { lastSeenAt: new Date() },
   });
 
-  const lobbyToken = await mintToken({
-    identity: device.id,
-    name: device.displayName,
-    room: lobbyRoom(device.householdId),
-    role: "lobby",
-    ttlSeconds: 60 * 60, // an hour; refreshed each heartbeat
-  });
+  /*
+   * mintToken now refuses to sign with the public dev credentials in
+   * production. That is right — a token signed with a key the world knows is
+   * worse than no token — but it must not take the whole heartbeat with it.
+   * This response also carries the panel's room, settings and DND state, and a
+   * panel that cannot do audio should still know what room it is and show a
+   * clock rather than sitting on "Connection failed".
+   *
+   * So the failure is reported in the payload and the rest still arrives.
+   */
+  let lobbyToken: string | null = null;
+  let livekitError: string | null = null;
+  try {
+    lobbyToken = await mintToken({
+      identity: device.id,
+      name: device.displayName,
+      room: lobbyRoom(device.householdId),
+      role: "lobby",
+      ttlSeconds: 60 * 60, // an hour; refreshed each heartbeat
+    });
+  } catch (e) {
+    livekitError = e instanceof Error ? e.message : "LiveKit is not configured";
+    reportError(e, { code: "presence.mint_lobby_token", route: "/api/presence" });
+  }
 
   const row = await prisma.device.findUniqueOrThrow({
     where: { id: device.id },
@@ -64,5 +82,6 @@ export async function POST(req: Request) {
     hasLeds: row.hasLeds,
     announceDwellSec: row.announceDwellSec,
     mock: env.mockLocalServices,
+    ...(livekitError ? { livekitError } : {}),
   });
 }
