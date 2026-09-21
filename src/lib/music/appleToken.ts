@@ -46,12 +46,70 @@ function base64url(input: Buffer | string): string {
     .replace(/=+$/, "");
 }
 
+/** The key is present but OpenSSL cannot read it — almost always how it was pasted. */
+export class AppleMusicKeyError extends Error {
+  constructor(detail: string) {
+    super(`The MusicKit private key could not be read: ${detail}`);
+    this.name = "AppleMusicKeyError";
+  }
+}
+
+const PEM_LABEL = /-----(?:BEGIN|END) ([A-Z ]+?)-----/;
+const ARMOUR = /-----(?:BEGIN|END) [A-Z ]+-----/g;
+
 /**
- * Environment variables cannot hold real newlines on most hosts, so the key is
- * stored with literal "\n" and restored here.
+ * Rebuild a usable PEM from however the key was pasted.
+ *
+ * A .p8 only survives a dashboard env-var field intact if nothing touches its
+ * newlines, and something usually does. Real newlines become literal "\n", or
+ * spaces, or vanish; the value arrives wrapped in quotes it was copied with, or
+ * base64-encoded whole, or as the body with the BEGIN/END lines left behind.
+ * OpenSSL rejects every one of those with the same opaque
+ * "DECODER routines::unsupported", which says nothing about which mistake it was.
+ *
+ * So rather than trusting the layout, take the base64 body and re-emit the PEM
+ * the way OpenSSL wants it: armour on its own lines, body wrapped at 64
+ * characters. The label is kept when there is one, because a SEC1 "EC PRIVATE
+ * KEY" and a PKCS#8 "PRIVATE KEY" decode differently and Apple issues the latter.
  */
 export function normalisePrivateKey(raw: string): string {
-  return raw.includes("\\n") ? raw.replace(/\\n/g, "\n") : raw;
+  let text = raw.trim();
+  if (!text) throw new AppleMusicKeyError("it is empty");
+
+  // Copied with its surrounding quotes.
+  if ((text.startsWith('"') && text.endsWith('"')) || (text.startsWith("'") && text.endsWith("'"))) {
+    text = text.slice(1, -1).trim();
+  }
+
+  // Stored with escaped newlines rather than real ones.
+  text = text.replace(/\\r/g, "").replace(/\\n/g, "\n");
+
+  // Base64 of the whole file, which some hosts suggest to dodge the newline problem.
+  if (!text.includes("-----") && looksBase64(text)) {
+    const decoded = safeDecode(text);
+    if (decoded.includes("-----")) text = decoded.trim();
+  }
+
+  const label = text.match(PEM_LABEL)?.[1] ?? "PRIVATE KEY";
+  const body = text.replace(ARMOUR, "").replace(/\s/g, "");
+
+  if (!body) throw new AppleMusicKeyError("it contains no key data");
+  if (!looksBase64(body)) throw new AppleMusicKeyError("it is not valid base64");
+
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
+}
+
+function looksBase64(text: string): boolean {
+  return /^[A-Za-z0-9+/=\s]+$/.test(text) && text.replace(/[^A-Za-z0-9+/=]/g, "").length > 0;
+}
+
+function safeDecode(text: string): string {
+  try {
+    return Buffer.from(text, "base64").toString("utf8");
+  } catch {
+    return "";
+  }
 }
 
 /** Mint (or reuse) a developer token. Throws when the credentials are absent. */
@@ -68,7 +126,17 @@ export function getDeveloperToken(now = Date.now()): { token: string; expiresAt:
   const payload = base64url(JSON.stringify({ iss: teamId, iat: issuedAt, exp: expires }));
   const signingInput = `${header}.${payload}`;
 
-  const key = createPrivateKey(normalisePrivateKey(privateKey));
+  let key;
+  try {
+    key = createPrivateKey(normalisePrivateKey(privateKey));
+  } catch (e) {
+    if (e instanceof AppleMusicKeyError) throw e;
+    // OpenSSL's own message names no cause, so say what is actually actionable.
+    throw new AppleMusicKeyError(
+      "it is not a P-256 private key in PKCS#8 form. Paste the whole .p8 file, " +
+        "BEGIN and END lines included.",
+    );
+  }
   // JOSE wants the raw r||s pair, not the ASN.1 DER sequence OpenSSL emits by
   // default — without this Apple rejects every token as malformed.
   const signature = sign("sha256", Buffer.from(signingInput), {

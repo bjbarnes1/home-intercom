@@ -127,11 +127,21 @@ export function useAppleMusic(): AppleMusic {
     (async () => {
       try {
         const res = await fetch("/api/music/apple/token", { cache: "no-store" });
-        const json = (await res.json()) as { configured: boolean; token?: string };
+        const json = (await res.json()) as {
+          configured: boolean;
+          token?: string;
+          reason?: string;
+        };
         if (!alive) return;
 
-        if (!json.configured || !json.token) {
+        if (!json.configured) {
           setStatus("unconfigured");
+          return;
+        }
+        if (!json.token) {
+          // Credentials are set but unusable — the server knows why, so say it.
+          setError(json.reason ?? "The Apple Music credentials on this server are not usable");
+          setStatus("error");
           return;
         }
 
