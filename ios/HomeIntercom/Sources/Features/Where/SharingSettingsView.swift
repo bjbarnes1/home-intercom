@@ -61,17 +61,7 @@ struct SharingSettingsView: View {
 
             Section("On this phone") {
                 LabeledContent("Permission", value: permissionLabel)
-                if location.authorization != .always {
-                    Button("Allow \"Always\" in Settings") {
-                        openSystemSettings()
-                    }
-                    Text(
-                        "Geofences only fire with the app closed if iOS has "
-                        + "\"Always\". With \"While Using\", arrivals are missed."
-                    )
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
+                permissionAction
 
                 NavigationLink {
                     PlacesEditorView(canEdit: store.auth.user?.isAdmin == true)
@@ -110,6 +100,57 @@ struct SharingSettingsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Your stored positions and place visits are deleted immediately.")
+        }
+    }
+
+    /// What to offer depends on where iOS currently stands, and getting this
+    /// wrong is worse than it sounds: send someone to Settings before the app
+    /// has ever asked and they land on a page with no Location row at all,
+    /// because iOS only creates one once an app has requested. That reads as a
+    /// broken app rather than an unasked question.
+    @ViewBuilder
+    private var permissionAction: some View {
+        switch location.authorization {
+        case .notDetermined:
+            Button("Allow location access") {
+                location.requestAuthorization()
+            }
+            Text(
+                "iOS will ask. Choose \"Allow While Using App\" — then come back "
+                + "here and you'll be offered the upgrade to \"Always\", which is "
+                + "what lets arrivals fire with the app closed."
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+
+        case .whenInUse:
+            Button("Upgrade to \"Always\"") {
+                // iOS shows this prompt once per install. If nothing happens,
+                // it has already been asked and declined — Settings is the only
+                // way from here, which is why both buttons are offered.
+                location.requestAuthorization()
+            }
+            Button("Open Settings instead") {
+                openSystemSettings()
+            }
+            Text(
+                "With \"While Using\", geofences only fire while the app is open — "
+                + "so arrivals are missed exactly when you'd want them. In Settings, "
+                + "choose Location → Always."
+            )
+            .font(.caption)
+            .foregroundStyle(.orange)
+
+        case .denied:
+            Button("Open Settings") {
+                openSystemSettings()
+            }
+            Text("Location is off for Home Intercom. Turn it on under Location → Always.")
+                .font(.caption)
+                .foregroundStyle(.orange)
+
+        case .always:
+            EmptyView()
         }
     }
 
