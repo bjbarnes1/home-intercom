@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Identity } from "@/lib/color/identity";
 import { getDeviceSecret } from "@/lib/client/identity";
-import { love, lovedIds, unlove, type LovableKind } from "@/lib/music/appleApi";
+import {
+  love,
+  lovedIds,
+  searchCatalog,
+  storefront,
+  unlove,
+  type LovableKind,
+} from "@/lib/music/appleApi";
 import { clearResume, queueDescriptor, readResume, saveResume } from "./resume";
 import { indexAfterMove, reorder } from "@/lib/music/reorder";
 import {
@@ -184,6 +191,8 @@ export function useAppleMusic(): AppleMusic {
   const [reordering, setReordering] = useState(false);
   /** Needed for the REST calls MusicKit has no helper for. */
   const developerToken = useRef<string>("");
+  /** Resolved once, lazily. Catalog search will not work without it. */
+  const storefrontId = useRef<string>("");
   /** The level to come back to. Tracks the slider even while ducked. */
   const baseVolume = useRef(0.65);
   const [volume, setVolumeState] = useState(0.65);
@@ -626,36 +635,46 @@ export function useAppleMusic(): AppleMusic {
       const query = term.trim();
       if (!m || query.length < 2) return { songs: [], playlists: [] };
 
-      try {
-        // `{{storefrontId}}` is MusicKit's own templating, filled from the
-        // storefront it resolved at configure time. Reading `storefrontId` off
-        // the instance instead gives whatever the lazy getter has so far, which
-        // early on is nothing — and `/v1/catalog/undefined/search` is a 404.
-        const res = (await m.api.music("/v1/catalog/{{storefrontId}}/search", {
-          term: query,
-          types: "songs,playlists",
-          limit: 12,
-        })) as unknown as {
-          data: {
-            results?: {
-              songs?: { data: MusicKitResource[] };
-              playlists?: { data: MusicKitResource[] };
-            };
-          };
-        };
-        const results = res.data?.results ?? {};
-        const songs = (results.songs?.data ?? []).map(toTrack);
-        const playlists = (results.playlists?.data ?? []).map(toPlaylist);
+      const auth = { developerToken: developerToken.current, musicUserToken: m.musicUserToken };
+      if (!auth.developerToken) {
+        setError("Search needs the Apple Music credentials on this server");
+        return { songs: [], playlists: [] };
+      }
 
-        // Mark what is already loved, so the heart is right the moment it appears.
+      try {
+        // Resolve the storefront before searching rather than trusting whatever
+        // MusicKit has so far. Catalog search is per-storefront, and an
+        // unresolved one produced `/v1/catalog/undefined/search` — a 404 that
+        // looked exactly like "nothing found".
+        if (!storefrontId.current) {
+          storefrontId.current = m.storefrontId || (await storefront(auth)) || "";
+        }
+        if (!storefrontId.current) {
+          setError("Apple Music has not said which storefront this account is in");
+          return { songs: [], playlists: [] };
+        }
+
+        const found = await searchCatalog(auth, storefrontId.current, query);
+        const songs: Track[] = found.songs.map((t) => ({
+          id: t.id,
+          title: t.title,
+          artist: t.artist,
+          length: formatLength(t.durationMs),
+        }));
+        const playlists: Playlist[] = found.playlists.map((p) => ({
+          id: p.id,
+          name: p.name,
+          artwork: p.artworkUrl ? p.artworkUrl.replace("{w}", "120").replace("{h}", "120") : null,
+        }));
+
+        setError(null);
+        // Mark what is already loved, so the heart is right as it appears.
         void refreshLoved(songs.map((t) => t.id), "songs");
         return { songs, playlists };
       } catch (e) {
         // A failed search and a search with no matches look identical on screen
         // otherwise, and they want very different things done about them.
-        setError(
-          e instanceof Error ? `Search failed: ${e.message}` : "Search is unavailable",
-        );
+        setError(e instanceof Error ? `Search failed: ${e.message}` : "Search is unavailable");
         return { songs: [], playlists: [] };
       }
     },
