@@ -337,9 +337,12 @@ function PlaceSearch({ onClose, onPick }: { onClose: () => void; onPick: (m: Pla
               className="flex cursor-pointer items-center gap-3 rounded-xl border-none bg-transparent px-4 py-3 text-left transition-colors hover:bg-bg"
             >
               <Icon name="weather" size={18} className="flex-none text-accent" />
-              <span className="flex min-w-0 flex-col">
+              <span className="flex min-w-0 flex-grow flex-col">
                 <span className="truncate text-[15px] font-semibold leading-5 text-text">{r.place}</span>
                 <span className="truncate text-[13px] leading-[18px] text-ink-muted">{r.region}</span>
+              </span>
+              <span className="flex-none text-[13px] leading-[18px] text-ink-muted tabular-nums">
+                {formatDistance(r.distanceKm)}
               </span>
             </button>
           ))}
@@ -382,4 +385,12 @@ function dedupe(places: Place[]): Place[] {
     seen.add(key);
     return true;
   });
+}
+
+/** Near things in kilometres, far things rounded — nobody needs 11,842 km. */
+function formatDistance(km: number): string {
+  if (km < 1) return "here";
+  if (km < 100) return `${Math.round(km)} km`;
+  if (km < 1000) return `${Math.round(km / 10) * 10} km`;
+  return `${Math.round(km / 100) * 100} km`;
 }
