@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { withRoute } from "@/lib/http";
-import { appleMusicConfigured, getDeveloperToken } from "@/lib/music/appleToken";
+import { AppleMusicKeyError, appleMusicConfigured, getDeveloperToken } from "@/lib/music/appleToken";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +21,25 @@ export async function GET() {
       if (!appleMusicConfigured()) {
         return NextResponse.json({ configured: false }, { status: 200 });
       }
-      const { token, expiresAt } = getDeveloperToken();
-      return NextResponse.json(
-        { configured: true, token, expiresAt },
-        { headers: { "Cache-Control": "no-store" } },
-      );
+
+      try {
+        const { token, expiresAt } = getDeveloperToken();
+        return NextResponse.json(
+          { configured: true, token, expiresAt },
+          { headers: { "Cache-Control": "no-store" } },
+        );
+      } catch (e) {
+        // A credential that is present but unusable is a setup mistake, not a
+        // crash. Saying so on the screen beats a 500 that sends someone reading
+        // server logs to find out their key lost its newlines.
+        if (e instanceof AppleMusicKeyError) {
+          return NextResponse.json(
+            { configured: true, reason: e.message },
+            { status: 200, headers: { "Cache-Control": "no-store" } },
+          );
+        }
+        throw e;
+      }
     },
     { route: "/api/music/apple/token" },
   );

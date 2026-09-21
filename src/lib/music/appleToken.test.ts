@@ -78,12 +78,56 @@ describe("getDeveloperToken", () => {
     expect(later.token).not.toBe(first.token);
   });
 
-  it("restores a key whose newlines were escaped for an env var", async () => {
+  /**
+   * Every one of these is a real way a .p8 comes back out of a dashboard
+   * env-var field, and every one of them makes OpenSSL throw the same opaque
+   * ERR_OSSL_UNSUPPORTED. They must all still mint a token.
+   */
+  it.each([
+    ["escaped newlines", (k: string) => k.replace(/\n/g, "\\n")],
+    ["newlines turned into spaces", (k: string) => k.replace(/\n/g, " ")],
+    ["newlines stripped entirely", (k: string) => k.replace(/\n/g, "")],
+    ["CRLF line endings", (k: string) => k.replace(/\n/g, "\r\n")],
+    ["wrapped in the quotes it was copied with", (k: string) => `"${k}"`],
+    ["leading and trailing whitespace", (k: string) => `\n  ${k}  \n`],
+    ["base64 of the whole file", (k: string) => Buffer.from(k).toString("base64")],
+    ["the body with the BEGIN/END lines lost", (k: string) =>
+      k.replace(/-----[^-]+-----/g, "").replace(/\s+/g, "")],
+  ])("survives a key with %s", async (_name, mangle) => {
     const { getDeveloperToken } = await load({
       ...good,
-      APPLE_MUSIC_PRIVATE_KEY: privateKey.replace(/\n/g, "\\n"),
+      APPLE_MUSIC_PRIVATE_KEY: mangle(privateKey),
     });
-    expect(() => getDeveloperToken()).not.toThrow();
+    const [header, payload, signature] = getDeveloperToken().token.split(".");
+    expect(
+      verify(
+        "sha256",
+        Buffer.from(`${header}.${payload}`),
+        { key: createPublicKey(publicKey), dsaEncoding: "ieee-p1363" },
+        Buffer.from(signature.replace(/-/g, "+").replace(/_/g, "/"), "base64"),
+      ),
+    ).toBe(true);
+  });
+
+  it("names the problem when the key is not a key at all", async () => {
+    const { getDeveloperToken, AppleMusicKeyError } = await load({
+      ...good,
+      APPLE_MUSIC_PRIVATE_KEY: "not-a-key",
+    });
+    expect(() => getDeveloperToken()).toThrow(AppleMusicKeyError);
+  });
+
+  it("does not put key material in the error", async () => {
+    const { getDeveloperToken } = await load({
+      ...good,
+      APPLE_MUSIC_PRIVATE_KEY: `-----BEGIN PRIVATE KEY-----\nc2VjcmV0LW1hdGVyaWFs\n-----END PRIVATE KEY-----`,
+    });
+    try {
+      getDeveloperToken();
+      throw new Error("should have thrown");
+    } catch (e) {
+      expect((e as Error).message).not.toContain("c2VjcmV0");
+    }
   });
 
   it("refuses to pretend when a credential is missing", async () => {
