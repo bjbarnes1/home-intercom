@@ -87,6 +87,16 @@ describe("POST /api/presence", () => {
     expect(touch).toHaveBeenCalledWith(device.id);
   });
 
+  it("names the lobby room, so a panel can notice it moved", async () => {
+    const { POST } = await import("./presence/route");
+    const body = await (await POST(beat())).json();
+
+    // Without this the panel cannot tell that the room it is connected to is
+    // no longer the one the server addresses — which is exactly what stranded
+    // every live panel when the lobby was namespaced per household.
+    expect(body.lobbyRoomName).toBe(`lobby:${device.householdId}`);
+  });
+
   it("still tells the panel its room and settings", async () => {
     const { POST } = await import("./presence/route");
     const body = await (await POST(beat())).json();

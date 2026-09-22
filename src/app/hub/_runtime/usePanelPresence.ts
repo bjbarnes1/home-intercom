@@ -129,6 +129,30 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
         setReceiveError(String(data.livekitError));
       }
 
+      /*
+       * Already connected, but to a room the server is no longer addressing.
+       *
+       * This is not hypothetical: renaming the lobby from "lobby" to
+       * "lobby:<householdId>" left every panel that was connected at the time
+       * sitting in the old room, receiving nothing, with no way to notice —
+       * the reconnect below only runs when there is no connection at all, and
+       * a LiveKit session does not end just because its token expired.
+       *
+       * Dropping the stale one lets the reconnect below pick up the new token.
+       * The Disconnected handler checks identity before clearing, and the ref
+       * is already null here, so it cannot clobber the replacement.
+       */
+      if (
+        lobbyRef.current &&
+        data.lobbyRoomName &&
+        lobbyRef.current.name !== data.lobbyRoomName
+      ) {
+        const stale = lobbyRef.current;
+        lobbyRef.current = null;
+        setReceiving(false);
+        await stale.disconnect().catch(() => {});
+      }
+
       if (!data.mock && !data.livekitError && data.lobbyToken && !lobbyRef.current) {
         const r = new Room();
         lobbyRef.current = r;

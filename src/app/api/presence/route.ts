@@ -81,6 +81,13 @@ export async function POST(req: Request) {
 
   return NextResponse.json({
     lobbyToken,
+    /*
+     * Which room that token is for. The panel needs it to notice when the room
+     * NAME changes underneath a connection it is already holding — renaming
+     * the lobby per household stranded every panel that was connected at the
+     * time, because it only ever reconnects when its socket drops.
+     */
+    lobbyRoomName: lobbyRoom(device.householdId),
     livekitUrl: env.livekit.publicUrl,
     // The panel is told which room it is on every beat. It only learned this
     // at pairing before, so a reload left it calling itself something generic
