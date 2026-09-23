@@ -69,6 +69,40 @@ const MusicHandoffCommandSchema = z.object({
   startTime: z.number().min(0),
   /** The room it came from, for the arriving panel to say so. */
   from: z.string().max(80).optional(),
+  /**
+   * Set by a sender that waits to hear the music started before it goes
+   * quiet. The receiver answers through /api/music/handoff/ack with this id
+   * and the panel it came from. Absent from an older sender, which pauses
+   * straight away and expects no answer.
+   */
+  handoffId: z.string().max(64).optional(),
+  fromDeviceId: z.string().max(64).optional(),
+  /**
+   * Shuffle and repeat belong to the queue, so they travel with it: music that
+   * was shuffling in the kitchen should still be shuffling in the bedroom.
+   * Optional so an older sender's handoff still parses.
+   */
+  shuffle: z.boolean().optional(),
+  repeat: z.enum(["none", "all", "one"]).optional(),
+});
+
+/**
+ * Whether a handoff actually started playing at the other end.
+ *
+ * A 200 from /api/music/handoff only means the command was published. The
+ * sending panel stays audible until this arrives saying the music started, so
+ * a target that cannot play — a stale Apple Music token, a queue that will not
+ * resolve, a browser that will not start audio — leaves the music where it was
+ * instead of leaving two rooms silent.
+ */
+const MusicHandoffResultCommandSchema = z.object({
+  type: z.literal("musicHandoffResult"),
+  handoffId: z.string().max(64),
+  ok: z.boolean(),
+  /** Why it would not play, in words fit for the sending panel's screen. */
+  error: z.string().max(200).optional(),
+  /** The room that took it, or would not. */
+  to: z.string().max(80).optional(),
 });
 
 /**
@@ -96,7 +130,12 @@ const MusicFetchCommandSchema = z.object({
  */
 const MusicControlCommandSchema = z.object({
   type: z.literal("musicControl"),
-  action: z.enum(["play", "pause", "next", "previous", "volume"]),
+  /**
+   * "shuffle" toggles and "repeat" moves to the next of off → all → one, the
+   * same as pressing the button on that panel. The asking panel cannot see the
+   * other one's current state, so an absolute value would be a guess.
+   */
+  action: z.enum(["play", "pause", "next", "previous", "volume", "shuffle", "repeat"]),
   /** 0–1, required for "volume" and ignored otherwise. */
   value: z.number().min(0).max(1).optional(),
 });
@@ -117,6 +156,7 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   ReminderCommandSchema,
   AnnounceCommandSchema,
   MusicHandoffCommandSchema,
+  MusicHandoffResultCommandSchema,
   MusicFetchCommandSchema,
   MusicControlCommandSchema,
   HangupCommandSchema,
@@ -129,6 +169,7 @@ export type RingCommand = z.infer<typeof RingCommandSchema>;
 export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
 export type MusicHandoffCommand = z.infer<typeof MusicHandoffCommandSchema>;
+export type MusicHandoffResultCommand = z.infer<typeof MusicHandoffResultCommandSchema>;
 export type MusicFetchCommand = z.infer<typeof MusicFetchCommandSchema>;
 export type MusicControlCommand = z.infer<typeof MusicControlCommandSchema>;
 export type HangupCommand = z.infer<typeof HangupCommandSchema>;

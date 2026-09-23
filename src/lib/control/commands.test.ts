@@ -6,6 +6,7 @@ import {
   type MusicControlCommand,
   type MusicFetchCommand,
   type MusicHandoffCommand,
+  type MusicHandoffResultCommand,
 } from "@/lib/control/commands";
 
 const handoff: MusicHandoffCommand = {
@@ -116,5 +117,39 @@ describe("musicControl — working another room's player", () => {
     expect(ControlCommandSchema.safeParse({ type: "musicControl", action: "eject" }).success).toBe(
       false,
     );
+  });
+});
+
+describe("the answer to a handoff", () => {
+  const result: MusicHandoffResultCommand = {
+    type: "musicHandoffResult",
+    handoffId: "3f2b9c1e-0000-4000-8000-000000000000",
+    ok: false,
+    error: "Nobody is signed in to Apple Music on that panel",
+    to: "Kitchen",
+  };
+
+  it("survives the round trip the lobby puts it through", () => {
+    expect(decodeCommand(encodeCommand(result))).toEqual(result);
+  });
+
+  it("carries the id and sender an acking panel needs, and an older handoff without them still parses", () => {
+    const withAck = { ...handoff, handoffId: "abc12345", fromDeviceId: "dev_1" };
+    expect(decodeCommand(encodeCommand(withAck))).toEqual(withAck);
+    expect(ControlCommandSchema.safeParse(handoff).success).toBe(true);
+  });
+});
+
+describe("shuffle and repeat travel with the queue", () => {
+  it("carries them on a handoff, and an older handoff without them still parses", () => {
+    const withModes = { ...handoff, shuffle: true, repeat: "all" as const };
+    expect(decodeCommand(encodeCommand(withModes))).toEqual(withModes);
+    expect(ControlCommandSchema.safeParse({ ...handoff, repeat: "sometimes" }).success).toBe(false);
+  });
+
+  it("lets another room press shuffle and repeat", () => {
+    for (const action of ["shuffle", "repeat"] as const) {
+      expect(ControlCommandSchema.safeParse({ type: "musicControl", action }).success).toBe(true);
+    }
   });
 });

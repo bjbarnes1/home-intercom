@@ -25,6 +25,8 @@ export async function GET() {
         type: true,
         pairing: true,
         doNotDisturb: true,
+        // So the controller can show a parent which panels play clean only.
+        musicCleanOnly: true,
         lastSeenAt: true,
       },
     });

@@ -17,6 +17,14 @@ function numeric(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/** A comma-separated list, trimmed, with empty entries dropped. */
+function list(value: string | undefined): string[] {
+  return (value ?? "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
 /** Treat empty/whitespace env vars as unset (Vercel can store empty strings). */
 function str(value: string | undefined): string | undefined {
   if (value == null) return undefined;
@@ -65,6 +73,12 @@ export const env = {
     keyId: str(process.env.APPLE_MUSIC_KEY_ID) ?? "",
     /** The .p8 contents, PKCS#8 PEM. Newlines may be escaped as \n. */
     privateKey: process.env.APPLE_MUSIC_PRIVATE_KEY ?? "",
+    /**
+     * Every origin a Hub loads from, e.g. "https://app.example.com". Signed
+     * into the developer token as its `origin` claim so the token is only good
+     * on those sites. Empty omits the claim.
+     */
+    origins: list(process.env.APPLE_MUSIC_ORIGINS),
   },
 
   tts: {

@@ -1,6 +1,7 @@
 import type { Identity } from "@/lib/color/identity";
 import type { ReactNode } from "react";
 import NavDock from "./NavDock";
+import MiniPlayer from "../music/MiniPlayer";
 import UtilityStrip from "./UtilityStrip";
 
 /**
@@ -10,6 +11,9 @@ import UtilityStrip from "./UtilityStrip";
  * to the left edge, and the section's own content between them. Content is inset
  * past the collapsed dock (84px) plus a gutter; the dock overlays when expanded
  * rather than pushing this, so nothing reflows on a menu tap.
+ *
+ * What is playing sits at the foot of the content, in the flow rather than
+ * floating over it, so it never covers the thing the screen is for.
  */
 export default function BaseLayer({
   people,
@@ -25,7 +29,10 @@ export default function BaseLayer({
   return (
     <>
       <UtilityStrip people={people} active={active} weatherActive={weatherActive} />
-      <div className="flex min-h-0 flex-grow flex-col gap-5 pb-8 pl-[116px] pr-8">{children}</div>
+      <div className="flex min-h-0 flex-grow flex-col gap-5 pb-8 pl-[116px] pr-8">
+        {children}
+        <MiniPlayer />
+      </div>
       <NavDock />
     </>
   );

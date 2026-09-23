@@ -28,6 +28,10 @@ export interface MusicKitItem {
   artwork?: MusicKitArtwork;
   /** Milliseconds. */
   playbackDuration?: number;
+  /** "explicit" when Apple marks it so; "clean" for an edited version; absent when unrated. */
+  contentRating?: string;
+  /** The raw resource attributes, where MusicKit keeps what it has no getter for. */
+  attributes?: { contentRating?: string; url?: string };
 }
 
 export interface MusicKitResource {
@@ -38,6 +42,8 @@ export interface MusicKitResource {
     albumName?: string;
     artwork?: MusicKitArtwork;
     durationInMillis?: number;
+    contentRating?: string;
+    url?: string;
   };
 }
 
@@ -47,7 +53,11 @@ export type MusicKitEvent =
   | "playbackTimeDidChange"
   | "authorizationStatusDidChange"
   | "queueItemsDidChange"
-  | "repeatModeDidChange";
+  | "repeatModeDidChange"
+  | "shuffleModeDidChange"
+  | "autoplayEnabledDidChange"
+  /** Carries the MKError. A track that cannot play arrives here, not as a rejection. */
+  | "mediaPlaybackError";
 
 export interface MusicKitQueue {
   items: MusicKitItem[];
@@ -78,6 +88,19 @@ export interface MusicKitInstance {
   storefrontId: string;
   /** PlayerRepeatMode: 0 none, 1 this song, 2 the queue. */
   repeatMode: number;
+  /**
+   * PlayerShuffleMode: 0 off, 1 songs. Setting it reshuffles what is still to
+   * come, and MusicKit warns rather than throws where a playback type cannot
+   * shuffle — so read it back rather than trusting the assignment.
+   */
+  shuffleMode: number;
+  /**
+   * Keep going with similar music when the queue runs out — Apple Music's ∞.
+   * Verified against the v3 bundle: a plain setter that starts or stops it.
+   */
+  autoplayEnabled: boolean;
+  /** Apple's own subscribe offer for this storefront, for a listener with no subscription. */
+  subscribeURL?: string;
   /** Jump straight to a queue entry. */
   changeToMediaAtIndex(index: number): Promise<void>;
   /** Insert right after the track playing. The only supported way in. */
@@ -92,10 +115,14 @@ export interface MusicKitInstance {
   skipToNextItem(): Promise<void>;
   skipToPreviousItem(): Promise<void>;
   seekToTime(seconds: number): Promise<void>;
-  /** `{ songs: string[], startWith?: number }` or `{ playlist: string }`. */
+  /**
+   * `{ songs: string[], startWith?: number }`, `{ song }`, `{ album }`,
+   * `{ playlist }` or `{ station }` — the named keys v3 accepts, checked
+   * against the bundle's own list.
+   */
   setQueue(options: Record<string, unknown>): Promise<void>;
-  addEventListener(event: MusicKitEvent, handler: () => void): void;
-  removeEventListener(event: MusicKitEvent, handler: () => void): void;
+  addEventListener(event: MusicKitEvent, handler: (payload?: unknown) => void): void;
+  removeEventListener(event: MusicKitEvent, handler: (payload?: unknown) => void): void;
   api: {
     music(path: string, params?: Record<string, unknown>): Promise<{ data: { data: MusicKitResource[] } }>;
   };
@@ -111,6 +138,7 @@ export interface MusicKitGlobal {
   getInstance(): MusicKitInstance | undefined;
   PlaybackStates: Record<string, number>;
   PlayerRepeatMode: Record<string, number>;
+  PlayerShuffleMode?: Record<string, number>;
 }
 
 declare global {

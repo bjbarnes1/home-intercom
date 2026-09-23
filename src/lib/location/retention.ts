@@ -13,7 +13,9 @@
  * That last line covers the derived record too. A PlaceVisit — "arrived School
  * 08:31, left 15:08" — is a higher-fidelity picture of a child's routine than
  * the raw fixes it came from, and it used to be kept forever while the consent
- * screen said seven days. The screen reads the constants below, so the promise
+ * screen said seven days. The same goes for a RoomFix — which room of the house
+ * someone is in, finer than any GPS fix — which is pruned once it is a week
+ * old. The screen reads the constants below, so the promise
  * and the sweep cannot drift apart.
  *
  * These are the numbers the household agreed to; changing them is a decision,
@@ -58,6 +60,8 @@ export interface RetentionResult {
   deleted: number;
   /** PlaceVisit rows deleted on the same seven-day promise. */
   visitsDeleted: number;
+  /** RoomFix rows deleted once the room they record is a week old. */
+  roomFixesDeleted: number;
 }
 
 /**
@@ -80,6 +84,12 @@ export async function pruneLocationHistory(now: Date): Promise<RetentionResult> 
     where: { arrivedAt: { lt: deleteBefore } },
   });
 
+  // Keyed on since: a fix only changes when someone moves, so a week-old
+  // `since` is a week-old statement of where they were.
+  const { count: roomFixesDeleted } = await prisma.roomFix.deleteMany({
+    where: { since: { lt: deleteBefore } },
+  });
+
   // Rounding happens in SQL so a day's worth of rows is one statement rather
   // than a read-modify-write per row.
   //
@@ -96,5 +106,5 @@ export async function pruneLocationHistory(now: Date): Promise<RetentionResult> 
     WHERE "coarse" = false AND "capturedAt" < ${coarsenBefore}
   `;
 
-  return { coarsened, deleted, visitsDeleted };
+  return { coarsened, deleted, visitsDeleted, roomFixesDeleted };
 }

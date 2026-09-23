@@ -3,10 +3,12 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { saveDeviceCredentials } from "@/lib/client/identity";
 import { isWellFormedPairingCode } from "@/lib/devices/pairing";
+import { parseHmToMinutes } from "@/lib/etiquette/quietHours";
 import PairingScreen from "./_components/PairingScreen";
 import { useMediaSession } from "./_runtime/useMediaSession";
 import { usePanelPresence } from "./_runtime/usePanelPresence";
 import { useAppleMusic, type AppleMusic, type RemoteAction } from "./music/useAppleMusic";
+import type { MusicHandoffCommand, MusicHandoffResultCommand } from "@/lib/control/commands";
 import CallCard from "./_components/CallCard";
 import RingCard from "./_components/RingCard";
 import SpeakingCard from "./_components/SpeakingCard";
@@ -62,6 +64,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
    */
   const music = useAppleMusic();
   const acceptHandoff = music.acceptHandoff;
+  const handoffResult = music.handoffResult;
   const handOffTo = music.handOffTo;
   const applyRemote = music.applyRemote;
   const {
@@ -74,14 +77,19 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     dnd,
     setDoNotDisturb,
     etiquette,
+    musicCleanOnly,
     receiving,
     speaking,
     dismissSpeaking,
     heartbeat,
   } = usePanelPresence(media, {
     onMusicHandoff: useCallback(
-      (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => acceptHandoff(cmd),
+      (cmd: MusicHandoffCommand) => acceptHandoff(cmd),
       [acceptHandoff],
+    ),
+    onMusicHandoffResult: useCallback(
+      (cmd: MusicHandoffResultCommand) => handoffResult(cmd),
+      [handoffResult],
     ),
     // Somebody at another panel asked for what is playing here. Handing it over
     // is the same path as tapping their room from this end.
@@ -95,6 +103,21 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
       [applyRemote],
     ),
   });
+
+  // The panel's own settings that govern music: the parent's clean-only
+  // switch, and quiet hours holding the volume down.
+  const setCleanOnly = music.setCleanOnly;
+  const setQuietHours = music.setQuietHours;
+  useEffect(() => {
+    setCleanOnly(musicCleanOnly);
+  }, [setCleanOnly, musicCleanOnly]);
+  useEffect(() => {
+    setQuietHours({
+      enabled: etiquette.quietHoursEnabled,
+      start: parseHmToMinutes(etiquette.quietHoursStart),
+      end: parseHmToMinutes(etiquette.quietHoursEnd),
+    });
+  }, [setQuietHours, etiquette.quietHoursEnabled, etiquette.quietHoursStart, etiquette.quietHoursEnd]);
 
   const { sinkRef, incoming, ringing, answerRing, declineRing, leaveMedia } = media;
   const [connectedAt, setConnectedAt] = useState<number | null>(null);

@@ -56,6 +56,7 @@ const device = {
   quietHoursEnd: null,
   hasLeds: false,
   announceDwellSec: 8,
+  musicCleanOnly: true,
 };
 
 const beat = () =>
@@ -109,6 +110,9 @@ describe("POST /api/presence", () => {
       chimeEnabled: true,
       announceDwellSec: 8,
       doNotDisturb: false,
+      // Parent-set, so it has to arrive with the rest; the panel has no other
+      // way of learning it.
+      musicCleanOnly: true,
     });
   });
 

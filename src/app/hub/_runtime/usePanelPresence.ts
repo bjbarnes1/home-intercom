@@ -19,6 +19,7 @@ import {
   type MusicControlCommand,
   type MusicFetchCommand,
   type MusicHandoffCommand,
+  type MusicHandoffResultCommand,
 } from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
@@ -39,6 +40,8 @@ export interface PresenceHandlers {
    * player of its own ignores the command rather than pretending to take it.
    */
   onMusicHandoff?: (cmd: MusicHandoffCommand) => void;
+  /** The panel this one handed its music to says whether it started. */
+  onMusicHandoffResult?: (cmd: MusicHandoffResultCommand) => void;
   /**
    * Another panel is asking for what this one is playing. Optional for the
    * same reason: a surface with no player has nothing to hand over.
@@ -61,6 +64,12 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
   const [note, setNote] = useState("");
   const [room, setRoom] = useState("This room");
   const [dnd, setDnd] = useState(false);
+  /**
+   * Set by a parent in the controller, never from the panel: explicit songs
+   * are hidden and skipped here. Read from every heartbeat, so a change
+   * reaches the panel within one beat.
+   */
+  const [musicCleanOnly, setMusicCleanOnly] = useState(false);
   const [etiquette, setEtiquette] = useState<EtiquetteSettings>({
     chimeEnabled: true,
     quietHoursEnabled: false,
@@ -103,6 +112,7 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
       // controller reaches the panel without anybody touching it.
       if (typeof data.room === "string" && data.room) setRoom(data.room);
       setDnd(!!data.doNotDisturb);
+      setMusicCleanOnly(data.musicCleanOnly === true);
       setEtiquette({
         chimeEnabled: data.chimeEnabled !== false,
         quietHoursEnabled: !!data.quietHoursEnabled,
@@ -204,6 +214,9 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
               }
               case "musicHandoff":
                 handlersRef.current.onMusicHandoff?.(cmd);
+                break;
+              case "musicHandoffResult":
+                handlersRef.current.onMusicHandoffResult?.(cmd);
                 break;
               case "musicFetch":
                 handlersRef.current.onMusicFetch?.(cmd);
@@ -322,6 +335,7 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
     setDoNotDisturb,
     etiquette,
     updateEtiquette,
+    musicCleanOnly,
     receiving,
     receiveError,
     livekitUrl,

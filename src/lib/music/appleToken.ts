@@ -1,4 +1,4 @@
-import { createPrivateKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
 import { env } from "@/lib/env";
 
 /**
@@ -17,13 +17,44 @@ import { env } from "@/lib/env";
  * Apple caps developer tokens at six months. We mint for twelve hours and cache,
  * so a leaked token from a client is short-lived and a key rotation takes effect
  * within the day.
+ *
+ * When APPLE_MUSIC_ORIGINS is set the token also carries Apple's `origin`
+ * claim, which Apple recommends for web clients: a token lifted out of a Hub's
+ * page is then refused anywhere but the sites we serve it from. Unset, the
+ * claim is left out rather than sent empty, because an empty list would match
+ * no origin at all.
  */
 
 const TTL_SECONDS = 12 * 60 * 60;
 /** Re-mint a little early so a token never expires mid-request. */
 const REFRESH_MARGIN_SECONDS = 10 * 60;
 
-let cached: { token: string; expiresAt: number } | null = null;
+/**
+ * Keyed on the credential that signed it, so a rotated key is used on the next
+ * request rather than after the cached token runs out. The origins are part of
+ * that key too: they are signed into the token, so adding a preview host must
+ * re-mint rather than keep serving a token that host would be refused with.
+ */
+let cached: { token: string; expiresAt: number; credential: string } | null = null;
+
+function credentialOf(
+  teamId: string,
+  keyId: string,
+  privateKey: string,
+  origins: readonly string[],
+): string {
+  return createHash("sha256")
+    .update(`${teamId}\0${keyId}\0${privateKey}\0${origins.join(",")}`)
+    .digest("hex");
+}
+
+/**
+ * Forget the cached token. For tests, which otherwise see whichever token an
+ * earlier case left behind in a module that was not re-imported.
+ */
+export function resetDeveloperTokenCache(): void {
+  cached = null;
+}
 
 export class AppleMusicNotConfiguredError extends Error {
   constructor() {
@@ -114,16 +145,30 @@ function safeDecode(text: string): string {
 
 /** Mint (or reuse) a developer token. Throws when the credentials are absent. */
 export function getDeveloperToken(now = Date.now()): { token: string; expiresAt: number } {
-  if (cached && cached.expiresAt - REFRESH_MARGIN_SECONDS * 1000 > now) return cached;
-
-  const { teamId, keyId, privateKey } = env.appleMusic;
+  const { teamId, keyId, privateKey, origins } = env.appleMusic;
   if (!teamId || !keyId || !privateKey) throw new AppleMusicNotConfiguredError();
+
+  const credential = credentialOf(teamId, keyId, privateKey, origins);
+  if (
+    cached &&
+    cached.credential === credential &&
+    cached.expiresAt - REFRESH_MARGIN_SECONDS * 1000 > now
+  ) {
+    return { token: cached.token, expiresAt: cached.expiresAt };
+  }
 
   const issuedAt = Math.floor(now / 1000);
   const expires = issuedAt + TTL_SECONDS;
 
   const header = base64url(JSON.stringify({ alg: "ES256", kid: keyId, typ: "JWT" }));
-  const payload = base64url(JSON.stringify({ iss: teamId, iat: issuedAt, exp: expires }));
+  const payload = base64url(
+    JSON.stringify({
+      iss: teamId,
+      iat: issuedAt,
+      exp: expires,
+      ...(origins.length > 0 ? { origin: origins } : {}),
+    }),
+  );
   const signingInput = `${header}.${payload}`;
 
   let key;
@@ -144,6 +189,7 @@ export function getDeveloperToken(now = Date.now()): { token: string; expiresAt:
     dsaEncoding: "ieee-p1363",
   });
 
-  cached = { token: `${signingInput}.${base64url(signature)}`, expiresAt: expires * 1000 };
-  return cached;
+  const token = `${signingInput}.${base64url(signature)}`;
+  cached = { token, expiresAt: expires * 1000, credential };
+  return { token, expiresAt: cached.expiresAt };
 }

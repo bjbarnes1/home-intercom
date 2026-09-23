@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const executeRaw = vi.fn().mockResolvedValue(3);
 const deleteMany = vi.fn().mockResolvedValue({ count: 7 });
 const deleteVisits = vi.fn().mockResolvedValue({ count: 2 });
+const deleteRoomFixes = vi.fn().mockResolvedValue({ count: 1 });
 
 vi.mock("@/lib/prisma", () => ({
   prisma: {
@@ -24,6 +25,7 @@ vi.mock("@/lib/prisma", () => ({
       executeRaw(strings, ...values),
     locationPing: { deleteMany: (args: unknown) => deleteMany(args) },
     placeVisit: { deleteMany: (args: unknown) => deleteVisits(args) },
+    roomFix: { deleteMany: (args: unknown) => deleteRoomFixes(args) },
   },
 }));
 
@@ -31,6 +33,7 @@ afterEach(() => {
   executeRaw.mockClear();
   deleteMany.mockClear();
   deleteVisits.mockClear();
+  deleteRoomFixes.mockClear();
 });
 
 async function sweep() {
@@ -80,7 +83,7 @@ describe("the coarsening statement", () => {
   });
 
   it("reports what it did", async () => {
-    expect(await sweep()).toEqual({ coarsened: 3, deleted: 7, visitsDeleted: 2 });
+    expect(await sweep()).toEqual({ coarsened: 3, deleted: 7, visitsDeleted: 2, roomFixesDeleted: 1 });
   });
 });
 
@@ -101,5 +104,16 @@ describe("the derived record", () => {
     await sweep();
     const [visits] = deleteVisits.mock.calls[0] as [{ where: Record<string, unknown> }];
     expect(Object.keys(visits.where)).toEqual(["arrivedAt"]);
+  });
+});
+
+describe("the room fix", () => {
+  // Which room of the house someone is in is finer than any GPS fix, and the
+  // consent screen's seven days covers it too.
+  it("prunes room fixes on the same seven-day cutoff as the pings", async () => {
+    await sweep();
+    const [pings] = deleteMany.mock.calls[0] as [{ where: { capturedAt: { lt: Date } } }];
+    const [fixes] = deleteRoomFixes.mock.calls[0] as [{ where: { since: { lt: Date } } }];
+    expect(fixes.where.since.lt.getTime()).toBe(pings.where.capturedAt.lt.getTime());
   });
 });

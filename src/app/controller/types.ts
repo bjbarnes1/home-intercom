@@ -4,6 +4,8 @@ export interface DeviceRow {
   room: string | null;
   type: "ENDPOINT" | "CONTROLLER";
   online: boolean;
+  /** Parent-set: Apple Music on this panel plays clean versions only. */
+  musicCleanOnly?: boolean;
 }
 
 export interface ZoneRow {

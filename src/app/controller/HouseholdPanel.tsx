@@ -317,7 +317,13 @@ function MusicEditor({ devices }: { devices: DeviceRow[] }) {
   }
 
   if (!music) {
-    return <div className="text-sm text-neutral-500">Loading music…</div>;
+    return (
+      <div>
+        <div className="mb-4 text-sm text-neutral-500">Loading music…</div>
+        <CleanOnlyList devices={devices} />
+        <AboutAppleMusic />
+      </div>
+    );
   }
 
   return (
@@ -374,6 +380,119 @@ function MusicEditor({ devices }: { devices: DeviceRow[] }) {
             </button>
           );
         })}
+      </div>
+      <CleanOnlyList devices={devices} />
+      <AboutAppleMusic />
+    </div>
+  );
+}
+
+/**
+ * Per-panel "Clean only", set by a parent.
+ *
+ * It lives here rather than in the panel's own settings because the panel can
+ * change its own settings, and the child this is for is the one standing at
+ * it. The route behind it refuses anyone who is not a household admin.
+ *
+ * Optimistic, because a switch that waits on the network before it moves
+ * reads as broken. The chosen value is held locally until the page's regular
+ * device poll reports the same thing back, so the switch does not flick to
+ * the old value for the few seconds in between; a failed save puts it back.
+ */
+function CleanOnlyList({ devices }: { devices: DeviceRow[] }) {
+  const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [error, setError] = useState("");
+  const panels = devices.filter((d) => d.type === "ENDPOINT");
+
+  // Let the server's answer take over once it agrees with what was chosen.
+  useEffect(() => {
+    setPending((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      for (const d of devices) {
+        if (d.id in next && next[d.id] === (d.musicCleanOnly ?? false)) {
+          delete next[d.id];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [devices]);
+
+  async function toggle(d: DeviceRow, current: boolean) {
+    const want = !current;
+    setError("");
+    setPending((p) => ({ ...p, [d.id]: want }));
+    const ok = await fetch(`/api/devices/${d.id}/music`, {
+      method: "PATCH",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ musicCleanOnly: want }),
+    })
+      .then((res) => res.ok)
+      .catch(() => false);
+    if (!ok) {
+      setPending((p) => {
+        const next = { ...p };
+        delete next[d.id];
+        return next;
+      });
+      setError(`Couldn't change ${d.displayName}. Only a household admin can.`);
+    }
+  }
+
+  if (panels.length === 0) return null;
+
+  return (
+    <div className="mt-5">
+      <div className="uplabel mb-2">Clean only</div>
+      <div className="mb-2 text-[11px] text-neutral-600">
+        Explicit songs are hidden and skipped on this panel. Children&apos;s own
+        Apple ID restrictions still apply.
+      </div>
+      <div className="flex flex-col gap-1.5">
+        {panels.map((d) => {
+          const on = pending[d.id] ?? d.musicCleanOnly ?? false;
+          return (
+            <button
+              key={d.id}
+              onClick={() => toggle(d, on)}
+              aria-pressed={on}
+              className="hi-tinted card flex items-center gap-3 p-3 text-left"
+              style={identStyle(d.displayName)}
+            >
+              <i
+                className={`ph ${on ? "ph-shield-check" : "ph-shield"}`}
+                style={{ color: "var(--hi-ident)" }}
+              />
+              <span className="flex-1 text-sm">{d.displayName}</span>
+              <span className="text-[11px] text-neutral-500">
+                {on ? "Clean only" : "Off"}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {error && <p className="text-sm text-accent-200">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * The attribution Apple asks for wherever its marks appear, and the promise
+ * that keeps Music outside the famOS subscription (docs/music/apple-music.md).
+ */
+function AboutAppleMusic() {
+  return (
+    <div className="mt-5">
+      <div className="uplabel mb-2">About Apple Music</div>
+      <div className="text-[11px] text-neutral-600">
+        Music plays on Apple Music through each person&apos;s own subscription.
+        famOS never charges for it or uses what you listen to for anything but
+        playing it.
+      </div>
+      <div className="mt-2 text-[11px] text-neutral-600">
+        Apple and Apple Music are trademarks of Apple Inc., registered in the
+        U.S. and other countries.
       </div>
     </div>
   );

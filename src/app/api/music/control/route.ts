@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const Body = z.object({
   deviceId: z.string().min(1).max(64),
-  action: z.enum(["play", "pause", "next", "previous", "volume"]),
+  action: z.enum(["play", "pause", "next", "previous", "volume", "shuffle", "repeat"]),
   value: z.number().min(0).max(1).optional(),
 });
 

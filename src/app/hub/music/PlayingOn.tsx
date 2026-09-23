@@ -265,6 +265,12 @@ function Remote({
             <Tap label={`Pause in ${where}`} icon="pause" onClick={() => onAct("pause")} />
             <Tap label={`Next track in ${where}`} icon="next" onClick={() => onAct("next")} />
           </div>
+          {/* The same buttons as on that panel: shuffle toggles, repeat steps
+              through off, all and one. Its screen shows which it landed on. */}
+          <div className="flex items-center gap-1">
+            <Tap label={`Shuffle on or off in ${where}`} icon="shuffle" onClick={() => onAct("shuffle")} />
+            <Tap label={`Change repeat in ${where}`} icon="repeat" onClick={() => onAct("repeat")} />
+          </div>
 
           <span className="flex items-center gap-2">
             <Icon name="speaker" size={15} className="flex-none text-ink-muted" />
@@ -297,7 +303,7 @@ function Tap({
   onClick,
 }: {
   label: string;
-  icon: "prev" | "play" | "pause" | "next";
+  icon: "prev" | "play" | "pause" | "next" | "shuffle" | "repeat";
   onClick: () => void;
 }) {
   return (
@@ -305,9 +311,9 @@ function Tap({
       type="button"
       aria-label={label}
       onClick={onClick}
-      className="flex h-9 w-9 flex-none cursor-pointer items-center justify-center rounded-full border-none bg-bg text-text transition-transform active:scale-[0.97]"
+      className="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full border-none bg-bg text-text transition-transform active:scale-[0.97]"
     >
-      <Icon name={icon} size={15} />
+      <Icon name={icon} size={16} />
     </button>
   );
 }
