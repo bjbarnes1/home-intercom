@@ -19,6 +19,7 @@ import {
   type MusicControlCommand,
   type MusicFetchCommand,
   type MusicHandoffCommand,
+  type MusicHandoffResultCommand,
 } from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
@@ -39,6 +40,8 @@ export interface PresenceHandlers {
    * player of its own ignores the command rather than pretending to take it.
    */
   onMusicHandoff?: (cmd: MusicHandoffCommand) => void;
+  /** The panel this one handed its music to says whether it started. */
+  onMusicHandoffResult?: (cmd: MusicHandoffResultCommand) => void;
   /**
    * Another panel is asking for what this one is playing. Optional for the
    * same reason: a surface with no player has nothing to hand over.
@@ -204,6 +207,9 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
               }
               case "musicHandoff":
                 handlersRef.current.onMusicHandoff?.(cmd);
+                break;
+              case "musicHandoffResult":
+                handlersRef.current.onMusicHandoffResult?.(cmd);
                 break;
               case "musicFetch":
                 handlersRef.current.onMusicFetch?.(cmd);

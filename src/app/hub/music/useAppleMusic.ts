@@ -12,6 +12,7 @@ import {
   type LovableKind,
 } from "@/lib/music/appleApi";
 import { clearResume, queueDescriptor, readResume, saveResume } from "./resume";
+import { HandoffWaiter, newHandoffId, type HandoffAnswer } from "./handoffAck";
 import { indexAfterMove, reorder } from "@/lib/music/reorder";
 import {
   artworkUrl,
@@ -152,12 +153,24 @@ export interface AppleMusic {
    */
   resumed: boolean;
   /**
-   * Send what is playing to another panel and fall silent. Resolves to null on
-   * success, or the reason it could not go.
+   * Send what is playing to another panel, and fall silent once that panel
+   * says the music started. Resolves to null on success, or the reason it
+   * could not go — in which case it is still playing here.
    */
   handOffTo: (deviceId: string) => Promise<string | null>;
-  /** Pick up what another panel was playing. */
-  acceptHandoff: (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => void;
+  /**
+   * Pick up what another panel was playing, and tell it whether that worked
+   * when it asked to be told.
+   */
+  acceptHandoff: (cmd: {
+    trackIds: string[];
+    startIndex: number;
+    startTime: number;
+    handoffId?: string;
+    fromDeviceId?: string;
+  }) => void;
+  /** The other end of a handoff this panel sent says whether it started. */
+  handoffResult: (answer: HandoffAnswer) => void;
   /**
    * Ask the panel that is playing to hand over to this one. Resolves to null
    * once the request is away, or the reason it could not be made.
@@ -167,6 +180,44 @@ export interface AppleMusic {
   controlRemote: (deviceId: string, action: RemoteAction, value?: number) => Promise<string | null>;
   /** Apply an instruction that arrived from another panel. */
   applyRemote: (action: RemoteAction, value?: number) => void;
+}
+
+/**
+ * How long a panel taking a handoff waits for sound before saying it could not
+ * play. Inside the sender's own wait (HANDOFF_ACK_MS), so a "no" gets back
+ * before the sender gives up and says only that nothing was heard.
+ */
+const UNTIL_PLAYING_MS = 8_000;
+
+/** Resolves true once MusicKit reports it is playing, false if it has not by `ms`. */
+function untilPlaying(m: MusicKitInstance, ms: number): Promise<boolean> {
+  const playing = () => m.playbackState === window.MusicKit?.PlaybackStates?.playing;
+  if (playing()) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    const done = (result: boolean) => {
+      clearTimeout(timer);
+      m.removeEventListener("playbackStateDidChange", check);
+      resolve(result);
+    };
+    const check = () => {
+      if (playing()) done(true);
+    };
+    const timer = setTimeout(() => done(false), ms);
+    m.addEventListener("playbackStateDidChange", check);
+  });
+}
+
+/** Tell the panel that sent a handoff whether it started here. */
+async function ackHandoff(handoffId: string, fromDeviceId: string, ok: boolean, error?: string): Promise<void> {
+  const secret = getDeviceSecret();
+  if (!secret) return;
+  await fetch("/api/music/handoff/ack", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-device-secret": secret },
+    body: JSON.stringify({ handoffId, fromDeviceId, ok, ...(error ? { error } : {}) }),
+  }).catch(() => {
+    /* the sender times out and keeps playing, which is the safe side */
+  });
 }
 
 /** Milliseconds to "3:56". */
@@ -209,6 +260,17 @@ export function useAppleMusic(): AppleMusic {
   const [linking, setLinking] = useState(false);
   /** Set once MusicKit exists, so callbacks do not close over a stale instance. */
   const kit = useRef<MusicKitInstance | null>(null);
+  /**
+   * Handoffs sent from here that have not been answered yet. A late "it
+   * started" after this panel gave up waiting still means two rooms on one
+   * subscription, so this one steps back then.
+   */
+  const handoffs = useRef<HandoffWaiter | null>(null);
+  if (!handoffs.current) {
+    handoffs.current = new HandoffWaiter(() => {
+      void kit.current?.pause().catch(() => {});
+    });
+  }
 
   // Configure once: fetch the developer token, load MusicKit, hand it over.
   useEffect(() => {
@@ -808,6 +870,12 @@ export function useAppleMusic(): AppleMusic {
       const secret = getDeviceSecret();
       if (!secret) return "This Hub is not paired to the house";
 
+      const waiter = handoffs.current!;
+      const handoffId = newHandoffId();
+      // Waiting before sending: the answer comes over the control channel and
+      // can beat the HTTP response back.
+      const answer = waiter.expect(handoffId);
+
       try {
         const res = await fetch("/api/music/handoff", {
           method: "POST",
@@ -819,18 +887,33 @@ export function useAppleMusic(): AppleMusic {
             trackIds: items.slice(0, 100).map((i) => i.playParams?.catalogId ?? i.id),
             startIndex: Math.max(0, m.nowPlayingItemIndex ?? 0),
             startTime: Math.max(0, Math.floor(m.currentPlaybackTime ?? 0)),
+            handoffId,
           }),
         });
         const json = (await res.json()) as { error?: string };
-        if (!res.ok) return json.error ?? "That panel could not take it";
-
-        // Only now stop: one subscription streams to one device, and going
-        // quiet before the other end is told would lose the music entirely.
-        await m.pause().catch(() => {});
-        return null;
+        if (!res.ok) {
+          waiter.cancel(handoffId);
+          return json.error ?? "That panel could not take it";
+        }
       } catch {
+        waiter.cancel(handoffId);
         return "The house could not be reached";
       }
+
+      // Only now stop, and only if it started there: one subscription streams
+      // to one device, and going quiet on anything less than "it is playing"
+      // is how both rooms ended up silent with nothing on either screen.
+      const outcome = await answer;
+      if (outcome.kind === "played") {
+        await m.pause().catch(() => {});
+        return null;
+      }
+      if (outcome.kind === "refused") return `${outcome.error} — still playing here`;
+      return "That panel did not start playing — still playing here";
+    },
+
+    handoffResult: (answer: HandoffAnswer) => {
+      handoffs.current?.settle(answer);
     },
 
     bringHere: async (fromDeviceId: string): Promise<string | null> => {
@@ -895,19 +978,41 @@ export function useAppleMusic(): AppleMusic {
       }
     },
 
-    acceptHandoff: ({ trackIds, startIndex, startTime }) => {
+    acceptHandoff: ({ trackIds, startIndex, startTime, handoffId, fromDeviceId }) => {
       const m = kit.current;
-      if (!m) return;
+      // Answer the sender either way, so it keeps playing rather than waiting
+      // out its timeout when this panel cannot take it.
+      const answer = (ok: boolean, error?: string) => {
+        if (handoffId && fromDeviceId) void ackHandoff(handoffId, fromDeviceId, ok, error);
+      };
+      if (!m) {
+        answer(false, "Apple Music is not ready on that panel");
+        return;
+      }
+      if (!m.musicUserToken) {
+        answer(false, "Nobody is signed in to Apple Music on that panel");
+        return;
+      }
       void (async () => {
         try {
           setResumed(false);
           await m.setQueue({ songs: trackIds, startWith: startIndex });
           await m.play();
           if (startTime > 0) await m.seekToTime(startTime);
+          // play() resolving is not sound coming out: a browser that blocks
+          // autoplay, or an expired token, leaves the player stopped without
+          // throwing. Only a playing state counts.
+          if (!(await untilPlaying(m, UNTIL_PLAYING_MS))) {
+            answer(false, "That panel could not start playing");
+            return;
+          }
+          answer(true);
         } catch (e) {
           // Library ids belong to the account that owns them, so a queue handed
           // over from a different Apple ID can simply not resolve here.
-          setError(e instanceof Error ? e.message : "That music would not play here");
+          const message = e instanceof Error ? e.message : "That music would not play here";
+          setError(message);
+          answer(false, message.slice(0, 200));
         }
       })();
     },

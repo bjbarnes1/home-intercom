@@ -69,6 +69,33 @@ const MusicHandoffCommandSchema = z.object({
   startTime: z.number().min(0),
   /** The room it came from, for the arriving panel to say so. */
   from: z.string().max(80).optional(),
+  /**
+   * Set by a sender that waits to hear the music started before it goes
+   * quiet. The receiver answers through /api/music/handoff/ack with this id
+   * and the panel it came from. Absent from an older sender, which pauses
+   * straight away and expects no answer.
+   */
+  handoffId: z.string().max(64).optional(),
+  fromDeviceId: z.string().max(64).optional(),
+});
+
+/**
+ * Whether a handoff actually started playing at the other end.
+ *
+ * A 200 from /api/music/handoff only means the command was published. The
+ * sending panel stays audible until this arrives saying the music started, so
+ * a target that cannot play — a stale Apple Music token, a queue that will not
+ * resolve, a browser that will not start audio — leaves the music where it was
+ * instead of leaving two rooms silent.
+ */
+const MusicHandoffResultCommandSchema = z.object({
+  type: z.literal("musicHandoffResult"),
+  handoffId: z.string().max(64),
+  ok: z.boolean(),
+  /** Why it would not play, in words fit for the sending panel's screen. */
+  error: z.string().max(200).optional(),
+  /** The room that took it, or would not. */
+  to: z.string().max(80).optional(),
 });
 
 /**
@@ -117,6 +144,7 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   ReminderCommandSchema,
   AnnounceCommandSchema,
   MusicHandoffCommandSchema,
+  MusicHandoffResultCommandSchema,
   MusicFetchCommandSchema,
   MusicControlCommandSchema,
   HangupCommandSchema,
@@ -129,6 +157,7 @@ export type RingCommand = z.infer<typeof RingCommandSchema>;
 export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
 export type MusicHandoffCommand = z.infer<typeof MusicHandoffCommandSchema>;
+export type MusicHandoffResultCommand = z.infer<typeof MusicHandoffResultCommandSchema>;
 export type MusicFetchCommand = z.infer<typeof MusicFetchCommandSchema>;
 export type MusicControlCommand = z.infer<typeof MusicControlCommandSchema>;
 export type HangupCommand = z.infer<typeof HangupCommandSchema>;

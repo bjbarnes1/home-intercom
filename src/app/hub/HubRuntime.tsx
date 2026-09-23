@@ -7,6 +7,7 @@ import PairingScreen from "./_components/PairingScreen";
 import { useMediaSession } from "./_runtime/useMediaSession";
 import { usePanelPresence } from "./_runtime/usePanelPresence";
 import { useAppleMusic, type AppleMusic, type RemoteAction } from "./music/useAppleMusic";
+import type { MusicHandoffCommand, MusicHandoffResultCommand } from "@/lib/control/commands";
 import CallCard from "./_components/CallCard";
 import RingCard from "./_components/RingCard";
 import SpeakingCard from "./_components/SpeakingCard";
@@ -62,6 +63,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
    */
   const music = useAppleMusic();
   const acceptHandoff = music.acceptHandoff;
+  const handoffResult = music.handoffResult;
   const handOffTo = music.handOffTo;
   const applyRemote = music.applyRemote;
   const {
@@ -80,8 +82,12 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     heartbeat,
   } = usePanelPresence(media, {
     onMusicHandoff: useCallback(
-      (cmd: { trackIds: string[]; startIndex: number; startTime: number }) => acceptHandoff(cmd),
+      (cmd: MusicHandoffCommand) => acceptHandoff(cmd),
       [acceptHandoff],
+    ),
+    onMusicHandoffResult: useCallback(
+      (cmd: MusicHandoffResultCommand) => handoffResult(cmd),
+      [handoffResult],
     ),
     // Somebody at another panel asked for what is playing here. Handing it over
     // is the same path as tapping their room from this end.

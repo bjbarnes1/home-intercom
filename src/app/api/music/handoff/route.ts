@@ -13,13 +13,20 @@ const Body = z.object({
   trackIds: z.array(z.string().max(64)).min(1).max(100),
   startIndex: z.number().int().min(0),
   startTime: z.number().min(0),
+  /** Chosen by the sender so it can be waiting before the answer can arrive. */
+  handoffId: z
+    .string()
+    .regex(/^[A-Za-z0-9-]{8,64}$/)
+    .optional(),
 });
 
 /**
  * POST /api/music/handoff — move what is playing to another panel.
  *
  * Apple Music streams to one device per subscription, so this is a handoff
- * rather than a second speaker: the caller stops once the target has been told.
+ * rather than a second speaker. A 200 here means the target has been told, not
+ * that it is playing: the caller stays audible until the target answers through
+ * /api/music/handoff/ack that the music started (see MusicHandoffResult).
  *
  * Refused rather than silently dropped when the target cannot actually take it:
  * a panel in another household, one that is asleep, one with no speaker, or one
@@ -38,7 +45,7 @@ export async function POST(req: Request) {
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
-      const { toDeviceId, trackIds, startIndex, startTime } = parsed.data;
+      const { toDeviceId, trackIds, startIndex, startTime, handoffId } = parsed.data;
 
       if (toDeviceId === from.id) {
         return NextResponse.json({ error: "Already playing here" }, { status: 400 });
@@ -83,6 +90,7 @@ export async function POST(req: Request) {
         startIndex,
         startTime,
         from: from.room ?? from.displayName,
+        ...(handoffId ? { handoffId, fromDeviceId: from.id } : {}),
       });
 
       return NextResponse.json({ ok: true, to: target.room ?? target.displayName });
