@@ -18,6 +18,8 @@ const Body = z.object({
     .string()
     .regex(/^[A-Za-z0-9-]{8,64}$/)
     .optional(),
+  shuffle: z.boolean().optional(),
+  repeat: z.enum(["none", "all", "one"]).optional(),
 });
 
 /**
@@ -45,7 +47,7 @@ export async function POST(req: Request) {
       if (!parsed.success) {
         return NextResponse.json({ error: "Invalid request" }, { status: 400 });
       }
-      const { toDeviceId, trackIds, startIndex, startTime, handoffId } = parsed.data;
+      const { toDeviceId, trackIds, startIndex, startTime, handoffId, shuffle, repeat } = parsed.data;
 
       if (toDeviceId === from.id) {
         return NextResponse.json({ error: "Already playing here" }, { status: 400 });
@@ -91,6 +93,8 @@ export async function POST(req: Request) {
         startTime,
         from: from.room ?? from.displayName,
         ...(handoffId ? { handoffId, fromDeviceId: from.id } : {}),
+        ...(shuffle !== undefined ? { shuffle } : {}),
+        ...(repeat ? { repeat } : {}),
       });
 
       return NextResponse.json({ ok: true, to: target.room ?? target.displayName });

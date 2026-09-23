@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { saveDeviceCredentials } from "@/lib/client/identity";
 import { isWellFormedPairingCode } from "@/lib/devices/pairing";
+import { parseHmToMinutes } from "@/lib/etiquette/quietHours";
 import PairingScreen from "./_components/PairingScreen";
 import { useMediaSession } from "./_runtime/useMediaSession";
 import { usePanelPresence } from "./_runtime/usePanelPresence";
@@ -76,6 +77,7 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     dnd,
     setDoNotDisturb,
     etiquette,
+    musicCleanOnly,
     receiving,
     speaking,
     dismissSpeaking,
@@ -101,6 +103,21 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
       [applyRemote],
     ),
   });
+
+  // The panel's own settings that govern music: the parent's clean-only
+  // switch, and quiet hours holding the volume down.
+  const setCleanOnly = music.setCleanOnly;
+  const setQuietHours = music.setQuietHours;
+  useEffect(() => {
+    setCleanOnly(musicCleanOnly);
+  }, [setCleanOnly, musicCleanOnly]);
+  useEffect(() => {
+    setQuietHours({
+      enabled: etiquette.quietHoursEnabled,
+      start: parseHmToMinutes(etiquette.quietHoursStart),
+      end: parseHmToMinutes(etiquette.quietHoursEnd),
+    });
+  }, [setQuietHours, etiquette.quietHoursEnabled, etiquette.quietHoursStart, etiquette.quietHoursEnd]);
 
   const { sinkRef, incoming, ringing, answerRing, declineRing, leaveMedia } = media;
   const [connectedAt, setConnectedAt] = useState<number | null>(null);

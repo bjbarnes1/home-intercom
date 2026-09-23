@@ -81,7 +81,12 @@ describe("getDeveloperToken", () => {
   it("stops serving a cached token the moment the key changes", async () => {
     // The env module is read once, so stand in a mutable one to rotate under
     // a warm module the way a new credential would arrive.
-    const creds = { teamId: good.APPLE_MUSIC_TEAM_ID, keyId: good.APPLE_MUSIC_KEY_ID, privateKey };
+    const creds = {
+      teamId: good.APPLE_MUSIC_TEAM_ID,
+      keyId: good.APPLE_MUSIC_KEY_ID,
+      privateKey,
+      origins: [] as string[],
+    };
     vi.resetModules();
     vi.doMock("@/lib/env", () => ({ env: { appleMusic: creds } }));
     try {
@@ -99,6 +104,63 @@ describe("getDeveloperToken", () => {
       const next = getDeveloperToken(1_000_000_000_000);
       expect(next.token).not.toBe(first.token);
       expect(decode(next.token.split(".")[0]).kid).toBe("KEY7654321");
+    } finally {
+      vi.doUnmock("@/lib/env");
+    }
+  });
+
+  it("lives for exactly twelve hours", async () => {
+    const { getDeveloperToken } = await load(good);
+    const payload = decode(getDeveloperToken().token.split(".")[1]);
+
+    expect((payload.exp as number) - (payload.iat as number)).toBe(43_200);
+  });
+
+  it("carries the origin claim when origins are configured", async () => {
+    const { getDeveloperToken, resetDeveloperTokenCache } = await load({
+      ...good,
+      APPLE_MUSIC_ORIGINS: " https://app.example.com, ,https://preview.example.com ",
+    });
+    resetDeveloperTokenCache();
+    const payload = decode(getDeveloperToken().token.split(".")[1]);
+
+    // Trimmed, and the empty entry left by a stray comma dropped: an origin
+    // of "" would be one no Hub could ever load from.
+    expect(payload.origin).toEqual(["https://app.example.com", "https://preview.example.com"]);
+  });
+
+  it("leaves the origin claim out entirely when none are configured", async () => {
+    const { getDeveloperToken, resetDeveloperTokenCache } = await load({
+      ...good,
+      APPLE_MUSIC_ORIGINS: undefined,
+    });
+    resetDeveloperTokenCache();
+    const payload = decode(getDeveloperToken().token.split(".")[1]);
+
+    // Not an empty array, which would match no origin and fail every Hub.
+    expect(payload).not.toHaveProperty("origin");
+  });
+
+  it("re-mints when the origins change under a warm cache", async () => {
+    const creds = {
+      teamId: good.APPLE_MUSIC_TEAM_ID,
+      keyId: good.APPLE_MUSIC_KEY_ID,
+      privateKey,
+      origins: ["https://app.example.com"],
+    };
+    vi.resetModules();
+    vi.doMock("@/lib/env", () => ({ env: { appleMusic: creds } }));
+    try {
+      const { getDeveloperToken } = await import("@/lib/music/appleToken");
+      const first = getDeveloperToken(1_000_000_000_000);
+      expect(getDeveloperToken(1_000_000_000_000).token).toBe(first.token);
+
+      // A preview host added: the cached token would be refused there.
+      creds.origins = ["https://app.example.com", "https://preview.example.com"];
+
+      const next = getDeveloperToken(1_000_000_000_000);
+      expect(next.token).not.toBe(first.token);
+      expect(decode(next.token.split(".")[1]).origin).toEqual(creds.origins);
     } finally {
       vi.doUnmock("@/lib/env");
     }

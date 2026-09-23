@@ -77,6 +77,13 @@ const MusicHandoffCommandSchema = z.object({
    */
   handoffId: z.string().max(64).optional(),
   fromDeviceId: z.string().max(64).optional(),
+  /**
+   * Shuffle and repeat belong to the queue, so they travel with it: music that
+   * was shuffling in the kitchen should still be shuffling in the bedroom.
+   * Optional so an older sender's handoff still parses.
+   */
+  shuffle: z.boolean().optional(),
+  repeat: z.enum(["none", "all", "one"]).optional(),
 });
 
 /**
@@ -123,7 +130,12 @@ const MusicFetchCommandSchema = z.object({
  */
 const MusicControlCommandSchema = z.object({
   type: z.literal("musicControl"),
-  action: z.enum(["play", "pause", "next", "previous", "volume"]),
+  /**
+   * "shuffle" toggles and "repeat" moves to the next of off → all → one, the
+   * same as pressing the button on that panel. The asking panel cannot see the
+   * other one's current state, so an absolute value would be a guess.
+   */
+  action: z.enum(["play", "pause", "next", "previous", "volume", "shuffle", "repeat"]),
   /** 0–1, required for "volume" and ignored otherwise. */
   value: z.number().min(0).max(1).optional(),
 });

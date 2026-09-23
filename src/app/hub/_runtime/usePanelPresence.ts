@@ -64,6 +64,12 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
   const [note, setNote] = useState("");
   const [room, setRoom] = useState("This room");
   const [dnd, setDnd] = useState(false);
+  /**
+   * Set by a parent in the controller, never from the panel: explicit songs
+   * are hidden and skipped here. Read from every heartbeat, so a change
+   * reaches the panel within one beat.
+   */
+  const [musicCleanOnly, setMusicCleanOnly] = useState(false);
   const [etiquette, setEtiquette] = useState<EtiquetteSettings>({
     chimeEnabled: true,
     quietHoursEnabled: false,
@@ -106,6 +112,7 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
       // controller reaches the panel without anybody touching it.
       if (typeof data.room === "string" && data.room) setRoom(data.room);
       setDnd(!!data.doNotDisturb);
+      setMusicCleanOnly(data.musicCleanOnly === true);
       setEtiquette({
         chimeEnabled: data.chimeEnabled !== false,
         quietHoursEnabled: !!data.quietHoursEnabled,
@@ -328,6 +335,7 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
     setDoNotDisturb,
     etiquette,
     updateEtiquette,
+    musicCleanOnly,
     receiving,
     receiveError,
     livekitUrl,

@@ -9,8 +9,11 @@ import { useState } from "react";
 import PlayingOn from "./PlayingOn";
 import QueueLists from "./QueueLists";
 import SearchOverlay from "./SearchOverlay";
+import BrowseOverlay from "./BrowseOverlay";
 import { useHub, useHubMusic } from "../HubRuntime";
 import { formatTime, type AppleMusic } from "./useAppleMusic";
+import { Artwork, ExplicitMark, ListenOnAppleMusic, QrSheet } from "./parts";
+import { SLEEP_CHOICES, sleepLabel, type RepeatMode } from "./player";
 
 /**
  * Music — what is playing, and where.
@@ -22,26 +25,27 @@ import { formatTime, type AppleMusic } from "./useAppleMusic";
  *
  * "Playing on" stays ours — which rooms a track goes to is the house's routing,
  * not Apple's.
+ *
+ * The screen is "Music", never "Apple Music": Apple Music is where the music
+ * comes from, credited with Apple's own badge on the player and the words
+ * "on Apple Music" — never "in", "from" or "Apple Music's". See
+ * docs/music/apple-music.md for the rules this follows.
  */
 export default function Music() {
   const music = useHubMusic();
   const [adding, setAdding] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
 
   return (
     <BaseLayer people={PEOPLE.map((p) => p.key)}>
       <Hero title="Music" eyebrow={eyebrowFor(music)}>
         <span className="flex min-w-0 flex-none items-center gap-2">
           {music.status === "ready" ? (
-            <button
-              type="button"
-              onClick={() => setSearching(true)}
-              className="flex h-11 flex-none cursor-pointer items-center gap-2 rounded-full border-none bg-surface px-4 text-[13px] font-semibold text-text transition-transform active:scale-[0.97]"
-              style={{ boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.1)" }}
-            >
-              <Icon name="search" size={16} />
-              Search
-            </button>
+            <>
+              <HeroButton icon="library" label="Browse" onClick={() => setBrowsing(true)} />
+              <HeroButton icon="search" label="Search" onClick={() => setSearching(true)} />
+            </>
           ) : null}
           {music.status === "ready" || music.status === "unlinked" ? (
             <AccountBar music={music} onAdd={() => setAdding(true)} />
@@ -50,6 +54,8 @@ export default function Music() {
       </Hero>
 
       {music.status === "ready" ? <Player music={music} /> : <Gate music={music} onAdd={() => setAdding(true)} />}
+
+      <ProblemBar music={music} />
 
       {music.status === "ready" && music.active ? <AccountActions music={music} /> : null}
 
@@ -87,7 +93,12 @@ export default function Music() {
         <PlayingOn music={music} />
       </div>
 
+      <span className="flex-none px-1 text-[11px] leading-4 text-neutral-400">
+        Apple and Apple Music are trademarks of Apple Inc., registered in the U.S. and other countries.
+      </span>
+
       {searching ? <SearchOverlay music={music} onClose={() => setSearching(false)} /> : null}
+      {browsing ? <BrowseOverlay music={music} onClose={() => setBrowsing(false)} /> : null}
 
       {adding ? (
         <PersonPicker
@@ -106,7 +117,7 @@ export default function Music() {
 function eyebrowFor(music: AppleMusic): string {
   switch (music.status) {
     case "loading":
-      return "Connecting to Apple Music";
+      return "Connecting…";
     case "unconfigured":
       return "Apple Music is not set up on this Hub";
     case "unlinked":
@@ -117,8 +128,9 @@ function eyebrowFor(music: AppleMusic): string {
       if (music.linking) return "Waiting for Apple…";
       // Browsers will not start audio without a tap, so a restored queue sits
       // ready and says so rather than looking like nothing happened.
+      if (!music.online) return "Reconnecting…";
       if (music.resumed && !music.isPlaying) return "Where you left off · press play";
-      return `Apple Music · ${music.active ?? "nobody"}'s library`;
+      return `${music.active ?? "Nobody"}'s library · on Apple Music`;
   }
 }
 
@@ -167,6 +179,7 @@ function Player({ music }: { music: AppleMusic }) {
   const { room } = useHub();
   const np = music.nowPlaying;
   const progress = np && np.duration > 0 ? (np.elapsed / np.duration) * 100 : 0;
+  const [sleepOpen, setSleepOpen] = useState(false);
 
   return (
     <div className="flex flex-none items-center gap-6 rounded-[20px] bg-surface p-6 shadow-card">
@@ -175,22 +188,30 @@ function Player({ music }: { music: AppleMusic }) {
       <span className="flex min-w-0 flex-grow flex-col gap-3">
         <span className="flex items-start justify-between gap-4">
           <span className="flex min-w-0 flex-col gap-0.5">
-            <span className="truncate font-heading text-xl font-bold leading-7 text-text">
-              {np?.title ?? "Nothing playing"}
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-heading text-xl font-bold leading-7 text-text">
+                {np?.title ?? "Nothing playing"}
+              </span>
+              {np?.explicit ? <ExplicitMark /> : null}
             </span>
             <span className="truncate text-[13px] leading-[18px] text-ink-muted">
               {np?.artist ||
                 (music.resumed ? "Picked up where you left off — press play" : "Choose a playlist to start")}
             </span>
           </span>
-          <span
-            className="flex flex-none items-center gap-2 rounded-full px-3.5 py-1.5"
-            style={{ background: "rgba(59,92,246,0.10)" }}
-          >
-            <Icon name="home" size={15} className="text-accent" />
-            {/* The room this panel actually is, as the household named it —
-                every panel used to call itself the kitchen. */}
-            <span className="text-xs font-semibold leading-4 text-text">{room}</span>
+          <span className="flex flex-none items-center gap-2">
+            {/* Apple's credit, while there is something of Apple's playing.
+                One badge on this screen, and this is it. */}
+            {np ? <ListenOnAppleMusic url={np.url} height={32} /> : null}
+            <span
+              className="flex flex-none items-center gap-2 rounded-full px-3.5 py-1.5"
+              style={{ background: "rgba(59,92,246,0.10)" }}
+            >
+              <Icon name="home" size={15} className="text-accent" />
+              {/* The room this panel actually is, as the household named it —
+                  every panel used to call itself the kitchen. */}
+              <span className="text-xs font-semibold leading-4 text-text">{room}</span>
+            </span>
           </span>
         </span>
 
@@ -212,13 +233,20 @@ function Player({ music }: { music: AppleMusic }) {
               background: `linear-gradient(to right, var(--color-accent) ${progress}%, rgba(15,23,42,0.08) ${progress}%)`,
             }}
           />
-          <span className="w-[34px] flex-none text-right text-xs font-medium leading-4 text-ink-muted tabular-nums">
-            {formatTime(np?.duration ?? 0)}
+          <span className="w-[42px] flex-none text-right text-xs font-medium leading-4 text-ink-muted tabular-nums">
+            {/* Time left, the way every player counts down the end of a song. */}
+            -{formatTime(Math.max(0, (np?.duration ?? 0) - (np?.elapsed ?? 0)))}
           </span>
         </span>
 
         <span className="flex items-center justify-between gap-4">
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5">
+            <Toggle
+              label={music.shuffle ? "Shuffle is on" : "Shuffle"}
+              on={music.shuffle}
+              onClick={music.toggleShuffle}
+              icon="shuffle"
+            />
             <Transport label="Previous track" icon="prev" onClick={music.previous} />
             <button
               type="button"
@@ -229,25 +257,43 @@ function Player({ music }: { music: AppleMusic }) {
               <Icon name={music.isPlaying ? "pause" : "play"} size={22} />
             </button>
             <Transport label="Next track" icon="next" onClick={music.next} />
-            <button
-              type="button"
-              aria-label="Repeat this song"
-              aria-pressed={music.repeatOne}
-              onClick={music.toggleRepeatOne}
-              className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-none transition-colors active:scale-[0.97] ${
-                music.repeatOne ? "text-white" : "bg-transparent text-ink-muted"
-              }`}
-              style={music.repeatOne ? { background: "var(--color-accent)" } : undefined}
-            >
-              <Icon name="repeat" size={20} />
-            </button>
+            <RepeatButton mode={music.repeat} onClick={music.cycleRepeat} />
+            <Toggle
+              label={music.autoplay ? "Autoplay is on — similar music follows the queue" : "Autoplay similar music"}
+              on={music.autoplay}
+              onClick={music.toggleAutoplay}
+              icon="infinity"
+            />
+            <span className="relative">
+              <Toggle
+                label={music.sleep ? `Sleep timer: ${sleepLabel(music.sleep.choice)}` : "Sleep timer"}
+                on={!!music.sleep}
+                onClick={() => setSleepOpen((o) => !o)}
+                icon="moon"
+              />
+              {sleepOpen ? (
+                <SleepMenu
+                  music={music}
+                  onDone={() => setSleepOpen(false)}
+                />
+              ) : null}
+            </span>
           </span>
 
-          <span className="flex w-44 items-center gap-2.5" title={music.ducked ? "Turned down while the house is talking" : undefined}>
+          <span
+            className="flex w-44 items-center gap-2.5"
+            title={
+              music.ducked
+                ? "Turned down while the house is talking"
+                : music.quietCapped
+                  ? "Held down during quiet hours"
+                  : undefined
+            }
+          >
             <Icon
               name="speaker"
               size={18}
-              className={`flex-none ${music.ducked ? "text-accent" : "text-ink-muted"}`}
+              className={`flex-none ${music.ducked || music.quietCapped ? "text-accent" : "text-ink-muted"}`}
             />
             <input
               type="range"
@@ -265,6 +311,208 @@ function Player({ music }: { music: AppleMusic }) {
         </span>
       </span>
     </div>
+  );
+}
+
+/** Off, all, one — one button, with a "1" when it is looping this song. */
+function RepeatButton({ mode, onClick }: { mode: RepeatMode; onClick: () => void }) {
+  const on = mode !== "none";
+  const label = mode === "one" ? "Repeating this song" : mode === "all" ? "Repeating the queue" : "Repeat";
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={on}
+      onClick={onClick}
+      className={`relative flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-none transition-colors active:scale-[0.97] ${
+        on ? "text-white" : "bg-transparent text-ink-muted"
+      }`}
+      style={on ? { background: "var(--color-accent)" } : undefined}
+    >
+      <Icon name="repeat" size={20} />
+      {mode === "one" ? (
+        <span
+          aria-hidden
+          className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold leading-none text-accent"
+        >
+          1
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function Toggle({
+  label,
+  on,
+  onClick,
+  icon,
+}: {
+  label: string;
+  on: boolean;
+  onClick: () => void;
+  icon: "shuffle" | "infinity" | "moon";
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      aria-pressed={on}
+      onClick={onClick}
+      className={`flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border-none transition-colors active:scale-[0.97] ${
+        on ? "text-white" : "bg-transparent text-ink-muted"
+      }`}
+      style={on ? { background: "var(--color-accent)" } : undefined}
+    >
+      <Icon name={icon} size={20} />
+    </button>
+  );
+}
+
+/** End of this song, or 15/30/60 minutes. The music fades out rather than cutting. */
+function SleepMenu({ music, onDone }: { music: AppleMusic; onDone: () => void }) {
+  return (
+    <span className="absolute bottom-full left-1/2 z-40 mb-2 flex w-56 -translate-x-1/2 flex-col gap-0.5 rounded-xl bg-surface-2 p-2 shadow-overlay">
+      <span className="px-3 pb-1 pt-1.5 text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-neutral-400">
+        Stop playing
+      </span>
+      {SLEEP_CHOICES.map((choice) => {
+        const on = music.sleep?.choice === choice;
+        return (
+          <button
+            key={String(choice)}
+            type="button"
+            aria-pressed={on}
+            onClick={() => {
+              music.setSleep(choice);
+              onDone();
+            }}
+            className={`flex h-11 cursor-pointer items-center justify-between rounded-lg border-none px-3 text-left text-[13px] font-semibold ${
+              on ? "bg-accent text-white" : "bg-transparent text-text"
+            }`}
+          >
+            {sleepLabel(choice)}
+            {on && music.sleep?.deadline ? (
+              <span className="text-xs font-medium tabular-nums">
+                {new Date(music.sleep.deadline).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              </span>
+            ) : null}
+          </button>
+        );
+      })}
+      {music.sleep ? (
+        <button
+          type="button"
+          onClick={() => {
+            music.setSleep(null);
+            onDone();
+          }}
+          className="flex h-11 cursor-pointer items-center rounded-lg border-none bg-transparent px-3 text-left text-[13px] font-semibold text-ink-muted"
+        >
+          Turn off the timer
+        </button>
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * What went wrong, with the way out that fits it.
+ *
+ * No subscription gets Apple's own offer — as a code, because a wall panel
+ * cannot open a browser — rather than a generic error, and the rest of the
+ * Hub carries on. A token Apple stopped accepting gets "sign in again", the
+ * same door as linking. A song that could not play and was skipped is a
+ * passing note, not a failure.
+ */
+function ProblemBar({ music }: { music: AppleMusic }) {
+  const [offer, setOffer] = useState(false);
+  const p = music.problem;
+
+  if (!p && !music.notice) return null;
+
+  if (!p) {
+    return (
+      <span className="flex flex-none items-center gap-2 px-1 text-[13px] leading-[18px] text-ink-muted">
+        <Icon name="alert" size={15} className="flex-none text-accent" />
+        {music.notice}
+      </span>
+    );
+  }
+
+  return (
+    <div className="flex flex-none items-center gap-4 rounded-xl bg-surface px-5 py-3.5 shadow-card">
+      <Icon name="alert" size={20} className="flex-none text-accent" />
+      <span className="flex min-w-0 flex-grow flex-col">
+        <span className="text-[15px] font-semibold leading-5 text-text">
+          {p.kind === "subscription" ? "An Apple Music subscription is needed to play here" : p.message}
+        </span>
+        {p.kind === "subscription" ? (
+          <span className="text-[13px] leading-[18px] text-ink-muted">
+            {p.message} Everything else on the Hub works as usual.
+          </span>
+        ) : null}
+      </span>
+      {p.kind === "subscription" ? (
+        <button
+          type="button"
+          onClick={() => setOffer(true)}
+          className="h-11 flex-none cursor-pointer rounded-full border-none bg-accent px-5 text-[13px] font-bold text-white transition-transform active:scale-[0.97]"
+        >
+          Try Apple Music
+        </button>
+      ) : null}
+      {p.kind === "auth" ? (
+        <button
+          type="button"
+          onClick={music.relink}
+          disabled={music.linking}
+          className="h-11 flex-none cursor-pointer rounded-full border-none bg-accent px-5 text-[13px] font-bold text-white transition-transform active:scale-[0.97] disabled:opacity-50"
+        >
+          Sign in again
+        </button>
+      ) : null}
+      <button
+        type="button"
+        onClick={music.dismissProblem}
+        aria-label="Dismiss"
+        className="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-ink-muted"
+      >
+        <Icon name="close" size={18} />
+      </button>
+      {offer ? (
+        <QrSheet
+          url={music.subscribeUrl}
+          title="Try Apple Music"
+          body="Scan with your phone to see Apple's subscription offer. Once it's active, press play here again."
+          onClose={() => setOffer(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function HeroButton({
+  icon,
+  label,
+  onClick,
+}: {
+  icon: "search" | "library";
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-11 flex-none cursor-pointer items-center gap-2 rounded-full border-none bg-surface px-4 text-[13px] font-semibold text-text transition-transform active:scale-[0.97]"
+      style={{ boxShadow: "inset 0 0 0 1px rgba(15,23,42,0.1)" }}
+    >
+      <Icon name={icon} size={16} />
+      {label}
+    </button>
   );
 }
 
@@ -286,51 +534,6 @@ function Transport({
     >
       <Icon name={icon} size={22} />
     </button>
-  );
-}
-
-/**
- * Album art, with the glyph as the floor.
- *
- * Apple's artwork URLs are templated and can 404 for a library item whose art
- * has not been rendered yet — a broken-image box on a wall display is worse
- * than no art at all, so a failed load falls back rather than showing one.
- */
-function Artwork({
-  src,
-  size,
-  radius,
-  glyph,
-}: {
-  src: string | null;
-  size: number;
-  radius: number;
-  glyph: number;
-}) {
-  const [failed, setFailed] = useState(false);
-
-  if (src && !failed) {
-    return (
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt=""
-        onError={() => setFailed(true)}
-        className="flex-none object-cover"
-        style={{ width: size, height: size, borderRadius: radius }}
-      />
-    );
-  }
-
-  return (
-    <span
-      role="img"
-      aria-label="No artwork"
-      className="flex flex-none items-center justify-center"
-      style={{ width: size, height: size, borderRadius: radius, background: "rgba(59,92,246,0.10)" }}
-    >
-      <Icon name="music" size={glyph} className="text-accent" />
-    </span>
   );
 }
 
@@ -455,7 +658,7 @@ function AccountActions({ music }: { music: AppleMusic }) {
   return (
     <div className="flex flex-none items-center gap-3 px-1">
       <span className="text-[13px] leading-[18px] text-ink-muted">
-        Playing from <span className="font-semibold text-text">{name}</span>&rsquo;s Apple Music
+        <span className="font-semibold text-text">{name}</span>&rsquo;s library · on Apple Music
         {isDefault ? " · opens here by default" : null}
       </span>
 

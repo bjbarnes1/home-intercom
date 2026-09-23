@@ -200,6 +200,11 @@ model Device {
   /// another panel knows whether a handoff has anywhere to go.
   musicLinkedAt DateTime?
 
+  /// Apple Music on this panel plays clean versions only, and explicit songs
+  /// are hidden and skipped. Set by a parent from the controller, never by the
+  /// panel itself: a child standing at the panel must not be able to lift it.
+  musicCleanOnly Boolean @default(false)
+
   /// What this panel is playing right now, so other panels can say so. Title
   /// and artist only — enough for a line on a screen, not a listening history.
   nowPlayingTitle  String?

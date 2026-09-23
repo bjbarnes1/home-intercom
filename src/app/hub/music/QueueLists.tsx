@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from "react";
 import { Eyebrow } from "../_components/BaseLayer";
 import Icon from "../_components/Icon";
 import { Heart } from "./SearchOverlay";
+import { ExplicitMark } from "./parts";
 import type { AppleMusic, Track } from "./useAppleMusic";
 
 /**
@@ -19,6 +20,10 @@ import type { AppleMusic, Track } from "./useAppleMusic";
  *
  * Pointer events rather than HTML5 drag-and-drop, which does not fire on touch
  * at all — this runs on a wall panel that has no mouse.
+ *
+ * Any entry can be taken out, including one a sibling added — on a shared
+ * screen that is a real use — and Clear empties everything after the song
+ * playing without stopping it.
  */
 
 /** Far enough to be a drag rather than a tap that wobbled. */
@@ -117,6 +122,14 @@ export default function QueueLists({ music }: { music: AppleMusic }) {
             <Eyebrow tone="muted">
               {dragging.fromIndex != null ? "Drop to reorder" : over === "next" ? "Play next" : "Add to the end"}
             </Eyebrow>
+          ) : music.queue.length > 1 ? (
+            <button
+              type="button"
+              onClick={music.clearQueue}
+              className="h-8 cursor-pointer rounded-full border-none bg-transparent px-3 text-[11px] font-bold uppercase leading-4 tracking-[0.08em] text-ink-muted"
+            >
+              Clear
+            </button>
           ) : null}
         </span>
 
@@ -169,12 +182,15 @@ export default function QueueLists({ music }: { music: AppleMusic }) {
                   />
                 </span>
                 <span className="flex min-w-0 flex-grow flex-col">
-                  <span
-                    className={`truncate text-[13px] leading-[18px] ${
-                      t.playing ? "font-bold text-accent" : "font-semibold text-text"
-                    }`}
-                  >
-                    {t.title}
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span
+                      className={`truncate text-[13px] leading-[18px] ${
+                        t.playing ? "font-bold text-accent" : "font-semibold text-text"
+                      }`}
+                    >
+                      {t.title}
+                    </span>
+                    {t.explicit ? <ExplicitMark /> : null}
                   </span>
                   <span className="truncate text-xs leading-4 text-ink-muted">{t.artist}</span>
                 </span>
@@ -183,6 +199,16 @@ export default function QueueLists({ music }: { music: AppleMusic }) {
               <span className="flex-none text-xs font-medium leading-4 text-ink-muted tabular-nums">
                 {t.length}
               </span>
+              <button
+                type="button"
+                aria-label={`Remove ${t.title} from the queue`}
+                // Not the start of a drag: the row listens for pointerdown.
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => music.removeFromQueue(t.index)}
+                className="flex h-11 w-11 flex-none cursor-pointer items-center justify-center rounded-full border-none bg-transparent text-ink-muted"
+              >
+                <Icon name="close" size={16} />
+              </button>
             </div>
           ))}
 
@@ -217,7 +243,10 @@ export default function QueueLists({ music }: { music: AppleMusic }) {
                 <Icon name="music" size={17} className="text-accent" />
               </span>
               <span className="flex min-w-0 flex-grow flex-col">
-                <span className="truncate text-[13px] font-semibold leading-[18px] text-text">{t.title}</span>
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <span className="truncate text-[13px] font-semibold leading-[18px] text-text">{t.title}</span>
+                  {t.explicit ? <ExplicitMark /> : null}
+                </span>
                 <span className="truncate text-xs leading-4 text-ink-muted">{t.artist}</span>
               </span>
               <Heart music={music} kind="songs" id={t.id} />

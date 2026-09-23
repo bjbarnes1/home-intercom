@@ -101,6 +101,9 @@ export async function POST(req: Request) {
     quietHoursEnd: row.quietHoursEnd,
     hasLeds: row.hasLeds,
     announceDwellSec: row.announceDwellSec,
+    // Parent-set, via /api/devices/:id/music. The panel reads it here and has
+    // no route of its own to change it.
+    musicCleanOnly: row.musicCleanOnly,
     mock: env.mockLocalServices,
     ...(livekitError ? { livekitError } : {}),
   });

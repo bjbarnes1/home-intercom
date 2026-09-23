@@ -139,3 +139,17 @@ describe("the answer to a handoff", () => {
     expect(ControlCommandSchema.safeParse(handoff).success).toBe(true);
   });
 });
+
+describe("shuffle and repeat travel with the queue", () => {
+  it("carries them on a handoff, and an older handoff without them still parses", () => {
+    const withModes = { ...handoff, shuffle: true, repeat: "all" as const };
+    expect(decodeCommand(encodeCommand(withModes))).toEqual(withModes);
+    expect(ControlCommandSchema.safeParse({ ...handoff, repeat: "sometimes" }).success).toBe(false);
+  });
+
+  it("lets another room press shuffle and repeat", () => {
+    for (const action of ["shuffle", "repeat"] as const) {
+      expect(ControlCommandSchema.safeParse({ type: "musicControl", action }).success).toBe(true);
+    }
+  });
+});
