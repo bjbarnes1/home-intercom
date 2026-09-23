@@ -72,6 +72,8 @@ export async function PATCH(req: Request) {
       const [pings] = await Promise.all([
         prisma.locationPing.deleteMany({ where: { userId: user.id } }),
         prisma.placeVisit.deleteMany({ where: { userId: user.id } }),
+        // The room they are in is location too, and a finer one.
+        prisma.roomFix.deleteMany({ where: { userId: user.id } }),
       ]);
       cleared = pings.count;
     }

@@ -216,14 +216,29 @@ export function useAppleMusic(): AppleMusic {
 
     (async () => {
       try {
-        const res = await fetch("/api/music/apple/token", { cache: "no-store" });
+        const secret = getDeviceSecret();
+        if (!secret) {
+          setError("This Hub is not paired to the house");
+          setStatus("error");
+          return;
+        }
+        const res = await fetch("/api/music/apple/token", {
+          cache: "no-store",
+          headers: { "x-device-secret": secret },
+        });
         const json = (await res.json()) as {
           configured: boolean;
           token?: string;
           reason?: string;
+          error?: string;
         };
         if (!alive) return;
 
+        if (!res.ok) {
+          setError(json.error ?? "The house would not hand over the Apple Music token");
+          setStatus("error");
+          return;
+        }
         if (!json.configured) {
           setStatus("unconfigured");
           return;

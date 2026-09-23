@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { deviceFromRequest } from "@/lib/auth/context";
 import { withRoute } from "@/lib/http";
 import { AppleMusicKeyError, appleMusicConfigured, getDeveloperToken } from "@/lib/music/appleToken";
 
@@ -12,12 +13,22 @@ export const dynamic = "force-dynamic";
  * own Music User Token is obtained by the browser directly from Apple and never
  * passes through here.
  *
+ * Handed to the browser is not handed to anyone: the token is signed with the
+ * team's .p8 and drives the catalog API under that developer identity for
+ * twelve hours, with no way to revoke one short of rotating the key at Apple.
+ * So only a paired panel gets one, the same gate as every other music route.
+ *
  * `configured: false` is a normal answer, not an error — a household that has
  * not set up Apple Music gets a screen that says so.
  */
-export async function GET() {
+export async function GET(req: Request) {
   return withRoute(
     async () => {
+      const me = await deviceFromRequest(req);
+      if (!me || me.pairing !== "ACTIVE") {
+        return NextResponse.json({ error: "Unauthorized device" }, { status: 401 });
+      }
+
       if (!appleMusicConfigured()) {
         return NextResponse.json({ configured: false }, { status: 200 });
       }
