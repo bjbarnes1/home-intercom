@@ -78,6 +78,32 @@ describe("getDeveloperToken", () => {
     expect(later.token).not.toBe(first.token);
   });
 
+  it("stops serving a cached token the moment the key changes", async () => {
+    // The env module is read once, so stand in a mutable one to rotate under
+    // a warm module the way a new credential would arrive.
+    const creds = { teamId: good.APPLE_MUSIC_TEAM_ID, keyId: good.APPLE_MUSIC_KEY_ID, privateKey };
+    vi.resetModules();
+    vi.doMock("@/lib/env", () => ({ env: { appleMusic: creds } }));
+    try {
+      const { getDeveloperToken } = await import("@/lib/music/appleToken");
+      const first = getDeveloperToken(1_000_000_000_000);
+
+      const rotated = generateKeyPairSync("ec", {
+        namedCurve: "P-256",
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+        publicKeyEncoding: { type: "spki", format: "pem" },
+      });
+      creds.keyId = "KEY7654321";
+      creds.privateKey = rotated.privateKey;
+
+      const next = getDeveloperToken(1_000_000_000_000);
+      expect(next.token).not.toBe(first.token);
+      expect(decode(next.token.split(".")[0]).kid).toBe("KEY7654321");
+    } finally {
+      vi.doUnmock("@/lib/env");
+    }
+  });
+
   /**
    * Every one of these is a real way a .p8 comes back out of a dashboard
    * env-var field, and every one of them makes OpenSSL throw the same opaque

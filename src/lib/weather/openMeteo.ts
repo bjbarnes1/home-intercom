@@ -1,3 +1,4 @@
+import { env } from "@/lib/env";
 import { reportWarning } from "@/lib/errors/report";
 import { deriveAdvisory, dressFor, driestWindow } from "@/lib/weather/advice";
 import { describeWeather, roundTemp, type WeatherIcon } from "@/lib/weather/wmo";
@@ -71,13 +72,27 @@ function cacheKey(p: Place): string {
   return `${p.latitude.toFixed(3)},${p.longitude.toFixed(3)}`;
 }
 
+/**
+ * Least-recently-used, with the household's own location never evicted.
+ *
+ * A Map iterates in insertion order and re-setting a key does not move it, so
+ * evicting the first key used to evict whatever was cached first — almost
+ * always home, the one entry the Hub asks for every ten minutes. Deleting
+ * before setting (and on every hit, see getForecast) keeps the order by last
+ * use, and home is skipped outright so browsing other places cannot push it out.
+ */
 function remember(key: string, value: Forecast): void {
+  cache.delete(key);
   cache.set(key, { at: Date.now(), value });
-  while (cache.size > CACHE_MAX) {
-    const oldest = cache.keys().next().value;
-    if (oldest === undefined) break;
-    cache.delete(oldest);
+  const home = homeKey();
+  for (const k of cache.keys()) {
+    if (cache.size <= CACHE_MAX) break;
+    if (k !== home) cache.delete(k);
   }
+}
+
+function homeKey(): string {
+  return cacheKey({ latitude: env.weather.latitude, longitude: env.weather.longitude, place: "" });
 }
 
 const UV_WORDS: { from: number; word: string }[] = [
@@ -128,7 +143,12 @@ function num(v: unknown, fallback = 0): number {
 export async function getForecast(where: Place): Promise<Forecast | null> {
   const key = cacheKey(where);
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < CACHE_MS) return hit.value;
+  if (hit && Date.now() - hit.at < CACHE_MS) {
+    // Touched, so it counts as recently used.
+    cache.delete(key);
+    cache.set(key, hit);
+    return hit.value;
+  }
 
   const url =
     `${ENDPOINT}?latitude=${where.latitude}&longitude=${where.longitude}` +

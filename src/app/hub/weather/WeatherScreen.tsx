@@ -65,6 +65,8 @@ export default function WeatherScreen({ initial, home }: { initial: Forecast | n
         `/api/weather?lat=${place.latitude}&lon=${place.longitude}&place=${encodeURIComponent(place.place)}`,
         { cache: "no-store" },
       );
+      // Throttled or failed: keep what is on screen, as below.
+      if (!res.ok) return;
       const json = (await res.json()) as { forecast: Forecast | null };
       setForecast(json.forecast);
     } catch {
@@ -287,6 +289,10 @@ function PlaceSearch({ onClose, onPick }: { onClose: () => void; onPick: (m: Pla
       setBusy(true);
       try {
         const res = await fetch(`/api/weather/search?q=${encodeURIComponent(query)}`, { cache: "no-store" });
+        if (!res.ok) {
+          setResults([]);
+          return;
+        }
         const json = (await res.json()) as { results: PlaceMatch[] };
         setResults(json.results ?? []);
       } catch {

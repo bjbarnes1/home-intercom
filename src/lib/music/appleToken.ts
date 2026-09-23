@@ -1,4 +1,4 @@
-import { createPrivateKey, sign } from "node:crypto";
+import { createHash, createPrivateKey, sign } from "node:crypto";
 import { env } from "@/lib/env";
 
 /**
@@ -23,7 +23,15 @@ const TTL_SECONDS = 12 * 60 * 60;
 /** Re-mint a little early so a token never expires mid-request. */
 const REFRESH_MARGIN_SECONDS = 10 * 60;
 
-let cached: { token: string; expiresAt: number } | null = null;
+/**
+ * Keyed on the credential that signed it, so a rotated key is used on the next
+ * request rather than after the cached token runs out.
+ */
+let cached: { token: string; expiresAt: number; credential: string } | null = null;
+
+function credentialOf(teamId: string, keyId: string, privateKey: string): string {
+  return createHash("sha256").update(`${teamId}\0${keyId}\0${privateKey}`).digest("hex");
+}
 
 export class AppleMusicNotConfiguredError extends Error {
   constructor() {
@@ -114,10 +122,17 @@ function safeDecode(text: string): string {
 
 /** Mint (or reuse) a developer token. Throws when the credentials are absent. */
 export function getDeveloperToken(now = Date.now()): { token: string; expiresAt: number } {
-  if (cached && cached.expiresAt - REFRESH_MARGIN_SECONDS * 1000 > now) return cached;
-
   const { teamId, keyId, privateKey } = env.appleMusic;
   if (!teamId || !keyId || !privateKey) throw new AppleMusicNotConfiguredError();
+
+  const credential = credentialOf(teamId, keyId, privateKey);
+  if (
+    cached &&
+    cached.credential === credential &&
+    cached.expiresAt - REFRESH_MARGIN_SECONDS * 1000 > now
+  ) {
+    return { token: cached.token, expiresAt: cached.expiresAt };
+  }
 
   const issuedAt = Math.floor(now / 1000);
   const expires = issuedAt + TTL_SECONDS;
@@ -144,6 +159,7 @@ export function getDeveloperToken(now = Date.now()): { token: string; expiresAt:
     dsaEncoding: "ieee-p1363",
   });
 
-  cached = { token: `${signingInput}.${base64url(signature)}`, expiresAt: expires * 1000 };
-  return cached;
+  const token = `${signingInput}.${base64url(signature)}`;
+  cached = { token, expiresAt: expires * 1000, credential };
+  return { token, expiresAt: cached.expiresAt };
 }

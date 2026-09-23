@@ -3,8 +3,8 @@ import { redis } from "@/lib/redis";
 import { reportWarning } from "@/lib/errors/report";
 
 /**
- * Throttles for the two unauthenticated doors into the system: signing in, and
- * claiming a pairing code.
+ * Throttles for the unauthenticated doors into the system: signing in,
+ * claiming a pairing code, and looking up weather for anywhere but home.
  *
  * Backed by Upstash over its REST API rather than an in-process counter,
  * because on serverless a counter in module scope is per-instance: it resets
@@ -21,6 +21,7 @@ let limiters: {
   loginByIp: Ratelimit;
   loginByAccount: Ratelimit;
   claimByIp: Ratelimit;
+  weatherByIp: Ratelimit;
 } | null = null;
 let warnedUnconfigured = false;
 
@@ -72,6 +73,20 @@ function build() {
       prefix: "rl:claim:ip",
       analytics: false,
     }),
+    /*
+     * Forecasts for somewhere other than home, and place searches. Open
+     * because the Hub has nobody signed in, so this is what stops an anonymous
+     * loop fanning out to Open-Meteo through us — the in-process forecast
+     * cache is per-instance and cannot. Generous, because every panel and
+     * phone in a house shares one public IP; a family searching and flicking
+     * between places does not come close.
+     */
+    weatherByIp: new Ratelimit({
+      redis: r,
+      limiter: Ratelimit.slidingWindow(120, "10 m"),
+      prefix: "rl:weather:ip",
+      analytics: false,
+    }),
   };
   return limiters;
 }
@@ -93,7 +108,7 @@ export interface ThrottleVerdict {
 const ALLOWED: ThrottleVerdict = { ok: true, retryAfterSec: 0 };
 
 async function consume(
-  which: "loginByIp" | "loginByAccount" | "claimByIp",
+  which: "loginByIp" | "loginByAccount" | "claimByIp" | "weatherByIp",
   key: string,
 ): Promise<ThrottleVerdict> {
   const built = build();
@@ -132,6 +147,11 @@ export async function throttleLogin(
 /** Throttle a pairing-code claim by source IP. */
 export async function throttleClaim(ip: string): Promise<ThrottleVerdict> {
   return consume("claimByIp", ip);
+}
+
+/** Throttle a weather lookup that is not for home, by source IP. */
+export async function throttleWeather(ip: string): Promise<ThrottleVerdict> {
+  return consume("weatherByIp", ip);
 }
 
 /** 429 with a Retry-After header, which is what a well-behaved client reads. */

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { env } from "@/lib/env";
 import { withRoute } from "@/lib/http";
 import { getForecast } from "@/lib/weather/openMeteo";
+import { clientIp, throttleWeather } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +12,10 @@ export const dynamic = "force-dynamic";
  * Weather screen has been pointed at via ?lat=&lon=&place=.
  *
  * Deliberately open: the Hub runs this screen with nobody signed in, and a
- * forecast is public information. Coordinates are bounds-checked and results
- * are cached upstream for ten minutes per location, so this cannot be used to
- * fan arbitrary traffic out to Open-Meteo.
+ * forecast is public information. Home is served from a cache it can never be
+ * evicted from. Any other location is throttled per IP, because the forecast
+ * cache is small and per-instance and on its own would not stop a loop over
+ * coordinates fanning out to Open-Meteo.
  */
 const Query = z.object({
   lat: z.coerce.number().min(-90).max(90),
@@ -37,6 +39,16 @@ export async function GET(req: Request) {
         ? { latitude: parsed.data.lat, longitude: parsed.data.lon, place: parsed.data.place }
         : { latitude: env.weather.latitude, longitude: env.weather.longitude, place: env.weather.place };
 
+      if (parsed.success && !isHome(parsed.data.lat, parsed.data.lon)) {
+        const verdict = await throttleWeather(clientIp(req));
+        if (!verdict.ok) {
+          return NextResponse.json(
+            { error: "Too many weather lookups — try again shortly" },
+            { status: 429, headers: { "retry-after": String(verdict.retryAfterSec) } },
+          );
+        }
+      }
+
       const forecast = await getForecast(where);
       if (!forecast) {
         // Upstream is down and nothing is cached. The screen says so rather
@@ -46,5 +58,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ forecast, home: where.place === env.weather.place });
     },
     { route: "/api/weather" },
+  );
+}
+
+/** Same ~110 m grid the forecast cache uses, so home by any spelling is home. */
+function isHome(lat: number, lon: number): boolean {
+  return (
+    lat.toFixed(3) === env.weather.latitude.toFixed(3) &&
+    lon.toFixed(3) === env.weather.longitude.toFixed(3)
   );
 }
