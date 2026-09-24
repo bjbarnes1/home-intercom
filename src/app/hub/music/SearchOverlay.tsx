@@ -42,27 +42,48 @@ export default function SearchOverlay({
 
   useEffect(() => input.current?.focus(), []);
 
+  /*
+   * The latest hook value, read when the timer fires rather than listed as a
+   * dependency. The hook hands back a new object on every render, and while a
+   * song plays it renders several times a second — so with it as a dependency
+   * the 350ms pause before searching restarted on every playhead tick and the
+   * search never ran, and a search that did run re-rendered and started
+   * itself again.
+   */
+  const musicRef = useRef(music);
+  musicRef.current = music;
+
   useEffect(() => {
     if (term.trim().length < 2) {
       setResults(EMPTY_RESULTS);
       setSuggestions([]);
+      setFailed(null);
+      setBusy(false);
       return;
     }
+    // A reply for what was typed a moment ago must not replace the results
+    // for what is typed now, however late it arrives.
+    let current = true;
     // Wait for a pause rather than searching Apple's catalogue on every letter.
     const id = window.setTimeout(async () => {
+      const m = musicRef.current;
       setBusy(true);
       setFailed(null);
-      const [found, suggested] = await Promise.all([
-        music.search(term, where),
-        where === "catalog" ? music.suggest(term) : Promise.resolve([]),
+      const [outcome, suggested] = await Promise.all([
+        m.search(term, where),
+        where === "catalog" ? m.suggest(term) : Promise.resolve([]),
       ]);
-      setResults(found);
+      if (!current) return;
+      setResults(outcome.results);
+      setFailed(outcome.error);
       setSuggestions(suggested.filter((s) => s.toLowerCase() !== term.trim().toLowerCase()).slice(0, 5));
-      if (isEmpty(found) && music.error) setFailed(music.error);
       setBusy(false);
     }, 350);
-    return () => window.clearTimeout(id);
-  }, [term, where, music]);
+    return () => {
+      current = false;
+      window.clearTimeout(id);
+    };
+  }, [term, where]);
 
   const remember = () => music.rememberSearch(term);
   const play = (item: MusicItem) => {
