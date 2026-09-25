@@ -20,6 +20,8 @@ import {
   type MusicFetchCommand,
   type MusicHandoffCommand,
   type MusicHandoffResultCommand,
+  type ReminderCommand,
+  type ReminderStateCommand,
 } from "@/lib/control/commands";
 import type { Phase, Speaking } from "./types";
 import type { useMediaSession } from "./useMediaSession";
@@ -49,6 +51,16 @@ export interface PresenceHandlers {
   onMusicFetch?: (cmd: MusicFetchCommand) => void;
   /** Somebody at another panel is working this one's player. */
   onMusicControl?: (cmd: MusicControlCommand) => void;
+  /**
+   * A reminder fired here and carries an occurrence, so it can be answered.
+   * With this set, such a reminder raises the Triggered Alert instead of the
+   * transient spoken card. The voice plays either way.
+   */
+  onReminder?: (cmd: ReminderCommand) => void;
+  /** An occurrence changed state anywhere in the household. */
+  onReminderState?: (cmd: ReminderStateCommand) => void;
+  /** The household's reminders changed shape; refetch. */
+  onRemindersChanged?: () => void;
 }
 
 /**
@@ -201,17 +213,28 @@ export function usePanelPresence(media: Media, handlers: PresenceHandlers = {}) 
               case "reminder": {
                 const whisper = !!cmd.whisper;
                 const chime = !!cmd.chime && !whisper;
-                setSpeaking({
-                  text: cmd.text,
-                  label: "Reminder",
-                  audioUrl: cmd.audioUrl,
-                });
+                const actionable = !!cmd.occurrenceId && !!handlersRef.current.onReminder;
+                if (actionable) {
+                  handlersRef.current.onReminder!(cmd);
+                } else {
+                  setSpeaking({
+                    text: cmd.text,
+                    label: "Reminder",
+                    audioUrl: cmd.audioUrl,
+                  });
+                }
                 void speak(cmd.text, cmd.audioUrl, {
                   volume: whisper ? 0.35 : 1,
                   chime,
                 });
                 break;
               }
+              case "reminderState":
+                handlersRef.current.onReminderState?.(cmd);
+                break;
+              case "remindersChanged":
+                handlersRef.current.onRemindersChanged?.();
+                break;
               case "musicHandoff":
                 handlersRef.current.onMusicHandoff?.(cmd);
                 break;

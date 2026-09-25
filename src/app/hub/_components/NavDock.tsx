@@ -32,7 +32,7 @@ const ITEMS: Item[] = [
   { label: "Messages", icon: "messages", href: "/hub/open-line" },
   { label: "Calendar", icon: "calendar", href: "/hub/me" },
   { label: "Tasks", icon: "tasks", href: "/hub/me", match: "/hub/me" },
-  { label: "Reminders", icon: "reminders", href: "/hub/me" },
+  { label: "Reminders", icon: "reminders", href: "/hub/reminders", match: "/hub/reminders" },
   { label: "Music", icon: "music", href: "/hub/music", match: "/hub/music" },
   { label: "More", icon: "more", href: "/hub" },
 ];

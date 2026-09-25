@@ -10,7 +10,7 @@ should not take them out — it would mean writing them again.
 | Messages | `POST/GET /api/endpoint/messages` | device |
 | Schedule | `GET /api/schedule` | device |
 | Jobs | `GET /api/jobs`, `POST /api/jobs/tick` | device |
-| Reminders | `GET /api/endpoint/reminders` | device |
+| ~~Reminders~~ | Now `/hub/reminders`, plus the Triggered Alert and Home card. `GET /api/endpoint/reminders` is kept for older panels. See `docs/architecture/reminders.md` | device |
 
 The user-authed halves of the same features — `/api/controller/schedule`,
 `/api/controller/jobs`, `/api/reminders` — are live behind `/controller` and were

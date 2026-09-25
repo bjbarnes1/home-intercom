@@ -79,7 +79,8 @@ model Kid {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
 
-  chores Chore[]
+  chores            Chore[]
+  assignedReminders Reminder[]
 
   @@index([householdId])
 }
@@ -135,7 +136,8 @@ model User {
 
   devices          Device[]
   initiatedEvents  IntercomEvent[] @relation("EventInitiator")
-  createdReminders Reminder[]
+  createdReminders  Reminder[]     @relation("ReminderCreatedBy")
+  assignedReminders Reminder[]     @relation("ReminderAssignee")
   sessions         Session[]
   locationPings    LocationPing[]
   placeVisits      PlaceVisit[]
@@ -275,44 +277,108 @@ model ZoneMembership {
 }
 
 enum ReminderKind {
-  RECURRING // cron expression
+  RECURRING // structured `recurrence` rule (preferred) or legacy cron expression
   ONE_OFF // single runAt
 }
 
+/// Lifecycle of a reminder occurrence. On `Reminder` it mirrors the current
+/// occurrence (one-offs) or the series (recurring stays PENDING while live).
+/// Transition table: src/lib/reminders/lifecycle.ts.
+enum ReminderStatus {
+  PENDING
+  SNOOZED
+  COMPLETED
+  DISMISSED
+}
+
 model Reminder {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   householdId String
   household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
-  text  String
-  sound String? // chime name to play before speaking
+  /// Title: what is shown large and spoken aloud.
+  text    String
+  /// Optional context / description shown under the title.
+  details String?
+  sound   String? // chime name to play before speaking
 
-  kind ReminderKind @default(ONE_OFF)
-  // For RECURRING: a 5-field cron expression. For ONE_OFF: runAt is set.
-  cron  String?
-  runAt DateTime?
-  // IANA timezone the cron/runAt is interpreted in (defaults to home TZ).
-  timezone String @default("UTC")
+  kind       ReminderKind @default(ONE_OFF)
+  /// RECURRING: structured RecurrenceRule JSON (src/lib/reminders/recurrence.ts).
+  /// Takes precedence over `cron`, which is kept for rows created before it.
+  recurrence Json?
+  // Legacy RECURRING: a 5-field cron expression. For ONE_OFF: runAt is set.
+  cron       String?
+  runAt      DateTime?
+  // IANA timezone the recurrence/cron/runAt is interpreted in (defaults to home TZ).
+  timezone   String       @default("UTC")
 
-  enabled    Boolean   @default(true)
-  nextRunAt  DateTime? // materialised by the scheduler
-  lastRunAt  DateTime?
+  enabled      Boolean        @default(true)
+  status       ReminderStatus @default(PENDING)
+  nextRunAt    DateTime? // materialised by the scheduler: the next *series* slot
+  lastRunAt    DateTime?
+  /// Deprecated: snooze lives on ReminderOccurrence now. Kept for old rows.
   snoozedUntil DateTime?
 
-  // Target: exactly one of device or zone.
+  /// Who the reminder is for: at most one of a signed-in member or a kid
+  /// (CHECK constraint in migration 13). Collapses to one person FK when the
+  /// Kid/User identity migration lands.
+  assigneeUserId String?
+  assigneeUser   User?   @relation("ReminderAssignee", fields: [assigneeUserId], references: [id], onDelete: SetNull)
+  assigneeKidId  String?
+  assigneeKid    Kid?    @relation(fields: [assigneeKidId], references: [id], onDelete: SetNull)
+
+  // Target (where it rings): exactly one of device or zone.
   targetDeviceId String?
   targetDevice   Device? @relation(fields: [targetDeviceId], references: [id], onDelete: Cascade)
   targetZoneId   String?
   targetZone     Zone?   @relation(fields: [targetZoneId], references: [id], onDelete: Cascade)
 
   createdByUserId String?
-  createdBy       User?   @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+  createdBy       User?   @relation("ReminderCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  occurrences ReminderOccurrence[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([householdId])
   @@index([enabled, nextRunAt]) // scheduler poll
+}
+
+/// One firing of a reminder: the thing the family acts on. A recurring
+/// reminder gets one row per slot. Snoozing re-fires the *same* row, so a
+/// snooze never shifts or skips the series.
+model ReminderOccurrence {
+  id          String   @id @default(cuid())
+  reminderId  String
+  reminder    Reminder @relation(fields: [reminderId], references: [id], onDelete: Cascade)
+  /// Denormalised so tenant-scoped reads need no join.
+  householdId String
+
+  /// The series slot this occurrence belongs to (Reminder.nextRunAt at fire).
+  scheduledFor DateTime
+  /// Last time it was surfaced on a panel (first fire or snooze re-fire).
+  firedAt      DateTime?
+  fireCount    Int       @default(0)
+
+  status       ReminderStatus @default(PENDING)
+  snoozedUntil DateTime?
+  snoozeCount  Int            @default(0)
+
+  resolvedAt         DateTime?
+  /// 'user' | 'superseded' | 'expired' | 'missed'
+  resolution         String?
+  resolvedByDeviceId String?
+  resolvedByUserId   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Idempotency: a slot can only ever become one occurrence, so overlapping
+  /// scheduler ticks (Vercel cron + an in-process scheduler) cannot double-fire.
+  @@unique([reminderId, scheduledFor])
+  @@index([status, snoozedUntil]) // snooze re-fire poll
+  @@index([householdId, status])
 }
 
 enum EventType {

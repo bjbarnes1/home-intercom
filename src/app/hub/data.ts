@@ -58,7 +58,6 @@ export const TODAY: DayEntry[] = [
 export const HOME_CARDS = {
   nextUp: { at: "18:00", title: "Week reset", detail: "Jobs and streaks roll over" },
   jobs: { left: 7, leader: "Willoughby" },
-  reminder: { at: "19:20", title: "Bins go out tonight", detail: "Gus's room · weekdays" },
 };
 
 /** Loose Ends — the personal action queue. Never shown on a public screen. */

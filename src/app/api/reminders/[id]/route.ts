@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { currentHouseholdId, requireUser } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
 import { computeNextRun, validateCron } from "@/lib/reminders/schedule";
+import { parseRecurrence, RecurrenceRuleSchema } from "@/lib/reminders/recurrence";
+import { remindersChanged } from "@/lib/reminders/bus";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +14,8 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const PatchReminder = z.object({
   text: z.string().min(1).max(500).optional(),
+  details: z.string().max(1000).nullable().optional(),
+  recurrence: RecurrenceRuleSchema.nullable().optional(),
   enabled: z.boolean().optional(),
   sound: z.string().max(60).nullable().optional(),
   kind: z.enum(["RECURRING", "ONE_OFF"]).optional(),
@@ -49,6 +54,10 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const kind = d.kind ?? existing.kind;
     const cron = d.cron !== undefined ? d.cron : existing.cron;
+    // A structured rule wins over cron; editing one must not drop the other
+    // silently, or a rule-based reminder would get a null nextRunAt and stop.
+    const recurrence =
+      d.recurrence !== undefined ? d.recurrence : parseRecurrence(existing.recurrence);
     const runAt =
       d.runAt !== undefined
         ? d.runAt
@@ -75,6 +84,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
         kind,
         enabled,
         cron: cron ?? undefined,
+        recurrence,
         runAt,
         timezone,
         snoozedUntil: existing.snoozedUntil,
@@ -88,6 +98,8 @@ export async function PATCH(req: Request, ctx: Ctx) {
       data: {
         ...(d.text !== undefined ? { text: d.text } : {}),
         ...(d.sound !== undefined ? { sound: d.sound } : {}),
+        ...(d.details !== undefined ? { details: d.details } : {}),
+        ...(d.recurrence !== undefined ? { recurrence: d.recurrence ?? Prisma.DbNull } : {}),
         kind,
         cron,
         runAt,
@@ -99,6 +111,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
       },
     });
 
+    void remindersChanged(householdId, "updated");
     return NextResponse.json({ reminder });
   }, { route: "/api/reminders/[id]" });
 }
@@ -116,6 +129,7 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
     await prisma.reminder.delete({ where: { id } });
+    void remindersChanged(householdId, "deleted");
     return NextResponse.json({ ok: true });
   }, { route: "/api/reminders/[id]" });
 }

@@ -153,3 +153,46 @@ describe("shuffle and repeat travel with the queue", () => {
     }
   });
 });
+
+describe("reminder commands over the control channel", () => {
+  it("an actionable reminder carries its occurrence", () => {
+    const cmd = {
+      type: "reminder" as const,
+      text: "Gus, take the bins out",
+      reminderId: "rem_1",
+      occurrenceId: "occ_1",
+      title: "Take the bins out",
+      assignee: "Gus",
+      dueAt: "2026-09-29T09:30:00.000Z",
+      late: false,
+    };
+    expect(decodeCommand(encodeCommand(cmd))).toEqual(cmd);
+  });
+
+  it("a reminder from an older server, with no occurrence, still parses", () => {
+    const legacy = { type: "reminder" as const, text: "Bins", reminderId: "rem_1" };
+    expect(decodeCommand(encodeCommand(legacy))).toEqual(legacy);
+  });
+
+  it("state changes and change notices round-trip", () => {
+    const state = {
+      type: "reminderState" as const,
+      occurrenceId: "occ_1",
+      reminderId: "rem_1",
+      status: "SNOOZED" as const,
+      snoozedUntil: "2026-09-29T09:45:00.000Z",
+      by: "Kitchen",
+    };
+    expect(decodeCommand(encodeCommand(state))).toEqual(state);
+    expect(decodeCommand(encodeCommand({ type: "remindersChanged", reason: "created" }))).toEqual({
+      type: "remindersChanged",
+      reason: "created",
+    });
+  });
+
+  it("rejects a state the lifecycle does not have", () => {
+    expect(
+      ControlCommandSchema.safeParse({ type: "reminderState", occurrenceId: "o", reminderId: "r", status: "DONE" }).success,
+    ).toBe(false);
+  });
+});

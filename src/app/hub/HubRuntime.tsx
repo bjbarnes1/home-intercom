@@ -8,10 +8,20 @@ import PairingScreen from "./_components/PairingScreen";
 import { useMediaSession } from "./_runtime/useMediaSession";
 import { usePanelPresence } from "./_runtime/usePanelPresence";
 import { useAppleMusic, type AppleMusic, type RemoteAction } from "./music/useAppleMusic";
-import type { MusicHandoffCommand, MusicHandoffResultCommand } from "@/lib/control/commands";
+import type {
+  MusicHandoffCommand,
+  MusicHandoffResultCommand,
+  ReminderCommand,
+  ReminderStateCommand,
+} from "@/lib/control/commands";
 import CallCard from "./_components/CallCard";
 import RingCard from "./_components/RingCard";
 import SpeakingCard from "./_components/SpeakingCard";
+import { RemindersProvider, useReminderRuntime, type ReminderRuntime } from "./reminders/useReminders";
+import { currentAlert } from "./reminders/store";
+import TriggeredAlert from "./reminders/TriggeredAlert";
+import ReminderToast from "./reminders/ReminderToast";
+import CreateReminderModal from "./reminders/CreateReminderModal";
 
 /**
  * The Hub as a real panel rather than a prototype.
@@ -67,6 +77,14 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
   const handoffResult = music.handoffResult;
   const handOffTo = music.handOffTo;
   const applyRemote = music.applyRemote;
+
+  /*
+   * Reminders are owned here for the same reason music is: an alert has to
+   * ring whatever screen is up. The presence hook is created first (it
+   * decides when the panel is ready), so the lobby handlers reach the reminder
+   * runtime through a ref filled in just below.
+   */
+  const remindersRef = useRef<ReminderRuntime | null>(null);
   const {
     phase,
     setPhase,
@@ -102,7 +120,16 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
       (cmd: { action: RemoteAction; value?: number }) => applyRemote(cmd.action, cmd.value),
       [applyRemote],
     ),
+    onReminder: useCallback((cmd: ReminderCommand) => remindersRef.current?.onFired(cmd), []),
+    onReminderState: useCallback((cmd: ReminderStateCommand) => remindersRef.current?.onState(cmd), []),
+    onRemindersChanged: useCallback(() => remindersRef.current?.onChanged(), []),
   });
+
+  const reminders = useReminderRuntime(phase === "ready");
+  remindersRef.current = reminders;
+  const alert = currentAlert(reminders.state);
+  const tucked = reminders.state.alerts.filter((a) => reminders.state.minimised[a.occurrenceId]);
+  const minimiseReminder = reminders.minimise;
 
   // The panel's own settings that govern music: the parent's clean-only
   // switch, and quiet hours holding the volume down.
@@ -186,8 +213,13 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
     }
   }, [phase, code, claim]);
 
+  const tuckAlert = useCallback(() => {
+    if (alert) minimiseReminder(alert.occurrenceId, true);
+  }, [alert, minimiseReminder]);
+
   return (
     <Ctx.Provider value={{ music, room, receiving, doNotDisturb: dnd, setDoNotDisturb }}>
+    <RemindersProvider value={reminders}>
       {/* Remote audio lands here; it must outlive every screen change. */}
       <div ref={sinkRef} aria-hidden className="pointer-events-none absolute h-0 w-0 overflow-hidden" />
 
@@ -196,6 +228,8 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
       ) : (
         children
       )}
+
+      {reminders.createOpen && phase !== "unpaired" ? <CreateReminderModal /> : null}
 
       {/* One interruption at a time, most urgent first: a person waiting to be
           answered outranks a connected call, which outranks a recorded voice. */}
@@ -217,7 +251,25 @@ export default function HubRuntime({ children }: { children: ReactNode }) {
           dwellSec={etiquette.announceDwellSec}
           onDismiss={dismissSpeaking}
         />
+      ) : alert ? (
+        // A reminder waits behind anything live: a person calling or a voice
+        // speaking now outranks a task that will still be there in a minute.
+        <TriggeredAlert
+          alert={alert}
+          queued={reminders.state.alerts.length - tucked.length - 1}
+          timezone={reminders.state.snapshot?.timezone ?? "UTC"}
+          onComplete={() => reminders.complete(alert.occurrenceId)}
+          onSnooze={(req) => reminders.snooze(alert.occurrenceId, req)}
+          onDismiss={() => reminders.dismiss(alert.occurrenceId)}
+          onLater={tuckAlert}
+        />
       ) : null}
+
+      {/* A tucked-away alert stays in sight until someone answers it. */}
+      {phase !== "unpaired" && !alert && !ringing && !incoming ? (
+        <ReminderToast alerts={tucked} onOpen={(id) => minimiseReminder(id, false)} />
+      ) : null}
+    </RemindersProvider>
     </Ctx.Provider>
   );
 }

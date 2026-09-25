@@ -5,6 +5,7 @@ import Avatar from "./_components/Avatar";
 import BaseLayer, { Eyebrow } from "./_components/BaseLayer";
 import Icon from "./_components/Icon";
 import { useNow } from "./_components/Clock";
+import NextReminderCard from "./reminders/NextReminderCard";
 
 /**
  * Home — the ambient screen.
@@ -166,19 +167,7 @@ export default function HubHome() {
           </span>
         </Card>
 
-        <Card>
-          <span className="flex items-center justify-between gap-2">
-            <span className="flex items-center gap-1.5">
-              <Icon name="reminders" size={14} strokeWidth={2.5} className="text-accent" />
-              <Eyebrow tone="muted">Reminder</Eyebrow>
-            </span>
-            <span className="text-[13px] font-semibold leading-[18px] text-text tabular-nums">
-              {HOME_CARDS.reminder.at}
-            </span>
-          </span>
-          <span className="font-heading text-xl font-bold leading-7 text-text">{HOME_CARDS.reminder.title}</span>
-          <span className="text-[13px] leading-[18px] text-ink-muted">{HOME_CARDS.reminder.detail}</span>
-        </Card>
+        <NextReminderCard />
       </div>
     </BaseLayer>
   );

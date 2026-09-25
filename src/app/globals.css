@@ -69,6 +69,38 @@
   --radius-block: 20px;
   --radius-sheet: 32px;
   --radius-pill: 999px;
+
+  /*
+   * Touch targets, by size tier (Hub design guidelines §7): a consistent
+   * *physical* size of ~10mm, not a consistent pixel size. CSS `mm` is a
+   * fixed 3.78px whatever the screen, so it cannot express that; these are
+   * pixel values computed per tier from each panel's pixel density:
+   *   Standard, 10" 1280×800 ≈ 150 ppi → 10mm ≈ 60px
+   *   Compact,  7" 1024×600 ≈ 170 ppi → 10mm ≈ 66px
+   *   Large wall, 24–40" at 1080p/4K and 1.5–3m → bigger again for reach.
+   * `--touch-hero` is the Triggered Alert's Complete / Snooze: a target you
+   * can hit with wet hands on the way past, roughly 2.5× the minimum.
+   */
+  --touch-min: 60px;
+  --touch-hero: 112px;
+  --touch-gap: 12px;
+}
+
+/* Compact tier (Mini, 6–7"). */
+@media (max-width: 1100px) {
+  :root {
+    --touch-min: 66px;
+    --touch-hero: 104px;
+  }
+}
+
+/* Large / wall tier (24–40"). */
+@media (min-width: 1800px) {
+  :root {
+    --touch-min: 76px;
+    --touch-hero: 140px;
+    --touch-gap: 16px;
+  }
 }
 
 html,

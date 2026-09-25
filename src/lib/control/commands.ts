@@ -37,6 +37,46 @@ const ReminderCommandSchema = z.object({
   /** Quiet hours: softer playback, no chime. */
   whisper: z.boolean().optional(),
   chime: z.boolean().optional(),
+  /**
+   * The occurrence this firing belongs to. Present from the reminders module
+   * on: a panel that gets one shows the actionable Triggered Alert (Complete /
+   * Snooze) instead of the transient spoken card. Optional so a command from
+   * an older server still parses.
+   */
+  occurrenceId: z.string().max(64).optional(),
+  title: z.string().max(500).optional(),
+  details: z.string().max(2000).optional(),
+  /** Display name of who it is for, for the avatar and colour. */
+  assignee: z.string().max(80).optional(),
+  /** ISO instant of the slot, so the card can say "due 7:30 pm". */
+  dueAt: z.string().max(40).optional(),
+  /** Fired after its slot (a missed tick or a snooze re-fire). */
+  late: z.boolean().optional(),
+});
+
+/**
+ * An occurrence changed state somewhere in the house — completed on the
+ * kitchen Hub, snoozed from a phone. Broadcast to every panel in the household
+ * so an alert showing in three rooms clears in all three at once.
+ */
+const ReminderStateCommandSchema = z.object({
+  type: z.literal("reminderState"),
+  occurrenceId: z.string().max(64),
+  reminderId: z.string().max(64),
+  status: z.enum(["PENDING", "SNOOZED", "COMPLETED", "DISMISSED"]),
+  snoozedUntil: z.string().max(40).optional(),
+  /** Room or person that acted, for "Done — from the Kitchen". */
+  by: z.string().max(80).optional(),
+});
+
+/**
+ * The household's reminders changed shape (created, edited, deleted). Carries
+ * no data on purpose: panels refetch their agenda, so there is one read path
+ * and a lost message costs one poll interval, not a wrong screen.
+ */
+const RemindersChangedCommandSchema = z.object({
+  type: z.literal("remindersChanged"),
+  reason: z.enum(["created", "updated", "deleted"]).optional(),
 });
 
 const AnnounceCommandSchema = z.object({
@@ -154,6 +194,8 @@ export const ControlCommandSchema = z.discriminatedUnion("type", [
   JoinRoomCommandSchema,
   RingCommandSchema,
   ReminderCommandSchema,
+  ReminderStateCommandSchema,
+  RemindersChangedCommandSchema,
   AnnounceCommandSchema,
   MusicHandoffCommandSchema,
   MusicHandoffResultCommandSchema,
@@ -167,6 +209,8 @@ export type ControlCommand = z.infer<typeof ControlCommandSchema>;
 export type JoinRoomCommand = z.infer<typeof JoinRoomCommandSchema>;
 export type RingCommand = z.infer<typeof RingCommandSchema>;
 export type ReminderCommand = z.infer<typeof ReminderCommandSchema>;
+export type ReminderStateCommand = z.infer<typeof ReminderStateCommandSchema>;
+export type RemindersChangedCommand = z.infer<typeof RemindersChangedCommandSchema>;
 export type AnnounceCommand = z.infer<typeof AnnounceCommandSchema>;
 export type MusicHandoffCommand = z.infer<typeof MusicHandoffCommandSchema>;
 export type MusicHandoffResultCommand = z.infer<typeof MusicHandoffResultCommandSchema>;

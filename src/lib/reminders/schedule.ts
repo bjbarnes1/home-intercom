@@ -1,4 +1,5 @@
 import parser from "cron-parser";
+import { nextOccurrence, type RecurrenceRule } from "./recurrence";
 
 /**
  * Schedule math for reminders. Pure functions — no DB, no clock reads except
@@ -10,7 +11,12 @@ export type ReminderKind = "RECURRING" | "ONE_OFF";
 export interface ScheduleInput {
   kind: ReminderKind;
   enabled: boolean;
-  /** 5-field cron expression, required for RECURRING. */
+  /**
+   * Structured rule for RECURRING (preferred). When present it wins over
+   * `cron`, which only rows created before the reminders module still carry.
+   */
+  recurrence?: RecurrenceRule | null;
+  /** Legacy 5-field cron expression for RECURRING. */
   cron?: string | null;
   /** Fire time for ONE_OFF. */
   runAt?: Date | null;
@@ -58,6 +64,9 @@ export function computeNextRun(input: ScheduleInput, from: Date): Date | null {
   }
 
   // RECURRING
+  if (input.recurrence) {
+    return nextOccurrence(input.recurrence, input.timezone || "UTC", from);
+  }
   if (!input.cron) return null;
   try {
     const interval = parser.parseExpression(input.cron, {

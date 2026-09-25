@@ -4,6 +4,10 @@ import { prisma } from "@/lib/prisma";
 import { currentHouseholdId, requireUser } from "@/lib/auth/context";
 import { withAuth } from "@/lib/http";
 import { computeNextRun, validateCron } from "@/lib/reminders/schedule";
+import { createReminder } from "@/lib/reminders/service";
+import { CreateReminderSchema } from "@/lib/reminders/types";
+import { invalid, reminderErrorResponse } from "@/lib/reminders/http";
+import { remindersChanged } from "@/lib/reminders/bus";
 
 export const dynamic = "force-dynamic";
 
@@ -37,11 +41,28 @@ const CreateReminder = z
     message: "RECURRING needs cron; ONE_OFF needs runAt",
   });
 
-/** POST /api/reminders — create a reminder and materialise its nextRunAt. */
+/**
+ * POST /api/reminders — create a reminder and materialise its nextRunAt.
+ *
+ * Two body shapes. The reminders-module shape (`title`, `when`, `assignee`)
+ * goes through the domain service like the panel's does. The original shape
+ * (`text`, `kind`, `cron`/`runAt`, a target) is still accepted unchanged, so
+ * the controller keeps working while it moves over.
+ */
 export async function POST(req: Request) {
   return withAuth(async () => {
     const user = await requireUser();
     const body = await req.json().catch(() => null);
+    if (body && typeof body === "object" && "title" in body) {
+      const draft = CreateReminderSchema.safeParse(body);
+      if (!draft.success) return invalid(draft.error);
+      try {
+        const reminder = await createReminder(user.householdId, draft.data, { userId: user.id, label: user.name });
+        return NextResponse.json({ reminder }, { status: 201 });
+      } catch (e) {
+        return reminderErrorResponse(e);
+      }
+    }
     const parsed = CreateReminder.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -92,6 +113,7 @@ export async function POST(req: Request) {
       },
     });
 
+    void remindersChanged(user.householdId, "created");
     return NextResponse.json({ reminder }, { status: 201 });
   });
 }

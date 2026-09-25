@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { deviceFromRequest } from "@/lib/auth/context";
+import { withRoute } from "@/lib/http";
+import { createReminder } from "@/lib/reminders/service";
+import { CreateReminderSchema } from "@/lib/reminders/types";
+import { activeDevice, invalid, reminderErrorResponse, unauthorizedDevice } from "@/lib/reminders/http";
 
 export const dynamic = "force-dynamic";
 
@@ -42,4 +46,28 @@ export async function GET(req: Request) {
   });
 
   return NextResponse.json({ reminders });
+}
+
+/**
+ * POST /api/endpoint/reminders — save a reminder from a panel's Creation
+ * Modal. Anyone standing at the Hub can add one for the house, the same as
+ * writing on the fridge whiteboard. Where it rings defaults to the assignee's
+ * own panel, else this one.
+ */
+export async function POST(req: Request) {
+  return withRoute(async () => {
+    const device = await activeDevice(req);
+    if (!device) return unauthorizedDevice();
+    const parsed = CreateReminderSchema.safeParse(await req.json().catch(() => null));
+    if (!parsed.success) return invalid(parsed.error);
+    try {
+      const reminder = await createReminder(device.householdId, parsed.data, {
+        deviceId: device.id,
+        label: device.room ?? device.displayName,
+      });
+      return NextResponse.json({ reminder }, { status: 201 });
+    } catch (e) {
+      return reminderErrorResponse(e);
+    }
+  }, { route: "/api/endpoint/reminders" });
 }

@@ -22,6 +22,7 @@ let limiters: {
   loginByAccount: Ratelimit;
   claimByIp: Ratelimit;
   weatherByIp: Ratelimit;
+  reminderParseByHousehold: Ratelimit;
 } | null = null;
 let warnedUnconfigured = false;
 
@@ -87,6 +88,20 @@ function build() {
       prefix: "rl:weather:ip",
       analytics: false,
     }),
+    /*
+     * Natural-language reminder parsing costs a model call each time and the
+     * Hub has nobody signed in, so a stuck button or a script holding a device
+     * secret could run up a bill. Per household, because that is who pays.
+     * Thirty in ten minutes is several times what a family dictating reminders
+     * in a burst actually does; past it the panel still works, on the offline
+     * parser.
+     */
+    reminderParseByHousehold: new Ratelimit({
+      redis: r,
+      limiter: Ratelimit.slidingWindow(30, "10 m"),
+      prefix: "rl:reminder-parse:hh",
+      analytics: false,
+    }),
   };
   return limiters;
 }
@@ -108,7 +123,7 @@ export interface ThrottleVerdict {
 const ALLOWED: ThrottleVerdict = { ok: true, retryAfterSec: 0 };
 
 async function consume(
-  which: "loginByIp" | "loginByAccount" | "claimByIp" | "weatherByIp",
+  which: "loginByIp" | "loginByAccount" | "claimByIp" | "weatherByIp" | "reminderParseByHousehold",
   key: string,
 ): Promise<ThrottleVerdict> {
   const built = build();
@@ -152,6 +167,11 @@ export async function throttleClaim(ip: string): Promise<ThrottleVerdict> {
 /** Throttle a weather lookup that is not for home, by source IP. */
 export async function throttleWeather(ip: string): Promise<ThrottleVerdict> {
   return consume("weatherByIp", ip);
+}
+
+/** Throttle AI reminder parsing, per household. */
+export async function throttleReminderParse(householdId: string): Promise<ThrottleVerdict> {
+  return consume("reminderParseByHousehold", householdId);
 }
 
 /** 429 with a Retry-After header, which is what a well-behaved client reads. */
