@@ -114,6 +114,17 @@ export type RemoteAction = "play" | "pause" | "next" | "previous" | "volume" | "
 export type { MusicItem, CatalogResults } from "@/lib/music/appleApi";
 export type { RepeatMode, SleepChoice } from "./player";
 
+/**
+ * A search's results and, when it failed, why. Returned together rather than
+ * read back from `error` afterwards: the caller holds the hook's value from
+ * before the search ran, so a failure set as state arrives one render too late
+ * and a broken search looked exactly like "nothing found".
+ */
+export interface SearchOutcome {
+  results: CatalogResults;
+  error: string | null;
+}
+
 /** What the Music screen can browse, beyond search. */
 export interface BrowseApi {
   forYou: () => Promise<{ title: string; items: MusicItem[] }[]>;
@@ -194,7 +205,7 @@ export interface AppleMusic {
    * results rather than everything. Explicit results are dropped on a
    * clean-only panel.
    */
-  search: (term: string, where?: "catalog" | "library") => Promise<CatalogResults>;
+  search: (term: string, where?: "catalog" | "library") => Promise<SearchOutcome>;
   /** Search-as-you-type suggestions. Never an error: an empty list is fine. */
   suggest: (term: string) => Promise<string[]>;
   /** This member's recent searches, newest first. Kept on this panel only. */
@@ -954,6 +965,13 @@ export function useAppleMusic(): AppleMusic {
 
   // Other panels need to know whether a handoff has anywhere to land here. The
   // token itself stays on this device; only its existence is reported.
+  //
+  // Keyed on the title and artist, not the NowPlaying object: that object is
+  // replaced on every playhead tick, several times a second, and depending on
+  // it re-ran this effect — and its immediate report — on every one of them.
+  // A playing panel was posting here a few times a second instead of every 30.
+  const reportedTitle = isPlaying && nowPlaying ? nowPlaying.title.slice(0, 200) : null;
+  const reportedArtist = isPlaying && nowPlaying ? nowPlaying.artist.slice(0, 200) : null;
   useEffect(() => {
     if (status === "loading" || status === "unconfigured") return;
     const secret = getDeviceSecret();
@@ -968,9 +986,7 @@ export function useAppleMusic(): AppleMusic {
           // Only while actually playing: a paused panel is not playing
           // anything, and should not claim a song on everyone else's screen.
           nowPlaying:
-            isPlaying && nowPlaying
-              ? { title: nowPlaying.title.slice(0, 200), artist: nowPlaying.artist.slice(0, 200) }
-              : null,
+            reportedTitle != null ? { title: reportedTitle, artist: reportedArtist ?? "" } : null,
         }),
       }).catch(() => {
         /* the next tick reports again */
@@ -981,7 +997,7 @@ export function useAppleMusic(): AppleMusic {
     // one expires on its own if this panel stops talking.
     const id = window.setInterval(report, 30_000);
     return () => window.clearInterval(id);
-  }, [accounts.length, status, isPlaying, nowPlaying]);
+  }, [accounts.length, status, reportedTitle, reportedArtist]);
 
   const refreshLoved = useCallback(
     async (ids: string[], kind: LovableKind) => {
@@ -1093,15 +1109,12 @@ export function useAppleMusic(): AppleMusic {
     loved,
     resumed,
 
-    search: async (term: string, where: "catalog" | "library" = "catalog"): Promise<CatalogResults> => {
+    search: async (term: string, where: "catalog" | "library" = "catalog"): Promise<SearchOutcome> => {
       const query = term.trim();
-      if (query.length < 2) return EMPTY_RESULTS;
+      if (query.length < 2) return { results: EMPTY_RESULTS, error: null };
 
       const auth = appleAuth();
-      if (!auth) {
-        setError("Search needs the Apple Music credentials on this server");
-        return EMPTY_RESULTS;
-      }
+      if (!auth) return { results: EMPTY_RESULTS, error: "Search needs the Apple Music credentials on this server" };
 
       try {
         let found: CatalogResults;
@@ -1110,21 +1123,25 @@ export function useAppleMusic(): AppleMusic {
         } else {
           const store = await ensureStorefront(auth);
           if (!store) {
-            setError("Apple Music has not said which storefront this account is in");
-            return EMPTY_RESULTS;
+            return { results: EMPTY_RESULTS, error: "Apple Music has not said which storefront this account is in" };
           }
           found = await searchCatalog(auth, store, query);
         }
-        setError(null);
         const shown = filterResults(found, cleanRef.current);
-        // Mark what is already loved, so the heart is right as it appears.
-        void refreshLoved(shown.songs.map((t) => t.id), "songs");
-        return shown;
+        // Mark what is already loved, so the heart is right as it appears. A
+        // library song is rated by its catalog id; one without has no rating.
+        void refreshLoved(
+          shown.songs.map((t) => (t.library ? t.catalogId : t.id)).filter((id): id is string => !!id),
+          "songs",
+        );
+        return { results: shown, error: null };
       } catch (e) {
         // A failed search and a search with no matches look identical on screen
         // otherwise, and they want very different things done about them.
-        setError(e instanceof Error ? `Search failed: ${e.message}` : "Search is unavailable");
-        return EMPTY_RESULTS;
+        return {
+          results: EMPTY_RESULTS,
+          error: e instanceof Error ? `Search failed: ${e.message}` : "Search is unavailable",
+        };
       }
     },
 
